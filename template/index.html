@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic">
+    <link rel="stylesheet" href="css/main.css">
+</head>
+
+<body>
+    <nav class="navigation">
+        <section class="container">
+            <a href="/" class="navigation-title">Demo</a>
+            <ul class="navigation-list float-right">
+                <li class="navigation-item">
+                    <a href="/" class="navigation-link">Login</a>
+                </li>
+                <li class="navigation-item">
+                    <a href="/register" class="navigation-link">Register</a>
+                </li>
+            </ul>
+        </section>
+    </nav>
+    <div class="login">
+        <h2>Login</h2>
+        <form method="POST">
+            <fieldset>
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+                <input id="submit" class="button-primary" type="submit" value="Login">
+            </fieldset>
+        </form>
+    </div>
+</body>
+
+</html>

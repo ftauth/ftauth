@@ -1,0 +1,30 @@
+<material-drawer persistent #drawer="drawer">
+    <material-list>
+        <div group>
+            <material-list-item>
+                FTOAuth
+            </material-list-item>
+        </div>
+        <div group>
+            <material-list-item>
+                <material-icon icon="person"></material-icon>Clients
+            </material-list-item>
+        </div>
+    </material-list>
+</material-drawer>
+<material-content>
+    <header class="material-header">
+        <div class="material-header-row">
+            <material-button icon
+                class="material-drawer-button" (trigger)="drawer.toggle()">
+                <material-icon icon="menu"></material-icon>
+            </material-button>
+            <span class="material-header-title">Admin Panel</span>
+            <div class="material-spacer"></div>
+            <nav class="material-navigation">
+                <!-- <a>Login</a> -->
+            </nav>
+        </div>
+    </header>
+    <router-outlet [routes]="Routes.all"></router-outlet>
+</material-content>

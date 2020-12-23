@@ -1,0 +1,40 @@
+server:
+  scheme: http
+  host: localhost
+  port: 8000
+database:
+  host: localhost
+  port: 5432
+  dbname: oauth
+oauth:
+  # The paths to the RSA private and public keys for signing JWT tokens
+  publicKeyFile: /etc/ftoauth/public.pem
+  privateKeyFile: /etc/ftoauth/private.pem
+  scopes:
+    default: default
+  authentication:
+    # Whether or not the ROPC grant is enabled
+    #
+    # For trusted native clients, this allows the
+    # ability to use native login forms instead 
+    # of a webbrowser to authenticate the user,
+    # at the cost of security.
+    #
+    # This should not be used to conform to best
+    # security practices established by RFC
+    # https://tools.ietf.org/html/draft-ietf-oauth-security-topics-16
+    ropc: false
+  template:
+    # login page
+    # * template
+    # * url/host
+    login:
+      enabled: false
+      path: templates/login.html
+    register:
+      enabled: false
+      path: templates/register.html
+    options:
+      primaryColor: "#4d87ca"
+
+        

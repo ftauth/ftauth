@@ -1,0 +1,13 @@
+version: "3.7"
+
+services: 
+  app:
+    image: golang:1.15-alpine
+    command: go run cmd/main.go
+    ports:
+      - 8080:8080
+    working_dir: /app
+    volumes:
+      - ./:/app
+    environment: 
+      POSTGRES_HOST=postgres
