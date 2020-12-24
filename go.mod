@@ -9,6 +9,7 @@ require (
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/godror/godror v0.22.2
 	github.com/gofrs/uuid v3.2.0+incompatible
+	github.com/google/uuid v1.1.2
 	github.com/gorilla/mux v1.8.0
 	github.com/jackc/pgx/v4 v4.10.0
 	github.com/jmoiron/sqlx v1.2.0

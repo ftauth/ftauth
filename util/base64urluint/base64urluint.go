@@ -21,7 +21,7 @@ func Encode(i *big.Int) string {
 		}
 	}
 
-	return base64url.Encode([]byte{})
+	return base64url.Encode([]byte{0})
 }
 
 // Decode returns the BigInt represented by the base64url-encoded string.

@@ -6,12 +6,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"time"
 
+	"github.com/dnys1/ftoauth/internal/config"
 	"github.com/dnys1/ftoauth/internal/database"
 	"github.com/dnys1/ftoauth/internal/model"
+	"github.com/dnys1/ftoauth/internal/token"
 	"github.com/gorilla/mux"
 )
 
@@ -68,7 +71,6 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Parameters sent without a value MUST be treated as if they were omitted from the request.
 	query := r.URL.Query()
 
 	// REQUIRED
@@ -165,40 +167,15 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	scope := query.Get(paramScope)
 	if scope == "" {
 		// Use default scope
-		scope = "default"
+		scope = config.Current.OAuth.Scopes.Default
 	} else {
-		// Parse scope
-		scopeTokens, err := model.ParseScope(scope)
+		err = clientInfo.ValidateScopes(scope)
 		if err != nil {
 			handleAuthorizationRequestError(
 				w, r, redirectURI, state,
 				model.AuthorizationRequestErrInvalidScope,
 				model.RequestErrorDetails{},
 			)
-			return
-		}
-		// Validate scope tokens
-		valid := true
-		for _, token := range scopeTokens {
-			thisValid := false
-			for _, validToken := range clientInfo.Scopes {
-				if validToken.Name == token {
-					thisValid = true
-					break
-				}
-			}
-			if !thisValid {
-				valid = false
-				break
-			}
-		}
-		if !valid {
-			handleAuthorizationRequestError(
-				w, r, redirectURI, state,
-				model.AuthorizationRequestErrInvalidScope,
-				model.RequestErrorDetails{},
-			)
-			return
 		}
 	}
 
@@ -244,7 +221,7 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 
 	// Generate authorization request
 	code := model.GenerateAuthorizationCode()
-	exp := time.Now().Add(10 * time.Minute)
+	exp := time.Now().Add(10 * time.Minute) // TODO: document
 
 	authRequest := &model.AuthorizationRequest{
 		ClientID:            clientID,
@@ -429,7 +406,7 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Verify clientSecret, if present
+	// Verify client secret. OK if not present for public clients.
 	validSecret := clientInfo.Secret == clientSecret
 	if !validSecret {
 		handleHeaderErr("Invalid client secret")
@@ -463,6 +440,21 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		)
 	}
 
+	// OPTIONAL
+	scope := r.FormValue(paramScope)
+	if scope == "" {
+		scope = config.Current.OAuth.Scopes.Default
+	} else {
+		err = clientInfo.ValidateScopes(scope)
+		if err != nil {
+			handleTokenRequestError(
+				w,
+				model.TokenRequestErrInvalidScope,
+				model.RequestErrorDetails{},
+			)
+		}
+	}
+
 	var validator func(http.ResponseWriter, *http.Request, *model.ClientInfo) bool
 	switch grantType {
 	case model.GrantTypeAuthorizationCode:
@@ -488,8 +480,54 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	// 	If it fails, rollback changes in the database
 	// 	to prevent token rotation without client involvement
 
-	var _ model.TokenResponse
+	accessToken := token.IssueAccessToken(clientInfo, scope)
+	refreshToken := token.IssueRefreshToken(clientInfo, accessToken)
 
+	accessJWT, err := accessToken.Encode(config.Current.OAuth.Tokens.PrivateKey)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	refreshJWT, err := refreshToken.Encode(config.Current.OAuth.Tokens.PrivateKey)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	response := model.TokenResponse{
+		AccessToken:  accessJWT,
+		TokenType:    token.TypeJWT,
+		RefreshToken: refreshJWT,
+		ExpiresIn:    clientInfo.AccessTokenLife,
+	}
+
+	ctx, cancel = context.WithTimeout(r.Context(), database.DefaultTimeout)
+	defer cancel()
+
+	commit, rollback, err := h.db.RegisterTokens(ctx, accessToken, refreshToken)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	b, err := json.Marshal(&response)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	_, err = w.Write(b)
+	if err != nil {
+		err = rollback()
+		if err != nil {
+			log.Printf("Error rolling back: %v", err)
+		}
+	} else {
+		err = commit()
+		if err != nil {
+			log.Printf("Error committing changes: %v", err)
+		}
+	}
 }
 
 func (h tokenEndpointHandler) validateAuthorizationCodeRequest(w http.ResponseWriter, r *http.Request, clientInfo *model.ClientInfo) bool {
@@ -561,20 +599,20 @@ func (h tokenEndpointHandler) validateAuthorizationCodeRequest(w http.ResponseWr
 		return false
 	}
 
-	_ = model.TokenRequest{
-		ClientID:     clientID,
-		RedirectURI:  redirectURI,
-		Code:         code,
-		CodeVerifier: codeVerifier,
-	}
+	// Retrieve code challenge from session
+	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
+	defer cancel()
 
-	// Retrieve code challenge based off session ID
-	codeChallenge := ""
+	session, err := h.db.LookupSessionByCode(ctx, code)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return false
+	}
 
 	// Compare stored code challenge with code verifier
 	digest := sha256.Sum256([]byte(codeVerifier))
 	comp := base64.URLEncoding.EncodeToString(digest[:])
-	if codeChallenge != comp {
+	if session.CodeChallenge != comp {
 		handleTokenRequestError(
 			w,
 			model.TokenRequestErrInvalidRequest,

@@ -1,6 +1,9 @@
 package jwt
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 func errMissingParameter(name string) error {
 	return fmt.Errorf("Missing parameter: %s", name)
@@ -17,3 +20,8 @@ func errDuplicateKey(name string) error {
 func errUnsupportedValue(name, value string) error {
 	return fmt.Errorf("Unsupported key-value pair %s: %s", name, value)
 }
+
+// Token errors
+var (
+	ErrMustEncodeFirst = errors.New("must encode token first")
+)

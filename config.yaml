@@ -7,9 +7,10 @@ database:
   port: 5432
   dbname: oauth
 oauth:
-  # The paths to the RSA private and public keys for signing JWT tokens
-  publicKeyFile: /etc/ftoauth/public.pem
-  privateKeyFile: /etc/ftoauth/private.pem
+  tokens:
+    # The paths to the RSA private and public keys for signing JWT tokens
+    publicKeyFile: /etc/ftoauth/public.pem
+    privateKeyFile: /etc/ftoauth/private.pem
   scopes:
     default: default
   authentication:

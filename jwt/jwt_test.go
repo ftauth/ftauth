@@ -38,7 +38,7 @@ func Test_EncodeJWT(t *testing.T) {
 	key, err := ParseJWK(jwk)
 	require.NoError(t, err)
 
-	enc, err := jwt.SignWithKey(key)
+	enc, err := jwt.Encode(key)
 	require.NoError(t, err)
 
 	t.Logf("Got key: %s", enc)

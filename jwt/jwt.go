@@ -12,7 +12,7 @@ import (
 
 // Token is a JSON Web Token (JWT)
 type Token struct {
-	Raw       string  // The raw encoded token
+	raw       string  // cached raw string
 	Header    *Header // The header values
 	Claims    *Claims // The claims (registered and custom)
 	Signature []byte  // The signature of the token
@@ -57,39 +57,21 @@ var registeredClaims = []string{"iss", "sub", "aud", "exp", "nbf", "iat", "jti"}
 
 // Claims holds all the claims this token provides.
 type Claims struct {
-	Issuer         StringOrURI `json:"iss,omitempty"` // Required
-	Subject        StringOrURI `json:"sub,omitempty"` // Required
-	Audience       StringOrURI `json:"aud,omitempty"` // Required
-	ExpirationTime int64       `json:"exp,omitempty"` // Required for non-DPoP tokens
-	NotBefore      int64       `json:"nbf,omitempty"`
-	IssuedAt       int64       `json:"iat,omitempty"`       // Required
-	JwtID          string      `json:"jti,omitempty"`       // Required for DPoP tokens
-	ClientID       string      `json:"client_id,omitempty"` // Required
-	Scope          string      `json:"scope,omitempty"`     // Required
+	Issuer         string `json:"iss,omitempty"` // Required
+	Subject        string `json:"sub,omitempty"` // Required
+	Audience       string `json:"aud,omitempty"` // Required
+	ExpirationTime int64  `json:"exp,omitempty"` // Required for non-DPoP tokens
+	NotBefore      int64  `json:"nbf,omitempty"`
+	IssuedAt       int64  `json:"iat,omitempty"`       // Required
+	JwtID          string `json:"jti,omitempty"`       // Required for DPoP tokens
+	ClientID       string `json:"client_id,omitempty"` // Required
+	Scope          string `json:"scope,omitempty"`     // Required
 
 	// DPoP claims
 	HTTPMethod string `json:"htm,omitempty"` // The HTTP method for the request to which the JWT is attached
 	HTTPURI    string `json:"htu,omitempty"` // The HTTP URI used for the request, without query and fragment parts
 
 	CustomClaims CustomClaims `json:"custom,omitempty"`
-}
-
-// SignWithKey signs the JWT with the given JWK and returns
-// the base64url encoded version ready for transport.
-func (t *Token) SignWithKey(key *Key) (string, error) {
-	enc, err := t.encodeUnsigned()
-	if err != nil {
-		return "", err
-	}
-
-	signer := key.Signer()
-	signed, err := signer([]byte(enc))
-	if err != nil {
-		return "", err
-	}
-	signature := base64url.Encode(signed)
-
-	return fmt.Sprintf("%s.%s", enc, signature), nil
 }
 
 func (t *Token) encodeUnsigned() (string, error) {
@@ -107,6 +89,15 @@ func (t *Token) encodeUnsigned() (string, error) {
 	encPayload := base64url.Encode(payload)
 
 	return fmt.Sprintf("%s.%s", encHeader, encPayload), nil
+}
+
+// Raw returns the raw token string. Must run Encode first on generated tokens.
+func (t *Token) Raw() (string, error) {
+	if t.raw != "" {
+		return t.raw, nil
+	}
+
+	return "", ErrMustEncodeFirst
 }
 
 // Encode signs and encodes the token in base64 for transfer on the wire.
@@ -159,7 +150,7 @@ func Decode(token string) (*Token, error) {
 	}
 
 	return &Token{
-		Raw:       token,
+		raw:       token,
 		Header:    &header,
 		Claims:    &payload,
 		Signature: signature,

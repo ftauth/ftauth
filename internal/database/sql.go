@@ -2,11 +2,13 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 
 	"github.com/dnys1/ftoauth/internal/config"
 	"github.com/dnys1/ftoauth/internal/model"
+	"github.com/dnys1/ftoauth/jwt"
 	"github.com/dnys1/ftoauth/util/passwordutil"
 	"github.com/dnys1/ftoauth/util/sqlutil"
 	"github.com/gofrs/uuid"
@@ -143,6 +145,54 @@ func (db *SQLDatabase) GetRequestInfo(ctx context.Context, sessionID string) (*m
 		return nil, err
 	}
 	return &request, nil
+}
+
+// LookupSessionByCode retrieves a request session's data based off the authorization code.
+func (db *SQLDatabase) LookupSessionByCode(ctx context.Context, code string) (*model.AuthorizationRequest, error) {
+	query := sqlx.Rebind(db.Bindvar(), "SELECT * from requests WHERE code=?")
+	var request model.AuthorizationRequest
+	err := db.DB.GetContext(ctx, &request, query, code)
+	if err != nil {
+		return nil, err
+	}
+	return &request, nil
+}
+
+// RegisterTokens saves the given tokens to the database, returning functions to either commit or rollback changes
+// if the tokens cannot reach the end user, for example.
+func (db *SQLDatabase) RegisterTokens(ctx context.Context, accessToken, refreshToken *jwt.Token) (func() error, func() error, error) {
+	tx, err := db.DB.BeginTxx(ctx, &sql.TxOptions{})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	stmt := sqlx.Rebind(
+		db.Bindvar(),
+		"INSERT INTO tokens(type, token, exp) VALUES (access, ?, ?), (refresh, ?, ?)",
+	)
+
+	accessJWT, err := accessToken.Raw()
+	if err != nil {
+		return nil, nil, err
+	}
+	refreshJWT, err := refreshToken.Raw()
+	if err != nil {
+		return nil, nil, err
+	}
+	_, err = tx.ExecContext(
+		ctx,
+		stmt,
+		accessJWT,
+		accessToken.Claims.ExpirationTime,
+		refreshJWT,
+		refreshToken.Claims.ExpirationTime,
+	)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return tx.Commit, tx.Rollback, nil
 }
 
 // CreateUser registers a new user in the authentication database.

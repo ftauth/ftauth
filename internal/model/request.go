@@ -17,6 +17,7 @@ var (
 // AuthorizationRequest holds the request sent to the authorization endpoint.
 type AuthorizationRequest struct {
 	ID                  string              `db:"id"` // The session ID
+	GrantType           string              `db:"grant_type"`
 	ClientID            string              `db:"client_id"`
 	Scope               string              `db:"scope"`
 	State               string              `db:"state"`
@@ -25,26 +26,6 @@ type AuthorizationRequest struct {
 	Expiry              time.Time           `db:"exp"`
 	CodeChallenge       string              `db:"code_challenge"`
 	CodeChallengeMethod CodeChallengeMethod `db:"code_challenge_method"`
-}
-
-// IsValid returns true if this request conforms to the requirements
-// outlined in RFC 6749.
-func (req AuthorizationRequest) IsValid() error {
-	if !validateRedirectURI(req.RedirectURI) {
-		return ErrInvalidRedirectURI
-	}
-
-	return nil
-}
-
-func validateRedirectURI(redirectURI string) bool {
-	if redirectURI == "" {
-		return false
-	}
-
-	// Compare redirectURI with valid redirect URIs for client
-
-	return true
 }
 
 // TokenRequest holds information for the request of an access token.
@@ -56,6 +37,7 @@ type TokenRequest struct {
 	RedirectURI  string    `json:"redirect_uri"`
 	ClientID     string    `json:"client_id"`
 	CodeVerifier string    `json:"code_verifier"`
+	Scope        string    `json:"scope"`
 }
 
 // RequestError provides an interface that errors should conform to

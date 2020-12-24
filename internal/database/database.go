@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dnys1/ftoauth/internal/model"
+	"github.com/dnys1/ftoauth/jwt"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -41,6 +42,8 @@ type AuthorizationDB interface {
 	GetClientInfo(ctx context.Context, clientID string) (*model.ClientInfo, error)
 	CreateSession(ctx context.Context, request *model.AuthorizationRequest) (string, error)
 	GetRequestInfo(ctx context.Context, requestID string) (*model.AuthorizationRequest, error)
+	LookupSessionByCode(ctx context.Context, code string) (*model.AuthorizationRequest, error)
+	RegisterTokens(ctx context.Context, accessToken, refreshToken *jwt.Token) (func() error, func() error, error)
 }
 
 // AuthenticationDB handles interactions with the authentication databse,

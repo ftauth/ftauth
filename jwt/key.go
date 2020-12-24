@@ -310,7 +310,6 @@ func ParseJWK(jwk string) (*Key, error) {
 	}
 
 	// Set default so we can create Signer
-	// Parameter is not required by RFC.
 	if key.Algorithm == "" {
 		key.Algorithm = AlgorithmHMACSHA256
 	}
@@ -328,8 +327,8 @@ func ParseJWK(jwk string) (*Key, error) {
 	return &key, nil
 }
 
-// NewFromRSAPrivateKey creates a JWK from an RSA private key.
-func NewFromRSAPrivateKey(key *rsa.PrivateKey) (*Key, error) {
+// NewJWKFromRSAPrivateKey creates a JWK from an RSA private key.
+func NewJWKFromRSAPrivateKey(key *rsa.PrivateKey) (*Key, error) {
 	if key == nil {
 		return nil, errors.New("nil key")
 	}
@@ -361,8 +360,8 @@ func NewFromRSAPrivateKey(key *rsa.PrivateKey) (*Key, error) {
 	return newKey, newKey.IsValid()
 }
 
-// NewFromRSAPublicKey creates a JWK from an RSA public key.
-func NewFromRSAPublicKey(key *rsa.PublicKey) (*Key, error) {
+// NewJWKFromRSAPublicKey creates a JWK from an RSA public key.
+func NewJWKFromRSAPublicKey(key *rsa.PublicKey) (*Key, error) {
 	if key == nil {
 		return nil, errors.New("nil key")
 	}
@@ -451,10 +450,6 @@ func (key *Key) isValidEllipticCurve() error {
 
 	// TODO (dnys1): Check `d`
 	// The length of this octet string MUST be ceiling(log-base-2(n)/8) octets (where n is the order of the curve).
-	err := key.HasPrivateKeyInfo()
-	if err != nil {
-		return err
-	}
 	if key.X == "" {
 		return errMissingParameter("x")
 	}

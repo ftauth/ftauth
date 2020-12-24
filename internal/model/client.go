@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -33,87 +34,51 @@ const (
 	ClientTypePublic ClientType = "public"
 )
 
-// Identifier is a 36-character UUID v4 string which uniquely
-// idenitifes a particular client.
-//
-// See RFC 6749 2.2
-type Identifier string
-
-// RedirectRegistrationType defines the method by which redirect
-// comparison occurs: by prefix or by full string comparison.
-//
-// Example:
-// 	Client registers http://example.com:8080/redirect
-// 	With *prefix* matching
-// 		- redirect_uri=http://example.com/redirect would be valid
-//		- redirect_uri=http://example.com/redirect?param=value would be valid
-//		- redirect_uri=http://example.com/other would be invalid
-// 	With *full* matching
-// 		* redirect_uri=http://example.com/redirect would be valid
-//		* redirect_uri=http://example.com/redirect?param=value would be invalid
-//		* redirect_uri=http://example.com/other would be ininvalid
-type RedirectRegistrationType int
-
-const (
-	// RedirectRegistrationTypeFull matches redirect URIs sent in
-	// authorization requests by exact string matching.
-	RedirectRegistrationTypeFull RedirectRegistrationType = iota
-
-	// RedirectRegistrationTypePrefix matches redirect URIs sent in
-	// authorization requests by prefix alone.
-	// This is omitted from the OAuth 2.1 spec and thus deprecated
-	// by FTOAuth.
-	RedirectRegistrationTypePrefix
-)
-
-// IsValid returns whether the registration type is supported.
-func (typ RedirectRegistrationType) IsValid() bool {
-	switch typ {
-	case RedirectRegistrationTypeFull:
-		return true
-	}
-	return false
-}
-
 // ClientInfo holds all relevant information about a client.
 type ClientInfo struct {
-	ID           Identifier  `json:"client_id"`
-	Name         string      `json:"client_name"`
-	Type         ClientType  `json:"client_type"`
-	Secret       string      `json:"client_secret"`
-	SecretExpiry time.Time   `json:"client_secret_expires_at"` // Required if client_secret is issued. Time at which secret expires or 0 for no expiry.
-	RedirectURIs []string    `json:"redirect_uris"`
-	Scopes       []*Scope    `json:"scopes"`
-	JWKsURI      string      `json:"jwks_uri"`
-	LogoURI      string      `json:"logo_uri"`
-	GrantTypes   []GrantType `json:"grant_types"`
+	ID               string      `json:"client_id"` // A UUID v4 string which uniquely idenitifes a particular client.
+	Name             string      `json:"client_name"`
+	Type             ClientType  `json:"client_type"`
+	Secret           string      `json:"client_secret"`
+	SecretExpiry     time.Time   `json:"client_secret_expires_at"` // Required if client_secret is issued. Time at which secret expires or 0 for no expiry.
+	RedirectURIs     []string    `json:"redirect_uris"`
+	Scopes           []*Scope    `json:"scopes"`
+	JWKsURI          string      `json:"jwks_uri"`
+	LogoURI          string      `json:"logo_uri"`
+	GrantTypes       []GrantType `json:"grant_types"`
+	AccessTokenLife  int         `json:"access_token_life"`  // Lifetime of access token, in seconds
+	RefreshTokenLife int         `json:"refresh_token_life"` // Lifetime of refresh token, in seconds
 }
 
 // ClientInfoEntity holds client info for transfer on the wire,
 // e.g. when communicating with a DB.
 type ClientInfoEntity struct {
-	ID           Identifier `db:"id"`
-	Type         ClientType `db:"type"`
-	Secret       string     `db:"secret"`
-	SecretExpiry time.Time  `db:"secret_expiry"`
-	RedirectURIs string     `db:"redirect_uris"`
-	Scopes       string     `db:"scopes"`
-	JWKsURI      string     `db:"jwks_uri"`
-	LogoURI      string     `db:"logo_uri"`
-	GrantTypes   string     `db:"grant_types"`
+	ID               string     `db:"id"`
+	Type             ClientType `db:"type"`
+	Secret           string     `db:"secret"`
+	SecretExpiry     time.Time  `db:"secret_expiry"`
+	RedirectURIs     string     `db:"redirect_uris"`
+	Scopes           string     `db:"scopes"`
+	JWKsURI          string     `db:"jwks_uri"`
+	LogoURI          string     `db:"logo_uri"`
+	GrantTypes       string     `db:"grant_types"`
+	AccessTokenLife  int        `db:"access_token_life"`
+	RefreshTokenLife int        `db:"refresh_token_life"`
 }
 
 // ToModel converts the entity type to the model type.
 func (entity *ClientInfoEntity) ToModel(scopes []*Scope) *ClientInfo {
 	return &ClientInfo{
-		ID:           entity.ID,
-		Type:         entity.Type,
-		Secret:       entity.Secret,
-		RedirectURIs: sqlutil.ParseArray(entity.RedirectURIs),
-		Scopes:       scopes,
-		JWKsURI:      entity.JWKsURI,
-		LogoURI:      entity.LogoURI,
-		GrantTypes:   parseGrantTypes(entity.GrantTypes),
+		ID:               entity.ID,
+		Type:             entity.Type,
+		Secret:           entity.Secret,
+		RedirectURIs:     sqlutil.ParseArray(entity.RedirectURIs),
+		Scopes:           scopes,
+		JWKsURI:          entity.JWKsURI,
+		LogoURI:          entity.LogoURI,
+		GrantTypes:       parseGrantTypes(entity.GrantTypes),
+		AccessTokenLife:  entity.AccessTokenLife,
+		RefreshTokenLife: entity.RefreshTokenLife,
 	}
 }
 
@@ -132,6 +97,35 @@ func parseGrantTypes(grants string) []GrantType {
 type Scope struct {
 	Name    string `db:"name"`    // Primary key
 	Ruleset string `db:"ruleset"` // Set of rules - in JSON format
+}
+
+// ValidateScopes affirms whether the client supports the given scopes.
+func (clientInfo *ClientInfo) ValidateScopes(scopes string) error {
+	// Parse scope
+	scopeTokens, err := ParseScope(scopes)
+	if err != nil {
+		return err
+	}
+	// Validate scope tokens
+	valid := true
+	for _, token := range scopeTokens {
+		thisValid := false
+		for _, validToken := range clientInfo.Scopes {
+			if validToken.Name == token {
+				thisValid = true
+				break
+			}
+		}
+		if !thisValid {
+			valid = false
+			break
+		}
+	}
+	if !valid {
+		return errors.New("invalid scope")
+	}
+
+	return nil
 }
 
 // ClientRegistrationError is an error that occurred during the client

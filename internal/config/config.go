@@ -26,11 +26,13 @@ type DatabaseConfig struct {
 
 // OAuthConfig holds configuration variables for FTOAuth
 type OAuthConfig struct {
-	PublicKeyFile  string
-	PrivateKeyFile string
-	PublicKey      *jwt.Key
-	PrivateKey     *jwt.Key
-	Scopes         struct {
+	Tokens struct {
+		PublicKeyFile  string
+		PrivateKeyFile string
+		PublicKey      *jwt.Key
+		PrivateKey     *jwt.Key
+	}
+	Scopes struct {
 		Default string
 	}
 	Authentication struct {
@@ -85,7 +87,7 @@ func LoadConfig() {
 	}
 
 	// Read and parse server's public/private key pair
-	b, err := ioutil.ReadFile(Current.OAuth.PrivateKeyFile)
+	b, err := ioutil.ReadFile(Current.OAuth.Tokens.PrivateKeyFile)
 	if err != nil {
 		panic(fmt.Errorf("Error reading private key file: %v", err))
 	}
@@ -100,11 +102,11 @@ func LoadConfig() {
 		panic(fmt.Errorf("Error parsing private key: %v", err))
 	}
 
-	Current.OAuth.PrivateKey, err = jwt.NewFromRSAPrivateKey(key)
+	Current.OAuth.Tokens.PrivateKey, err = jwt.NewJWKFromRSAPrivateKey(key)
 	if err != nil {
 		panic(err)
 	}
-	Current.OAuth.PublicKey, err = jwt.NewFromRSAPublicKey(&key.PublicKey)
+	Current.OAuth.Tokens.PublicKey, err = jwt.NewJWKFromRSAPublicKey(&key.PublicKey)
 	if err != nil {
 		panic(err)
 	}
