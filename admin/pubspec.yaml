@@ -2,6 +2,7 @@ name: admin
 description: A web app that uses AngularDart Components
 # version: 1.0.0
 # homepage: https://www.example.com
+publish_to: none
 
 environment:
   sdk: '>=2.10.0 <3.0.0'
@@ -14,6 +15,10 @@ dependencies:
   angular_bloc: ^6.0.1
   equatable: ^1.2.5
   json_annotation: ^3.1.0
+  cryptography: ^1.4.1
+  oauth2: ^1.6.3
+  hive: ^1.4.4+1
+  jose: ^0.2.1+1
 
 dev_dependencies:
   angular_test: ^2.3.0

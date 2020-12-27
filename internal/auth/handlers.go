@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -15,6 +14,7 @@ import (
 	"github.com/dnys1/ftoauth/internal/database"
 	"github.com/dnys1/ftoauth/internal/model"
 	"github.com/dnys1/ftoauth/internal/token"
+	"github.com/dnys1/ftoauth/util/base64url"
 	"github.com/gorilla/mux"
 )
 
@@ -54,15 +54,17 @@ func SetupRoutes(
 	r *mux.Router,
 	authorizationDB database.AuthorizationDB,
 	authenticationDB database.AuthenticationDB,
+	clientDB database.ClientDB,
 ) {
-	r.Handle(AuthorizationEndpoint, authorizationEndpointHandler{authorizationDB})
-	r.Handle(TokenEndpoint, tokenEndpointHandler{authorizationDB})
+	r.Handle(AuthorizationEndpoint, authorizationEndpointHandler{db: authorizationDB, clientDB: clientDB})
+	r.Handle(TokenEndpoint, tokenEndpointHandler{db: authorizationDB, clientDB: clientDB})
 	r.Handle(LoginEndpoint, loginEndpointHandler{authenticationDB, authorizationDB})
 	r.Handle(RegisterEndpoint, registerHandler{authenticationDB: authenticationDB})
 }
 
 type authorizationEndpointHandler struct {
-	db database.AuthorizationDB
+	db       database.AuthorizationDB
+	clientDB database.ClientDB
 }
 
 func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -79,7 +81,7 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	// Get client info
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
-	clientInfo, err := h.db.GetClientInfo(ctx, clientID)
+	clientInfo, err := h.clientDB.GetClient(ctx, clientID)
 
 	if clientID == "" || err != nil {
 		// Even if the redirect URI is present, we should not redirect to it if
@@ -95,14 +97,12 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	}
 
 	// OPTIONAL, but must be registered otherwise
+	// Check if client has single endpoint registered
+	// If they do, use that
+	// If not, consider this a required parameter
 	redirectURI := query.Get(paramRedirectURI)
-	if redirectURI == "" {
-		// Check if client has single endpoint registered
-		// If they do, use that
-		// If not, consider this a required parameter
-		if len(clientInfo.RedirectURIs) == 1 {
-			redirectURI = clientInfo.RedirectURIs[0]
-		}
+	if redirectURI == "" && len(clientInfo.RedirectURIs) == 1 {
+		redirectURI = clientInfo.RedirectURIs[0]
 	} else {
 		// Verify redirect URI
 		valid := false
@@ -176,6 +176,7 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 				model.AuthorizationRequestErrInvalidScope,
 				model.RequestErrorDetails{},
 			)
+			return
 		}
 	}
 
@@ -229,16 +230,16 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		State:               state,
 		RedirectURI:         redirectURI,
 		Code:                code,
-		Expiry:              exp,
+		Expiry:              exp.Unix(),
 		CodeChallenge:       codeChallenge,
 		CodeChallengeMethod: codeChallengeMethod,
 	}
 
 	// Create session from request, storing all required information
-	ctx1, cancel1 := context.WithTimeout(r.Context(), database.DefaultTimeout)
-	defer cancel1()
+	ctx, cancel = context.WithTimeout(r.Context(), database.DefaultTimeout)
+	defer cancel()
 
-	sessionID, err := h.db.CreateSession(ctx1, authRequest)
+	sessionID, err := h.db.CreateSession(ctx, authRequest)
 	if err != nil {
 		handleAuthorizationRequestError(
 			w, r, redirectURI, state,
@@ -356,21 +357,32 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Get session information
-	ctx1, cancel1 := context.WithTimeout(r.Context(), database.DefaultTimeout)
-	defer cancel1()
+	ctx, cancel = context.WithTimeout(r.Context(), database.DefaultTimeout)
+	defer cancel()
 
-	requestInfo, err := h.authorizationDB.GetRequestInfo(ctx1, sessionID)
+	requestInfo, err := h.authorizationDB.GetRequestInfo(ctx, sessionID)
 	if err != nil {
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
+
+	// Delete session cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   0,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	})
 
 	redirect := fmt.Sprintf("%s?code=%s&state=%s", requestInfo.RedirectURI, requestInfo.Code, requestInfo.State)
 	http.Redirect(w, r, redirect, http.StatusFound)
 }
 
 type tokenEndpointHandler struct {
-	db database.AuthorizationDB
+	db       database.AuthorizationDB
+	clientDB database.ClientDB
 }
 
 func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -400,7 +412,7 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	clientInfo, err := h.db.GetClientInfo(ctx, clientID)
+	clientInfo, err := h.clientDB.GetClient(ctx, clientID)
 	if err != nil {
 		handleHeaderErr("Could not locate client ID")
 		return
@@ -442,8 +454,9 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	// OPTIONAL
 	scope := r.FormValue(paramScope)
+	var scopes []string
 	if scope == "" {
-		scope = config.Current.OAuth.Scopes.Default
+		scopes = []string{config.Current.OAuth.Scopes.Default}
 	} else {
 		err = clientInfo.ValidateScopes(scope)
 		if err != nil {
@@ -453,6 +466,7 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				model.RequestErrorDetails{},
 			)
 		}
+		scopes, _ = model.ParseScope(scope)
 	}
 
 	var validator func(http.ResponseWriter, *http.Request, *model.ClientInfo) bool
@@ -480,16 +494,18 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	// 	If it fails, rollback changes in the database
 	// 	to prevent token rotation without client involvement
 
-	accessToken := token.IssueAccessToken(clientInfo, scope)
+	accessToken := token.IssueAccessToken(clientInfo, scopes...)
 	refreshToken := token.IssueRefreshToken(clientInfo, accessToken)
 
 	accessJWT, err := accessToken.Encode(config.Current.OAuth.Tokens.PrivateKey)
 	if err != nil {
+		log.Printf("Error encoding access token: %v\n", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	refreshJWT, err := refreshToken.Encode(config.Current.OAuth.Tokens.PrivateKey)
 	if err != nil {
+		log.Printf("Error encoding refresh token: %v\n", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -506,16 +522,20 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	commit, rollback, err := h.db.RegisterTokens(ctx, accessToken, refreshToken)
 	if err != nil {
+		log.Printf("Error saving tokens to DB: %v\n", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	b, err := json.Marshal(&response)
 	if err != nil {
+		log.Printf("Error marshalling token response: %v\n", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(b)))
 	_, err = w.Write(b)
 	if err != nil {
 		err = rollback()
@@ -531,21 +551,6 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h tokenEndpointHandler) validateAuthorizationCodeRequest(w http.ResponseWriter, r *http.Request, clientInfo *model.ClientInfo) bool {
-	// REQUIRED
-	clientID := r.FormValue(paramClientID)
-	if clientID == "" {
-		// Even if the redirect URI is present, we should not redirect to it if
-		// we cannot identify the client and confirm its registration.
-		http.Error(
-			w,
-			model.TokenRequestErrInvalidRequest.Description(
-				model.RequestErrorDetails{ParamName: paramClientID, Details: "Client ID cannot be empty."},
-			),
-			http.StatusBadRequest,
-		)
-		return false
-	}
-
 	// REQUIRED, must match value from request
 	redirectURI := r.FormValue(paramRedirectURI)
 	if redirectURI == "" {
@@ -611,7 +616,7 @@ func (h tokenEndpointHandler) validateAuthorizationCodeRequest(w http.ResponseWr
 
 	// Compare stored code challenge with code verifier
 	digest := sha256.Sum256([]byte(codeVerifier))
-	comp := base64.URLEncoding.EncodeToString(digest[:])
+	comp := base64url.Encode(digest[:])
 	if session.CodeChallenge != comp {
 		handleTokenRequestError(
 			w,
@@ -658,8 +663,11 @@ func handleAuthorizationRequestError(
 	query.Add("error_description", err.Description(details))
 	query.Add("error_uri", err.URI())
 	query.Add("state", state)
-	errorURI.RawQuery = query.Encode()
-	http.Redirect(w, r, errorURI.String(), http.StatusFound)
+
+	// url.URL cannot handle '#' values in path
+	// e.g. localhost:8080/#/token results in Fragment = "/token"
+	uri := fmt.Sprintf("%s?%s", redirectURI, query.Encode())
+	http.Redirect(w, r, uri, http.StatusFound)
 }
 
 func handleTokenRequestError(w http.ResponseWriter, reqErr model.TokenRequestError, details model.RequestErrorDetails) {

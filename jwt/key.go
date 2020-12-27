@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/hmac"
 	"crypto/rand"
@@ -13,11 +14,32 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
-	"strconv"
 
 	"github.com/dnys1/ftoauth/util/base64url"
 	"github.com/dnys1/ftoauth/util/base64urluint"
 )
+
+type bigInt big.Int
+
+func (bi *bigInt) MarshalJSON() ([]byte, error) {
+	_bi := (*big.Int)(bi)
+	s := base64urluint.Encode(_bi)
+	return json.Marshal(s)
+}
+
+func (bi *bigInt) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	fmt.Printf("Decoding %s\n", s)
+	_bi, err := base64urluint.Decode(s)
+	if _bi == nil || err != nil {
+		return err
+	}
+	*bi = bigInt(*_bi)
+	return nil
+}
 
 // Key is a JSON Web Key which holds cryptographic information
 // about the signing/encryption used for a JSON Web Token.
@@ -48,14 +70,14 @@ type Key struct {
 	// For KeyTypeEllipticCurve (kty = "EC")
 
 	Curve EllipticCurve `json:"crv,omitempty"` // required, the elliptic curve for the public key
-	X     string        `json:"x,omitempty"`   // required, the base64url-encoded x-coordinate
-	Y     string        `json:"y,omitempty"`   // required, the base64url-encoded y-coordinate
+	X     *bigInt       `json:"x,omitempty"`   // required, the base64url-encoded x-coordinate
+	Y     *bigInt       `json:"y,omitempty"`   // required, the base64url-encoded y-coordinate
 
 	// RSA Properties
 	// For KeyTypeRSA (kty = "RSA")
 
-	N string `json:"n,omitempty"` // required, the base64urlUint-encoded modulus
-	E string `json:"e,omitempty"` // required, the base64urlUint-encoded exponent
+	N *bigInt `json:"n,omitempty"` // required, the base64urlUint-encoded modulus
+	E *bigInt `json:"e,omitempty"` // required, the base64urlUint-encoded exponent
 
 	// Symmetric Key Properties
 	// For KeyTypeOctet (kty = "octet")
@@ -64,31 +86,31 @@ type Key struct {
 
 	// PrivateKey Properties
 
-	D           string       `json:"d,omitempty"`   // required for EC/RSA, the base64url-encoded ECC private key or base64urlUint private exponent for RSA
-	P           string       `json:"p,omitempty"`   // required for RSA, the base64urlUint-encoded first prime factor
-	Q           string       `json:"q,omitempty"`   // required for RSA, the base64urlUint-encoded second prime factor
-	DP          string       `json:"dp,omitempty"`  // required for RSA, the base64urlUint-encoded first factor CRT exponent
-	DQ          string       `json:"dq,omitempty"`  // required for RSA, the base64urlUint-encoded second factor CRT exponent
-	QI          string       `json:"qi,omitempty"`  // required for RSA, the base64urlUint-encoded first CRT certificate
+	D           *bigInt      `json:"d,omitempty"`   // required for EC/RSA, the base64url-encoded ECC private key or base64urlUint private exponent for RSA
+	P           *bigInt      `json:"p,omitempty"`   // required for RSA, the base64urlUint-encoded first prime factor
+	Q           *bigInt      `json:"q,omitempty"`   // required for RSA, the base64urlUint-encoded second prime factor
+	DP          *bigInt      `json:"dp,omitempty"`  // required for RSA, the base64urlUint-encoded first factor CRT exponent
+	DQ          *bigInt      `json:"dq,omitempty"`  // required for RSA, the base64urlUint-encoded second factor CRT exponent
+	QI          *bigInt      `json:"qi,omitempty"`  // required for RSA, the base64urlUint-encoded first CRT certificate
 	OtherPrimes []OtherPrime `json:"oth,omitempty"` // optional for RSA, the base64urlUint-encoded other primes info
 }
 
 // OtherPrime is an extra prime for RSA when more than two primes are needed
 type OtherPrime struct {
-	R string `json:"r"` // required, the base64urlUint-encoded prime factor
-	D string `json:"d"` // required, the base64urlUint-encoded factor CRT exponent
-	T string `json:"t"` // required, the base64urlUint-encoded factor CRT coefficient
+	R *bigInt `json:"r"` // required, the base64urlUint-encoded prime factor
+	D *bigInt `json:"d"` // required, the base64urlUint-encoded factor CRT exponent
+	T *bigInt `json:"t"` // required, the base64urlUint-encoded factor CRT coefficient
 }
 
 // IsValid returns an error if there are problems with the object.
 func (oth OtherPrime) IsValid() error {
-	if oth.R == "" {
+	if oth.R == nil {
 		return errMissingParameter("r")
 	}
-	if oth.D == "" {
+	if oth.D == nil {
 		return errMissingParameter("d")
 	}
-	if oth.T == "" {
+	if oth.T == nil {
 		return errMissingParameter("t")
 	}
 	return nil
@@ -178,22 +200,22 @@ func (key *Key) HasPrivateKeyInfo() error {
 	case KeyTypeOctet:
 		return nil
 	case KeyTypeRSA:
-		if key.D == "" {
+		if key.D == nil {
 			return errMissingParameter("d")
 		}
-		if key.P == "" {
+		if key.P == nil {
 			return errMissingParameter("p")
 		}
-		if key.Q == "" {
+		if key.Q == nil {
 			return errMissingParameter("q")
 		}
-		if key.DP == "" {
+		if key.DP == nil {
 			return errMissingParameter("dp")
 		}
-		if key.DQ == "" {
+		if key.DQ == nil {
 			return errMissingParameter("dq")
 		}
-		if key.QI == "" {
+		if key.QI == nil {
 			return errMissingParameter("qi")
 		}
 
@@ -221,78 +243,33 @@ func (key *Key) generateKey() error {
 		}
 		key.SymmetricKey = b
 	case KeyTypeRSA:
-		n, err := base64urluint.Decode(key.N)
-		if err != nil {
-			return err
-		}
-		e, err := strconv.Atoi(key.E)
-		if err != nil {
-			return err
-		}
 		pub := rsa.PublicKey{
-			N: n,
-			E: e,
+			N: (*big.Int)(key.N),
+			E: int((*big.Int)(key.E).Int64()),
 		}
 		key.PublicKey = pub
 		if key.HasPrivateKeyInfo() == nil {
-			d, err := base64urluint.Decode(key.D)
-			if err != nil {
-				return err
-			}
-
-			p, err := base64urluint.Decode(key.P)
-			if err != nil {
-				return err
-			}
-			q, err := base64urluint.Decode(key.Q)
-			if err != nil {
-				return err
-			}
-			dp, err := base64urluint.Decode(key.DP)
-			if err != nil {
-				return err
-			}
-			dq, err := base64urluint.Decode(key.DQ)
-			if err != nil {
-				return err
-			}
-			qi, err := base64urluint.Decode(key.QI)
-			if err != nil {
-				return err
-			}
-			primes := []*big.Int{p, q}
+			primes := []*big.Int{(*big.Int)(key.P), (*big.Int)(key.Q)}
 			precomp := rsa.PrecomputedValues{
-				Dp:   dp,
-				Dq:   dq,
-				Qinv: qi,
+				Dp:   (*big.Int)(key.DP),
+				Dq:   (*big.Int)(key.DQ),
+				Qinv: (*big.Int)(key.QI),
 			}
 			if len(key.OtherPrimes) > 0 {
 				extraCRT := make([]rsa.CRTValue, 0)
-				for i, prime := range key.OtherPrimes {
-					r, err := base64urluint.Decode(prime.R)
-					if err != nil {
-						return fmt.Errorf("Error in oth[%d]: %v", i, err)
-					}
-					d, err := base64urluint.Decode(prime.D)
-					if err != nil {
-						return fmt.Errorf("Error in oth[%d]: %v", i, err)
-					}
-					t, err := base64urluint.Decode(prime.T)
-					if err != nil {
-						return fmt.Errorf("Error in oth[%d]: %v", i, err)
-					}
-					primes = append(primes, r)
+				for _, prime := range key.OtherPrimes {
+					primes = append(primes, (*big.Int)(prime.R))
 					extraCRT = append(extraCRT, rsa.CRTValue{
-						Exp:   d,
-						Coeff: t,
-						R:     r,
+						Exp:   (*big.Int)(prime.D),
+						Coeff: (*big.Int)(prime.T),
+						R:     (*big.Int)(prime.R),
 					})
 				}
 				precomp.CRTValues = extraCRT
 			}
 			key.PrivateKey = rsa.PrivateKey{
 				PublicKey:   pub,
-				D:           d,
+				D:           (*big.Int)(key.D),
 				Primes:      primes,
 				Precomputed: precomp,
 			}
@@ -337,24 +314,27 @@ func NewJWKFromRSAPrivateKey(key *rsa.PrivateKey) (*Key, error) {
 	if len(key.Primes) > 2 && len(key.Precomputed.CRTValues) > 0 {
 		for _, crt := range key.Precomputed.CRTValues {
 			oth = append(oth, OtherPrime{
-				R: crt.R.String(),
-				D: crt.Exp.String(),
-				T: crt.Coeff.String(),
+				R: (*bigInt)(crt.R),
+				D: (*bigInt)(crt.Exp),
+				T: (*bigInt)(crt.Coeff),
 			})
 		}
 	}
+	e := &big.Int{}
+	e.SetInt64(int64(key.E))
 	newKey := &Key{
 		PublicKey:   &key.PublicKey,
 		PrivateKey:  key,
 		KeyType:     KeyTypeRSA,
-		N:           key.N.String(),
-		E:           strconv.Itoa(key.E),
-		D:           key.D.String(),
-		P:           key.Primes[0].String(),
-		Q:           key.Primes[1].String(),
-		DP:          key.Precomputed.Dp.String(),
-		DQ:          key.Precomputed.Dp.String(),
-		QI:          key.Precomputed.Qinv.String(),
+		Algorithm:   AlgorithmRSASHA256,
+		N:           (*bigInt)(key.N),
+		E:           (*bigInt)(e),
+		D:           (*bigInt)(key.D),
+		P:           (*bigInt)(key.Primes[0]),
+		Q:           (*bigInt)(key.Primes[1]),
+		DP:          (*bigInt)(key.Precomputed.Dp),
+		DQ:          (*bigInt)(key.Precomputed.Dq),
+		QI:          (*bigInt)(key.Precomputed.Qinv),
 		OtherPrimes: oth,
 	}
 	return newKey, newKey.IsValid()
@@ -366,11 +346,14 @@ func NewJWKFromRSAPublicKey(key *rsa.PublicKey) (*Key, error) {
 		return nil, errors.New("nil key")
 	}
 
+	e := &big.Int{}
+	e.SetInt64(int64(key.E))
 	newKey := &Key{
 		PublicKey: key,
 		KeyType:   KeyTypeRSA,
-		N:         key.N.String(),
-		E:         strconv.Itoa(key.E),
+		Algorithm: AlgorithmRSASHA256,
+		N:         (*bigInt)(key.N),
+		E:         (*bigInt)(e),
 	}
 
 	return newKey, newKey.IsValid()
@@ -450,51 +433,51 @@ func (key *Key) isValidEllipticCurve() error {
 
 	// TODO (dnys1): Check `d`
 	// The length of this octet string MUST be ceiling(log-base-2(n)/8) octets (where n is the order of the curve).
-	if key.X == "" {
+	if key.X == nil {
 		return errMissingParameter("x")
 	}
-	if key.Y == "" {
+	if key.Y == nil {
 		return errMissingParameter("y")
 	}
 	return nil
 }
 
 func (key *Key) isValidRSA() error {
-	if key.N == "" {
+	if key.N == nil {
 		return errMissingParameter("n")
 	}
-	if key.E == "" {
+	if key.E == nil {
 		return errMissingParameter("e")
 	}
 	isPrivateKey := key.PrivateKey != nil
 	if isPrivateKey {
-		if key.D == "" {
+		if key.D == nil {
 			return errMissingParameter("d")
 		}
-		if key.P == "" {
+		if key.P == nil {
 			return errMissingParameter("p")
 		}
-		if key.Q == "" {
+		if key.Q == nil {
 			return errMissingParameter("q")
 		}
-		if key.DP == "" {
+		if key.DP == nil {
 			return errMissingParameter("dp")
 		}
-		if key.DQ == "" {
+		if key.DQ == nil {
 			return errMissingParameter("dq")
 		}
-		if key.QI == "" {
+		if key.QI == nil {
 			return errMissingParameter("qi")
 		}
 		if len(key.OtherPrimes) > 0 {
 			for i, oth := range key.OtherPrimes {
-				if oth.D == "" {
+				if oth.D == nil {
 					return errMissingParameter(fmt.Sprintf("oth[%d]: d", i))
 				}
-				if oth.R == "" {
+				if oth.R == nil {
 					return errMissingParameter(fmt.Sprintf("oth[%d]: r", i))
 				}
-				if oth.T == "" {
+				if oth.T == nil {
 					return errMissingParameter(fmt.Sprintf("oth[%d]: t", i))
 				}
 			}
@@ -544,6 +527,11 @@ func (key *Key) RetrieveX509Certificate() (cert []byte, err error) {
 // Signer returns a signing/hashing function based off
 // the algorithm and private key.
 func (key *Key) Signer() func([]byte) ([]byte, error) {
+	if key.PrivateKey == nil {
+		return func(b []byte) ([]byte, error) {
+			return nil, ErrMissingPrivateKey
+		}
+	}
 	switch key.Algorithm {
 	case AlgorithmHMACSHA256:
 		return func(b []byte) ([]byte, error) {
@@ -557,9 +545,9 @@ func (key *Key) Signer() func([]byte) ([]byte, error) {
 	case AlgorithmRSASHA256:
 		return func(b []byte) ([]byte, error) {
 			rng := rand.Reader
-			privateKey := key.PrivateKey.(rsa.PrivateKey)
+			privateKey := key.PrivateKey.(*rsa.PrivateKey)
 			hashed := sha256.Sum256(b)
-			return rsa.SignPSS(rng, &privateKey, crypto.SHA256, hashed[:], &rsa.PSSOptions{
+			return rsa.SignPSS(rng, privateKey, crypto.SHA256, hashed[:], &rsa.PSSOptions{
 				SaltLength: rsa.PSSSaltLengthAuto,
 				Hash:       crypto.SHA256,
 			})
@@ -567,5 +555,35 @@ func (key *Key) Signer() func([]byte) ([]byte, error) {
 	}
 	return func(b []byte) ([]byte, error) {
 		return nil, errUnsupportedValue("alg", string(key.Algorithm))
+	}
+}
+
+// Verifier returns a function for verifying a signature against the public key.
+func (key *Key) Verifier() func(msg []byte, sig []byte) error {
+	switch key.Algorithm {
+	case AlgorithmHMACSHA256:
+		return func(msg []byte, sig []byte) error {
+			mac := hmac.New(sha256.New, key.SymmetricKey)
+			_, err := mac.Write(msg)
+			if err != nil {
+				return err
+			}
+			if !bytes.Equal(sig, mac.Sum(nil)) {
+				return ErrInvalidSignature
+			}
+			return nil
+		}
+	case AlgorithmRSASHA256:
+		return func(msg []byte, sig []byte) error {
+			publicKey := key.PublicKey.(*rsa.PublicKey)
+			hashed := sha256.Sum256(msg)
+			return rsa.VerifyPSS(publicKey, crypto.SHA256, hashed[:], sig, &rsa.PSSOptions{
+				SaltLength: rsa.PSSSaltLengthAuto,
+				Hash:       crypto.SHA256,
+			})
+		}
+	}
+	return func(msg []byte, sig []byte) error {
+		return errUnsupportedValue("alg", string(key.Algorithm))
 	}
 }

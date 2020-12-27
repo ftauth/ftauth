@@ -18,7 +18,7 @@ class ClientCubit extends Cubit<ClientState> implements ClientRepo {
       emit(ClientLoaded(clientInfo));
       return clientInfo;
     } on Exception catch (e) {
-      emit(ClientError(e));
+      emit(ClientFailure(e));
       return null;
     }
   }
@@ -32,7 +32,7 @@ class ClientCubit extends Cubit<ClientState> implements ClientRepo {
       emit(ClientLoaded(registeredClient));
       return registeredClient;
     } on Exception catch (e) {
-      emit(ClientError(e, clientInfo));
+      emit(ClientFailure(e, clientInfo));
       return clientInfo;
     }
   }
@@ -46,7 +46,7 @@ class ClientCubit extends Cubit<ClientState> implements ClientRepo {
       emit(ClientLoaded(updatedClient));
       return updatedClient;
     } on Exception catch (e) {
-      emit(ClientError(e, clientInfo));
+      emit(ClientFailure(e, clientInfo));
       return clientInfo;
     }
   }
@@ -56,7 +56,7 @@ class ClientCubit extends Cubit<ClientState> implements ClientRepo {
     try {
       await _clientRepo.deleteClient(clientInfo);
     } on Exception catch (e) {
-      emit(ClientError(e, clientInfo));
+      emit(ClientFailure(e, clientInfo));
     }
   }
 }

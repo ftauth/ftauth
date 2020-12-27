@@ -1,0 +1,13 @@
+<div class="center height-100pc">
+    <div class="center" *ngIf="isLoading">
+        <h2>Checking if logged in...</h2>
+        <material-spinner></material-spinner>
+    </div>
+    <div *ngIf="isError">
+        <h2>{{ errorTitle }}</h2>
+        <h4>{{ errorMessage }}</h4>
+    </div>
+    <div *ngIf="showLoginButton">
+        <material-button>Login</material-button>
+    </div>
+</div>

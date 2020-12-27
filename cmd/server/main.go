@@ -27,9 +27,9 @@ func main() {
 
 	// Setup routing
 	r := mux.NewRouter()
-	auth.SetupRoutes(r, sqlDB, sqlDB)
+	auth.SetupRoutes(r, sqlDB, sqlDB, sqlDB)
 	discovery.SetupRoutes(r, sqlDB)
-	admin.SetupRoutes(r)
+	admin.SetupRoutes(r, sqlDB)
 
 	// Static file handling
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("template")))

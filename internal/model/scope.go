@@ -26,7 +26,7 @@ var (
 func ParseScope(scope string) ([]string, error) {
 	fields := strings.Fields(scope)
 	if len(fields) == 0 {
-		return nil, ErrInvalidScopeFormat
+		return []string{}, nil
 	}
 
 	scopeTokens := make([]string, 0)

@@ -3,17 +3,23 @@ package discovery
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
 
+	"github.com/dnys1/ftoauth/internal/config"
 	"github.com/dnys1/ftoauth/internal/database"
 	"github.com/dnys1/ftoauth/internal/model"
+	"github.com/dnys1/ftoauth/util/cors"
 	"github.com/gorilla/mux"
 )
 
 // DiscoveryEndpoint is the endpoint for service discovery, as defined by RFC 8414.
 const DiscoveryEndpoint = "/.well-known/oauth-authorization-server"
+
+// JWKSEndpoint is the endpoint for our public JWK set
+const JWKSEndpoint = "/jwks.json"
 
 var cond *sync.Cond
 
@@ -22,7 +28,11 @@ func SetupRoutes(r *mux.Router, discoveryDB database.DiscoveryDB) {
 	h := discoveryHandler{discoveryDB: discoveryDB}
 	h.needsRefresh = true
 
+	r.Use(mux.CORSMethodMiddleware(r))
+	r.Use(cors.Middleware)
+
 	r.Handle(DiscoveryEndpoint, &h).Methods(http.MethodOptions, http.MethodGet)
+	r.HandleFunc(JWKSEndpoint, handleJWKS).Methods(http.MethodOptions, http.MethodGet)
 
 	cond = sync.NewCond(&h)
 }
@@ -68,4 +78,17 @@ func (h *discoveryHandler) loadMetadata(ctx context.Context) {
 	h.needsRefresh = h.metadataErr != nil
 	cond.Broadcast()
 	cond.L.Unlock()
+}
+
+func handleJWKS(w http.ResponseWriter, r *http.Request) {
+	jwk := config.Current.OAuth.Tokens.PublicKey
+	b, err := json.Marshal(jwk)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(b)))
+	w.Write(b)
 }

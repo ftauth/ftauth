@@ -32,4 +32,9 @@ class ClientInfo {
     this.logoUri,
     this.grantTypes,
   });
+
+  factory ClientInfo.fromJson(Map<String, dynamic> json) =>
+      _$ClientInfoFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ClientInfoToJson(this);
 }

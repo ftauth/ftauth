@@ -1,6 +1,7 @@
 package token
 
 import (
+	"strings"
 	"time"
 
 	"github.com/dnys1/ftoauth/internal/config"
@@ -14,7 +15,7 @@ type Type string
 
 // Supported token types
 const (
-	TypeJWT  = "jwt"
+	TypeJWT  = "bearer"
 	TypeDPoP = "dpop+jwt"
 )
 
@@ -39,6 +40,7 @@ func IssueAccessToken(clientInfo *model.ClientInfo, scopes ...string) *jwt.Token
 			IssuedAt:       iat,
 			ExpirationTime: exp,
 			JwtID:          id.String(),
+			Scope:          strings.Join(scopes, " "),
 		},
 	}
 
@@ -55,6 +57,8 @@ func IssueRefreshToken(clientInfo *model.ClientInfo, accessToken *jwt.Token) *jw
 		Header: &jwt.Header{
 			Type:      "jwt",
 			Algorithm: jwt.AlgorithmRSASHA256,
+			JWK:       config.Current.OAuth.Tokens.PublicKey,
+			KeyID:     config.Current.OAuth.Tokens.PublicKey.KeyID,
 		},
 		Claims: &jwt.Claims{
 			Audience:       accessToken.Claims.JwtID,
@@ -62,6 +66,7 @@ func IssueRefreshToken(clientInfo *model.ClientInfo, accessToken *jwt.Token) *jw
 			IssuedAt:       iat,
 			ExpirationTime: exp,
 			JwtID:          id.String(),
+			Scope:          accessToken.Claims.Scope,
 		},
 	}
 

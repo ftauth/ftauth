@@ -66,6 +66,31 @@ type ClientInfoEntity struct {
 	RefreshTokenLife int        `db:"refresh_token_life"`
 }
 
+// ToEntity converts the model type to the entity type.
+func (clientInfo *ClientInfo) ToEntity() *ClientInfoEntity {
+	var scopes []string
+	for _, scope := range clientInfo.Scopes {
+		scopes = append(scopes, scope.Name)
+	}
+	var grants []string
+	for _, grant := range clientInfo.GrantTypes {
+		grants = append(grants, string(grant))
+	}
+	return &ClientInfoEntity{
+		ID:               clientInfo.ID,
+		Type:             clientInfo.Type,
+		Secret:           clientInfo.Secret,
+		SecretExpiry:     clientInfo.SecretExpiry,
+		RedirectURIs:     sqlutil.GenerateArrayString(clientInfo.RedirectURIs),
+		Scopes:           sqlutil.GenerateArrayString(scopes),
+		JWKsURI:          clientInfo.JWKsURI,
+		LogoURI:          clientInfo.LogoURI,
+		GrantTypes:       sqlutil.GenerateArrayString(grants),
+		AccessTokenLife:  clientInfo.AccessTokenLife,
+		RefreshTokenLife: clientInfo.RefreshTokenLife,
+	}
+}
+
 // ToModel converts the entity type to the model type.
 func (entity *ClientInfoEntity) ToModel(scopes []*Scope) *ClientInfo {
 	return &ClientInfo{
@@ -107,22 +132,17 @@ func (clientInfo *ClientInfo) ValidateScopes(scopes string) error {
 		return err
 	}
 	// Validate scope tokens
-	valid := true
-	for _, token := range scopeTokens {
-		thisValid := false
-		for _, validToken := range clientInfo.Scopes {
-			if validToken.Name == token {
-				thisValid = true
+	for _, scopeToken := range scopeTokens {
+		valid := false
+		for _, scope := range clientInfo.Scopes {
+			if scopeToken == scope.Name {
+				valid = true
 				break
 			}
 		}
-		if !thisValid {
-			valid = false
-			break
+		if !valid {
+			return errors.New("invalid scope")
 		}
-	}
-	if !valid {
-		return errors.New("invalid scope")
 	}
 
 	return nil

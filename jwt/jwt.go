@@ -1,7 +1,6 @@
 package jwt
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -114,7 +113,8 @@ func (t *Token) Encode(key *Key) (string, error) {
 	}
 
 	signature := base64url.Encode(signed)
-	return fmt.Sprintf("%s.%s", unsigned, signature), nil
+	t.raw = fmt.Sprintf("%s.%s", unsigned, signature)
+	return t.raw, nil
 }
 
 // Decode parses and verifies a token's signature.
@@ -135,6 +135,15 @@ func Decode(token string) (*Token, error) {
 	if err := json.Unmarshal(headerJSON, &header); err != nil {
 		return nil, ErrInvalidHeaderFormat
 	}
+
+	// Generate keys if JWK is included
+	if header.JWK != nil {
+		err = header.JWK.generateKey()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	payloadJSON, err := base64url.Decode(fields[1])
 	if err != nil {
 		return nil, ErrInvalidPayloadFormat
@@ -178,20 +187,11 @@ func (t *Token) Verify(key *Key) error {
 	payload := base64url.Encode(payloadJSON)
 
 	body := fmt.Sprintf("%s.%s", header, payload)
-	signer := key.Signer()
-	expected, err := signer([]byte(body))
+	verifier := key.Verifier()
+	err = verifier([]byte(body), t.Signature)
 	if err != nil {
-		return fmt.Errorf("Error signing body: %v", err)
-	}
-
-	if !bytes.Equal(t.Signature, expected) {
 		return ErrInvalidSignature
 	}
 
 	return nil
 }
-
-// func (t *Token) ValidateDPoP(key *Key) error {
-
-// 	return nil
-// }

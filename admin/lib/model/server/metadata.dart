@@ -26,4 +26,6 @@ class AuthorizationServerMetadata {
 
   factory AuthorizationServerMetadata.fromJson(Map<String, dynamic> json) =>
       _$AuthorizationServerMetadataFromJson(json);
+
+  Map<String, dynamic> toJson() => _$AuthorizationServerMetadataToJson(this);
 }

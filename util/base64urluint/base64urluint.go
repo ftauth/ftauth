@@ -26,6 +26,9 @@ func Encode(i *big.Int) string {
 
 // Decode returns the BigInt represented by the base64url-encoded string.
 func Decode(str string) (*big.Int, error) {
+	if str == "" {
+		return nil, nil
+	}
 	b, err := base64url.Decode(str)
 	if err != nil {
 		return nil, err

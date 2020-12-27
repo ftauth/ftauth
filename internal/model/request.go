@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"time"
 )
 
 var (
@@ -23,7 +22,7 @@ type AuthorizationRequest struct {
 	State               string              `db:"state"`
 	RedirectURI         string              `db:"redirect_uri"`
 	Code                string              `db:"code"`
-	Expiry              time.Time           `db:"exp"`
+	Expiry              int64               `db:"exp"`
 	CodeChallenge       string              `db:"code_challenge"`
 	CodeChallengeMethod CodeChallengeMethod `db:"code_challenge_method"`
 }
@@ -119,10 +118,9 @@ func (err AuthorizationRequestError) IsValid() bool {
 func (err AuthorizationRequestError) Description(details RequestErrorDetails) string {
 	switch err {
 	case AuthorizationRequestErrInvalidRequest:
-		return fmt.Sprintf(`The request is missing a required parameter, includes an invalid parameter value, 
-				includes a parameter more than once, or is otherwise malformed.
-				Invalid: %s
-				Details: %s`, details.ParamName, details.Details)
+		return fmt.Sprintf(`The request is missing a required parameter, includes an invalid parameter value, includes a parameter more than once, or is otherwise malformed.
+Invalid: %s
+Details: %s`, details.ParamName, details.Details)
 	case AuthorizationRequestErrUnauthorizedClient:
 		return "The client is not authorized to request an access token using this method."
 	case AuthorizationRequestErrAccessDenied:
@@ -200,31 +198,22 @@ func (err TokenRequestError) IsValid() bool {
 func (err TokenRequestError) Description(details RequestErrorDetails) string {
 	switch err {
 	case TokenRequestErrInvalidRequest:
-		return fmt.Sprintf(`The request is missing a required parameter, includes an
-               unsupported parameter value (other than grant type),
-               repeats a parameter, includes multiple credentials,
-               utilizes more than one mechanism for authenticating the
-			   client, or is otherwise malformed.
+		return fmt.Sprintf(
+			`The request is missing a required parameter, includes an unsupported parameter value (other than grant type), repeats a parameter, includes multiple credentials, utilizes more than one mechanism for authenticating the client, or is otherwise malformed.
 			   Invalid: %s
 			   Details: %s`, details.ParamName, details.Details)
 	case TokenRequestErrInvalidClient:
-		return fmt.Sprintf(`Client authentication failed (e.g., unknown client, no
-				client authentication included, or unsupported
-				authentication method).
+		return fmt.Sprintf(
+			`Client authentication failed (e.g., unknown client, no client authentication included, or unsupported authentication method).
 				Reason: %s`, details.Details)
 	case TokenRequestErrInvalidGrant:
-		return `The provided authorization grant (e.g., authorization
-				code, resource owner credentials) or refresh token is
-				invalid, expired, revoked, does not match the redirection
-				URI used in the authorization request, or was issued to
-				another client.`
+		return `The provided authorization grant (e.g., authorization code, resource owner credentials) or refresh token is invalid, expired, revoked, does not match the redirection URI used in the authorization request, or was issued to another client.`
 	case TokenRequestErrUnauthorizedClient:
 		return "The authenticated client is not authorized to use this authorization grant type."
 	case TokenRequestErrUnsupportedGrantType:
 		return "The authorization grant type is not supported by the authorization server."
 	case TokenRequestErrInvalidScope:
-		return `The requested scope is invalid, unknown, malformed, 
-				or exceeds the scope granted by the resource owner.`
+		return `The requested scope is invalid, unknown, malformed, or exceeds the scope granted by the resource owner.`
 	}
 
 	return "An unknown error occurred"

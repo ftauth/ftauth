@@ -50,8 +50,69 @@ func InitializePostgresDB() *sqlx.DB {
 	return db
 }
 
-// GetClientInfo returns client information for the given client ID.
-func (db *SQLDatabase) GetClientInfo(ctx context.Context, clientID string) (*model.ClientInfo, error) {
+// ListClients lists all clients in the database.
+func (db *SQLDatabase) ListClients(ctx context.Context) ([]*model.ClientInfo, error) {
+	query := sqlx.Rebind(db.Bindvar(), "SELECT * FROM clients")
+
+	var clientEntities []model.ClientInfoEntity
+	err := db.DB.SelectContext(ctx, &clientEntities, query)
+	if err != nil {
+		return nil, err
+	}
+
+	allScopes, err := db.GetScopes(ctx)
+
+	var clients []*model.ClientInfo
+	for _, entity := range clientEntities {
+		var scopes []*model.Scope
+		for _, scope := range sqlutil.ParseArray(entity.Scopes) {
+			scopes = append(scopes, allScopes[scope])
+		}
+		clients = append(clients, entity.ToModel(scopes))
+	}
+
+	return clients, nil
+}
+
+// RegisterClient registers the client with the provided information.
+func (db *SQLDatabase) RegisterClient(ctx context.Context, clientInfo *model.ClientInfo) (*model.ClientInfo, error) {
+	query := sqlx.Rebind(db.Bindvar(), `
+		INSERT INTO
+			clients(id, secret, redirect_uris, scopes, jwks_uri, logo_uri, grant_types, access_token_life, refresh_token_life)
+		VALUES
+			(?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+
+	uuid, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
+	}
+	var secret string
+	if clientInfo.Type == model.ClientTypeConfidential {
+		secret = model.GenerateAuthorizationCode()
+	}
+	entity := clientInfo.ToEntity()
+	_, err = db.DB.ExecContext(
+		ctx,
+		query,
+		uuid.String(),
+		secret,
+		entity.RedirectURIs,
+		entity.Scopes,
+		entity.JWKsURI,
+		entity.LogoURI,
+		entity.GrantTypes,
+		entity.AccessTokenLife,
+		entity.RefreshTokenLife,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return db.GetClient(ctx, uuid.String())
+}
+
+// GetClient returns client information for the given client ID.
+func (db *SQLDatabase) GetClient(ctx context.Context, clientID string) (*model.ClientInfo, error) {
 	query := sqlx.Rebind(db.Bindvar(), "SELECT * FROM clients WHERE id=?")
 	var entity model.ClientInfoEntity
 	err := db.DB.GetContext(ctx, &entity, query, clientID)
@@ -62,33 +123,87 @@ func (db *SQLDatabase) GetClientInfo(ctx context.Context, clientID string) (*mod
 	defer cancel()
 
 	scopes := sqlutil.ParseArray(entity.Scopes)
-	selectedScopes, err := db.GetScopes(ctx1, scopes...)
+	scopeMap, err := db.GetScopes(ctx1, scopes...)
 	if err != nil {
 		return nil, err
+	}
+	var selectedScopes []*model.Scope
+	for _, scope := range scopeMap {
+		selectedScopes = append(selectedScopes, scope)
 	}
 	return entity.ToModel(selectedScopes), nil
 }
 
+// UpdateClient updates the client with the provided information
+func (db *SQLDatabase) UpdateClient(ctx context.Context, clientInfo *model.ClientInfo) (*model.ClientInfo, error) {
+	query := sqlx.Rebind(db.Bindvar(), `
+		UPDATE
+			clients
+		SET
+			redirect_uris = ?,
+			scopes = ?,
+			jwks_uri = ?,
+			logo_uri = ?,
+			grant_types = ?,
+			access_token_life = ?,
+			refresh_token_life = ?
+		WHERE
+			id = ?`)
+
+	var scopes []string
+	for _, scope := range clientInfo.Scopes {
+		scopes = append(scopes, scope.Name)
+	}
+	var grants []string
+	for _, grant := range clientInfo.GrantTypes {
+		grants = append(grants, string(grant))
+	}
+	_, err := db.DB.ExecContext(
+		ctx,
+		query,
+		sqlutil.GenerateArrayString(clientInfo.RedirectURIs),
+		sqlutil.GenerateArrayString(scopes),
+		clientInfo.JWKsURI,
+		clientInfo.LogoURI,
+		sqlutil.GenerateArrayString(grants),
+		clientInfo.AccessTokenLife,
+		clientInfo.RefreshTokenLife,
+		clientInfo.ID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return db.GetClient(ctx, clientInfo.ID)
+}
+
+// DeleteClient deletes the client from the database.
+func (db *SQLDatabase) DeleteClient(ctx context.Context, clientID string) error {
+	query := sqlx.Rebind(db.Bindvar(), "DELETE FROM clients WHERE id = ?")
+	_, err := db.DB.ExecContext(ctx, query, clientID)
+	return err
+}
+
 // GetScopes returns the selected scopes from the database. If scopes is empty, all scope entities are returned.
-func (db *SQLDatabase) GetScopes(ctx context.Context, scopes ...string) ([]*model.Scope, error) {
+func (db *SQLDatabase) GetScopes(ctx context.Context, scopes ...string) (map[string]*model.Scope, error) {
 	rows, err := db.DB.QueryxContext(ctx, "SELECT * FROM scopes")
 	if err != nil {
 		return nil, err
 	}
-	allScopes := make([]*model.Scope, 0)
+	allScopes := make(map[string]*model.Scope, 0)
 	for rows.Next() {
 		var scope model.Scope
 		rows.StructScan(&scope)
-		allScopes = append(allScopes, &scope)
+		allScopes[scope.Name] = &scope
 	}
 	if len(scopes) == 0 {
 		return allScopes, nil
 	}
-	selectedScopes := make([]*model.Scope, 0)
+	selectedScopes := make(map[string]*model.Scope, 0)
 	for _, scopeEnt := range allScopes {
 		for _, scope := range scopes {
 			if scopeEnt.Name == scope {
-				selectedScopes = append(selectedScopes, scopeEnt)
+				selectedScopes[scope] = scopeEnt
 			}
 		}
 	}
@@ -168,7 +283,11 @@ func (db *SQLDatabase) RegisterTokens(ctx context.Context, accessToken, refreshT
 
 	stmt := sqlx.Rebind(
 		db.Bindvar(),
-		"INSERT INTO tokens(type, token, exp) VALUES (access, ?, ?), (refresh, ?, ?)",
+		`INSERT INTO 
+			tokens(id, type, token, exp) 
+		VALUES 
+			(?, 'access', ?, ?), 
+			(?, 'refresh', ?, ?)`,
 	)
 
 	accessJWT, err := accessToken.Raw()
@@ -182,8 +301,10 @@ func (db *SQLDatabase) RegisterTokens(ctx context.Context, accessToken, refreshT
 	_, err = tx.ExecContext(
 		ctx,
 		stmt,
+		accessToken.Claims.JwtID,
 		accessJWT,
 		accessToken.Claims.ExpirationTime,
+		refreshToken.Claims.JwtID,
 		refreshJWT,
 		refreshToken.Claims.ExpirationTime,
 	)
@@ -202,7 +323,7 @@ func (db *SQLDatabase) CreateUser(ctx context.Context, username, password string
 		return err
 	}
 	query := sqlx.Rebind(db.Bindvar(), `
-		INSERT INTO users(email, password_hash)
+		INSERT INTO users(username, password_hash)
 		VALUES (?, ?)`,
 	)
 	_, err = db.DB.ExecContext(ctx, query, username, hash)

@@ -23,3 +23,19 @@ class ApiException implements Exception {
     return "$method $path: $statusCode - '$body'";
   }
 }
+
+class AuthException implements Exception {
+  final String message;
+
+  const AuthException(this.message);
+
+  factory AuthException.uninitialized() =>
+      AuthException('Authentication has not been initialized.');
+
+  static const unknown = AuthException('An unknown error occurred.');
+
+  @override
+  String toString() {
+    return message;
+  }
+}

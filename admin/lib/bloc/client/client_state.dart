@@ -38,11 +38,11 @@ class ClientSaving extends ClientState {
   ClientInfo get clientInfo => _clientInfo;
 }
 
-class ClientError extends ClientState {
+class ClientFailure extends ClientState {
   final Exception exception;
   final ClientInfo _clientInfo;
 
-  ClientError(this.exception, [this._clientInfo]);
+  ClientFailure(this.exception, [this._clientInfo]);
 
   @override
   List<Object> get props => [exception, _clientInfo];

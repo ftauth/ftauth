@@ -33,13 +33,16 @@ func (db *SQLDatabase) Bindvar() int {
 
 // ClientDB handles interactions with the client database.
 type ClientDB interface {
+	ListClients(ctx context.Context) ([]*model.ClientInfo, error)
+	GetClient(ctx context.Context, clientID string) (*model.ClientInfo, error)
+	UpdateClient(ctx context.Context, clientInfo *model.ClientInfo) (*model.ClientInfo, error)
 	RegisterClient(ctx context.Context, clientInfo *model.ClientInfo) (*model.ClientInfo, error)
+	DeleteClient(ctx context.Context, clientID string) error
 }
 
 // AuthorizationDB handles interactions with the authorization database,
 // which may be the same as other databases or not.
 type AuthorizationDB interface {
-	GetClientInfo(ctx context.Context, clientID string) (*model.ClientInfo, error)
 	CreateSession(ctx context.Context, request *model.AuthorizationRequest) (string, error)
 	GetRequestInfo(ctx context.Context, requestID string) (*model.AuthorizationRequest, error)
 	LookupSessionByCode(ctx context.Context, code string) (*model.AuthorizationRequest, error)

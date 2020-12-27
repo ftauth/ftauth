@@ -1,4 +1,5 @@
-import 'package:admin/bloc/cubit/client_cubit.dart';
+import 'package:admin/bloc/auth/auth_cubit.dart';
+import 'package:admin/bloc/client/client_cubit.dart';
 import 'package:admin/model/model.dart';
 import 'package:admin/repo/client/client_repo.dart';
 import 'package:admin/repo/metadata/metadata_repo.dart';
@@ -10,10 +11,10 @@ import 'package:angular_forms/angular_forms.dart';
 import 'package:angular_router/angular_router.dart';
 
 @Component(
-  selector: 'client-register-form',
-  templateUrl: 'client_register_form_component.html',
+  selector: 'client-form',
+  templateUrl: 'client_form_component.html',
   styleUrls: [
-    'client_register_form_component.css',
+    'client_form_component.css',
   ],
   directives: [
     coreDirectives,
@@ -27,12 +28,14 @@ import 'package:angular_router/angular_router.dart';
 class ClientRegisterFormComponent implements OnActivate, OnDestroy {
   final Location _location;
   final MetadataRepo metadataRepo;
+  final AuthCubit _authCubit;
   final ClientCubit clientCubit;
 
   ClientRegisterFormComponent(
     ClientRepo clientRepo,
     this.metadataRepo,
     this._location,
+    this._authCubit,
   ) : clientCubit = ClientCubit(clientRepo);
 
   ClientInfo get clientInfo => clientCubit.state.clientInfo;
@@ -49,8 +52,8 @@ class ClientRegisterFormComponent implements OnActivate, OnDestroy {
 
   String _error;
   String get error {
-    if (clientCubit.state is ClientError) {
-      return (clientCubit.state as ClientError).exception.toString();
+    if (clientCubit.state is ClientFailure) {
+      return (clientCubit.state as ClientFailure).exception.toString();
     }
     return _error;
   }
@@ -67,14 +70,15 @@ class ClientRegisterFormComponent implements OnActivate, OnDestroy {
   }
 
   @override
-  void onActivate(RouterState previous, RouterState current) {
-    loadMetadata();
+  void onActivate(RouterState previous, RouterState current) async {
+    await _authCubit.isInitialized;
+    print('Loading client metadata...');
     final clientId = current.parameters[clientIdParam];
     if (clientId == null) {
       _error = 'Client ID not specified';
       return;
     }
-    clientCubit.getClientInfo(clientId);
+    await clientCubit.getClientInfo(clientId);
   }
 
   @override

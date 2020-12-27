@@ -30,23 +30,6 @@ func SuppressReferrer(next http.Handler) http.Handler {
 	})
 }
 
-// SessionAuthenticated protects endpoints based off a user's session cookie.
-func SessionAuthenticated(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		session, err := r.Cookie("session")
-		if session == nil || err != nil {
-			http.NotFound(w, r)
-			return
-		}
-
-		// Lookup session data and get access/refresh JWT
-
-		// Attach tokens to request context
-
-		next.ServeHTTP(w, r)
-	})
-}
-
 // BearerAuthenticated protects endpoints based off a user's Bearer auth token.
 func BearerAuthenticated(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -75,6 +58,7 @@ func BearerAuthenticatedWithScope(scope string) mux.MiddlewareFunc {
 					w.Header().Set("WWW-Authenticate", "Bearer")
 				}
 				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte(err.Error()))
 			}
 			authHeader := r.Header.Get("Authorization")
 			token, err := decodeAndVerifyAuthHeader(authHeader)
@@ -86,7 +70,7 @@ func BearerAuthenticatedWithScope(scope string) mux.MiddlewareFunc {
 
 			grantedScopes, err := model.ParseScope(token.Claims.Scope)
 			if err != nil {
-				log.Printf("Error parsing scopes for token %v: %v", token, err)
+				log.Printf("Error parsing scopes '%s': %v", token.Claims.Scope, err)
 				handleErr(err)
 				return
 			}
@@ -123,6 +107,8 @@ func decodeAndVerifyAuthHeader(authHeader string) (*jwt.Token, error) {
 		log.Printf("Error decoding bearer token: %v\n", err)
 		return nil, err
 	}
+
+	log.Printf("Got token: %s\n", bearer)
 
 	err = token.Verify(config.Current.OAuth.Tokens.PublicKey)
 	if err != nil {
