@@ -1,3 +1,5 @@
+// +build e2e
+
 package e2e
 
 import (
@@ -43,7 +45,7 @@ func generateCodeChallenge() string {
 	return base64url.Encode(hash[:])
 }
 
-func Test_EndToEnd(t *testing.T) {
+func TestEndToEnd(t *testing.T) {
 	config := &oauth2.Config{
 		ClientID:     "e29e6460-61f1-4d55-8541-a10b13375af7",
 		ClientSecret: "",

@@ -527,11 +527,6 @@ func (key *Key) RetrieveX509Certificate() (cert []byte, err error) {
 // Signer returns a signing/hashing function based off
 // the algorithm and private key.
 func (key *Key) Signer() func([]byte) ([]byte, error) {
-	if key.PrivateKey == nil {
-		return func(b []byte) ([]byte, error) {
-			return nil, ErrMissingPrivateKey
-		}
-	}
 	switch key.Algorithm {
 	case AlgorithmHMACSHA256:
 		return func(b []byte) ([]byte, error) {
@@ -544,6 +539,9 @@ func (key *Key) Signer() func([]byte) ([]byte, error) {
 		}
 	case AlgorithmRSASHA256:
 		return func(b []byte) ([]byte, error) {
+			if key.PrivateKey == nil {
+				return nil, ErrMissingPrivateKey
+			}
 			rng := rand.Reader
 			privateKey := key.PrivateKey.(*rsa.PrivateKey)
 			hashed := sha256.Sum256(b)

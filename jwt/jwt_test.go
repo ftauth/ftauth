@@ -18,7 +18,7 @@ const (
 	jwt = "eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
 )
 
-func Test_EncodeJWT(t *testing.T) {
+func TestEncodeJWT(t *testing.T) {
 	jwt := &Token{
 		Header: &Header{
 			Algorithm: AlgorithmHMACSHA256,
@@ -44,7 +44,7 @@ func Test_EncodeJWT(t *testing.T) {
 	t.Logf("Got key: %s", enc)
 }
 
-func Test_DecodeJWT(t *testing.T) {
+func TestDecodeJWT(t *testing.T) {
 	key, err := ParseJWK(jwk)
 	require.NoError(t, err)
 	require.NotNil(t, key)
