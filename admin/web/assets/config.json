@@ -1,0 +1,17 @@
+{
+    "oauth": {
+        "client_id": "ee1de5ad-c4a8-415c-8ff6-769ca0fd3bf1",
+        "client_type": "public",
+        "redirect_uris": [
+            "http://localhost:8080/#/auth"
+        ],
+        "scopes": [
+            "default",
+            "admin"
+        ],
+        "grant_types": [
+            "authorization_code",
+            "refresh_token"
+        ]
+    }
+}
