@@ -22,21 +22,24 @@ const (
 
 // IsValid returns true if the algorithm is supported
 func (alg Algorithm) IsValid() error {
+	if alg == "" {
+		return errMissingParameter("alg")
+	}
 	switch alg {
 	case AlgorithmHMACSHA256,
-		AlgorithmRSASHA256:
-		return nil
-	case AlgorithmHMACSHA384,
+		AlgorithmHMACSHA384,
 		AlgorithmHMACSHA512,
+		AlgorithmRSASHA256,
 		AlgorithmRSASHA384,
 		AlgorithmRSASHA512,
 		AlgorithmECDSASHA256,
 		AlgorithmECDSASHA384,
 		AlgorithmECDSASHA512,
 		AlgorithmPSSSHA256,
-		AlgorithmPSSSHA512,
-		AlgorithmNone:
+		AlgorithmPSSSHA384,
+		AlgorithmPSSSHA512:
+		return nil
+	default:
 		return errUnsupportedValue("alg", string(alg))
 	}
-	return errMissingParameter("alg")
 }

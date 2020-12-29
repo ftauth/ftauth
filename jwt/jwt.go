@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/dnys1/ftoauth/util/base64url"
+	"github.com/mitchellh/mapstructure"
 )
 
 // Token is a JSON Web Token (JWT)
@@ -30,7 +31,7 @@ var (
 // Header holds metadata about a JWT, including JWS or JWE-specific algorithm
 // and certificate information.
 type Header struct {
-	Type        string `json:"typ,omitempty"` // JWT or dpop+jwt
+	Type        Type   `json:"typ,omitempty"` // JWT or dpop+jwt
 	ContentType string `json:"cty,omitempty"`
 
 	// JWS Headers (will be different for JWE)
@@ -44,9 +45,23 @@ type Header struct {
 	X509CertificateSHA256Thumprint string    `json:"x5t#S256,omitempty"`
 }
 
-// StringOrURI is a helper type denoting a string that should
-// be interpreted as a URI if it contains a ":" character.
-type StringOrURI string
+// IsValid checks whether the header contains all required fields
+// and is properly formatted. Returns an error if not.
+func (h *Header) IsValid() error {
+	if h.Type == "" {
+		return errMissingParameter("typ")
+	}
+	if h.Algorithm == "" {
+		return errMissingParameter("alg")
+	}
+	switch h.Type {
+	case TypeDPoP:
+		if h.JWK == nil {
+			return errMissingParameter("jwk")
+		}
+	}
+	return nil
+}
 
 // CustomClaims holds custom claims information outside the
 // registered claims fields.
@@ -54,23 +69,74 @@ type CustomClaims map[string]interface{}
 
 var registeredClaims = []string{"iss", "sub", "aud", "exp", "nbf", "iat", "jti"}
 
+func isRegisteredClaim(claim string) bool {
+	for _, c := range registeredClaims {
+		if c == claim {
+			return true
+		}
+	}
+	return false
+}
+
 // Claims holds all the claims this token provides.
 type Claims struct {
-	Issuer         string `json:"iss,omitempty"` // Required
-	Subject        string `json:"sub,omitempty"` // Required
-	Audience       string `json:"aud,omitempty"` // Required
-	ExpirationTime int64  `json:"exp,omitempty"` // Required for non-DPoP tokens
-	NotBefore      int64  `json:"nbf,omitempty"`
-	IssuedAt       int64  `json:"iat,omitempty"`       // Required
-	JwtID          string `json:"jti,omitempty"`       // Required for DPoP tokens
-	ClientID       string `json:"client_id,omitempty"` // Required
-	Scope          string `json:"scope,omitempty"`     // Required
+	Issuer         string `mapstructure:"iss,omitempty" json:"iss,omitempty"` // Required
+	Subject        string `mapstructure:"sub,omitempty" json:"sub,omitempty"` // Required
+	Audience       string `mapstructure:"aud,omitempty" json:"aud,omitempty"` // Required
+	ExpirationTime int64  `mapstructure:"exp,omitempty" json:"exp,omitempty"` // Required for non-DPoP tokens
+	NotBefore      int64  `mapstructure:"nbf,omitempty" json:"nbf,omitempty"`
+	IssuedAt       int64  `mapstructure:"iat,omitempty" json:"iat,omitempty"`             // Required
+	JwtID          string `mapstructure:"jti,omitempty" json:"jti,omitempty"`             // Required for DPoP tokens
+	ClientID       string `mapstructure:"client_id,omitempty" json:"client_id,omitempty"` // Required for non-DPoP tokens
+	Scope          string `mapstructure:"scope,omitempty" json:"scope,omitempty"`         // Required for non-DPoP tokens
 
 	// DPoP claims
-	HTTPMethod string `json:"htm,omitempty"` // The HTTP method for the request to which the JWT is attached
-	HTTPURI    string `json:"htu,omitempty"` // The HTTP URI used for the request, without query and fragment parts
+	HTTPMethod string `mapstructure:"htm,omitempty" json:"htm,omitempty"` // The HTTP method for the request to which the JWT is attached
+	HTTPURI    string `mapstructure:"htu,omitempty" json:"htu,omitempty"` // The HTTP URI used for the request, without query and fragment parts
 
-	CustomClaims CustomClaims `json:"custom,omitempty"`
+	CustomClaims CustomClaims `mapstructure:",remain" json:"-"`
+}
+
+// IsValid checks whether the payload contains all required fields
+// and is properly formatted. Returns an error if not.
+func (c *Claims) IsValid(typ Type) error {
+	if typ == TypeAccess || typ == TypeDPoP {
+		if c.Issuer == "" {
+			return errMissingParameter("iss")
+		}
+		if c.Subject == "" {
+			return errMissingParameter("sub")
+		}
+		if c.Audience == "" {
+			return errMissingParameter("aud")
+		}
+		if c.IssuedAt == 0 {
+			return errMissingParameter("iat")
+		}
+		switch typ {
+		case TypeAccess:
+			if c.ExpirationTime == 0 {
+				return errMissingParameter("exp")
+			}
+			if c.ClientID == "" {
+				return errMissingParameter("client_id")
+			}
+			if c.Scope == "" {
+				return errMissingParameter("scope")
+			}
+		case TypeDPoP:
+			if c.JwtID == "" {
+				return errMissingParameter("jti")
+			}
+			if c.HTTPMethod == "" {
+				return errMissingParameter("htm")
+			}
+			if c.HTTPURI == "" {
+				return errMissingParameter("htu")
+			}
+		}
+	}
+	return nil
 }
 
 func (t *Token) encodeUnsigned() (string, error) {
@@ -82,6 +148,21 @@ func (t *Token) encodeUnsigned() (string, error) {
 	payload, err := json.Marshal(t.Claims)
 	if err != nil {
 		return "", err
+	}
+	if t.Claims.CustomClaims != nil {
+		var payloadMap map[string]interface{}
+		if err := json.Unmarshal(payload, &payloadMap); err != nil {
+			return "", err
+		}
+		for key, value := range t.Claims.CustomClaims {
+			if !isRegisteredClaim(key) {
+				payloadMap[key] = value
+			}
+		}
+		payload, err = json.Marshal(payloadMap)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	encHeader := base64url.Encode(header)
@@ -143,14 +224,24 @@ func Decode(token string) (*Token, error) {
 			return nil, err
 		}
 	}
+	if err := header.IsValid(); err != nil {
+		return nil, err
+	}
 
 	payloadJSON, err := base64url.Decode(fields[1])
 	if err != nil {
 		return nil, ErrInvalidPayloadFormat
 	}
-	var payload Claims
-	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+	var payloadMap map[string]interface{}
+	if err := json.Unmarshal(payloadJSON, &payloadMap); err != nil {
 		return nil, ErrInvalidPayloadFormat
+	}
+	var payload Claims
+	if err := mapstructure.Decode(payloadMap, &payload); err != nil {
+		return nil, ErrInvalidPayloadFormat
+	}
+	if err := payload.IsValid(header.Type); err != nil {
+		return nil, err
 	}
 
 	signature, err := base64url.Decode(fields[2])

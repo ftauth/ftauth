@@ -1,7 +1,6 @@
 package token
 
 import (
-	"strings"
 	"time"
 
 	"github.com/dnys1/ftoauth/internal/config"
@@ -15,21 +14,19 @@ type Type string
 
 // Supported token types
 const (
-	TypeJWT  = "bearer"
-	TypeDPoP = "dpop+jwt"
+	TypeBearer = "bearer"
 )
 
 // IssueAccessToken provisions and signs a new JWT for the given client and scopes.
-func IssueAccessToken(clientInfo *model.ClientInfo, scopes ...string) *jwt.Token {
+func IssueAccessToken(clientInfo *model.ClientInfo, scopes string) *jwt.Token {
 	now := time.Now().UTC()
 	iat := now.Unix()
 	exp := now.Add(time.Second * time.Duration(clientInfo.AccessTokenLife)).Unix()
 	id := uuid.New()
 	token := &jwt.Token{
 		Header: &jwt.Header{
-			Type:      "jwt",
+			Type:      jwt.TypeAccess,
 			Algorithm: jwt.AlgorithmRSASHA256,
-			JWK:       config.Current.OAuth.Tokens.PublicKey,
 			KeyID:     config.Current.OAuth.Tokens.PublicKey.KeyID,
 		},
 		Claims: &jwt.Claims{
@@ -40,7 +37,7 @@ func IssueAccessToken(clientInfo *model.ClientInfo, scopes ...string) *jwt.Token
 			IssuedAt:       iat,
 			ExpirationTime: exp,
 			JwtID:          id.String(),
-			Scope:          strings.Join(scopes, " "),
+			Scope:          scopes,
 		},
 	}
 
@@ -55,9 +52,8 @@ func IssueRefreshToken(clientInfo *model.ClientInfo, accessToken *jwt.Token) *jw
 	id := uuid.New()
 	token := &jwt.Token{
 		Header: &jwt.Header{
-			Type:      "jwt",
+			Type:      jwt.TypeAccess,
 			Algorithm: jwt.AlgorithmRSASHA256,
-			JWK:       config.Current.OAuth.Tokens.PublicKey,
 			KeyID:     config.Current.OAuth.Tokens.PublicKey.KeyID,
 		},
 		Claims: &jwt.Claims{

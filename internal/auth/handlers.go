@@ -452,29 +452,12 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		)
 	}
 
-	// OPTIONAL
-	scope := r.FormValue(paramScope)
-	var scopes []string
-	if scope == "" {
-		scopes = []string{config.Current.OAuth.Scopes.Default}
-	} else {
-		err = clientInfo.ValidateScopes(scope)
-		if err != nil {
-			handleTokenRequestError(
-				w,
-				model.TokenRequestErrInvalidScope,
-				model.RequestErrorDetails{},
-			)
-		}
-		scopes, _ = model.ParseScope(scope)
-	}
-
-	var validator func(http.ResponseWriter, *http.Request, *model.ClientInfo) bool
+	var validateRequestAndRetrieveScopes func(http.ResponseWriter, *http.Request, *model.ClientInfo) string
 	switch grantType {
 	case model.GrantTypeAuthorizationCode:
-		validator = h.validateAuthorizationCodeRequest
+		validateRequestAndRetrieveScopes = h.validateAuthorizationCodeRequest
 	case model.GrantTypeRefreshToken:
-		validator = h.validateRefreshTokenRequest
+		validateRequestAndRetrieveScopes = h.validateRefreshTokenRequest
 	default:
 		handleTokenRequestError(
 			w,
@@ -485,7 +468,8 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// validator handles error redirect
-	if !validator(w, r, clientInfo) {
+	scopes := validateRequestAndRetrieveScopes(w, r, clientInfo)
+	if scopes == "" {
 		return
 	}
 
@@ -494,7 +478,7 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	// 	If it fails, rollback changes in the database
 	// 	to prevent token rotation without client involvement
 
-	accessToken := token.IssueAccessToken(clientInfo, scopes...)
+	accessToken := token.IssueAccessToken(clientInfo, scopes)
 	refreshToken := token.IssueRefreshToken(clientInfo, accessToken)
 
 	accessJWT, err := accessToken.Encode(config.Current.OAuth.Tokens.PrivateKey)
@@ -512,7 +496,7 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	response := model.TokenResponse{
 		AccessToken:  accessJWT,
-		TokenType:    token.TypeJWT,
+		TokenType:    token.TypeBearer,
 		RefreshToken: refreshJWT,
 		ExpiresIn:    clientInfo.AccessTokenLife,
 	}
@@ -550,7 +534,7 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-func (h tokenEndpointHandler) validateAuthorizationCodeRequest(w http.ResponseWriter, r *http.Request, clientInfo *model.ClientInfo) bool {
+func (h tokenEndpointHandler) validateAuthorizationCodeRequest(w http.ResponseWriter, r *http.Request, clientInfo *model.ClientInfo) string {
 	// REQUIRED, must match value from request
 	redirectURI := r.FormValue(paramRedirectURI)
 	if redirectURI == "" {
@@ -572,7 +556,7 @@ func (h tokenEndpointHandler) validateAuthorizationCodeRequest(w http.ResponseWr
 					Details:   "Invalid redirectURI",
 				},
 			)
-			return false
+			return ""
 		}
 	}
 
@@ -587,7 +571,7 @@ func (h tokenEndpointHandler) validateAuthorizationCodeRequest(w http.ResponseWr
 				Details:   "Authorization code cannot be empty.",
 			},
 		)
-		return false
+		return ""
 	}
 
 	// REQUIRED
@@ -601,7 +585,7 @@ func (h tokenEndpointHandler) validateAuthorizationCodeRequest(w http.ResponseWr
 				Details:   "Code verifier cannot be empty.",
 			},
 		)
-		return false
+		return ""
 	}
 
 	// Retrieve code challenge from session
@@ -611,7 +595,7 @@ func (h tokenEndpointHandler) validateAuthorizationCodeRequest(w http.ResponseWr
 	session, err := h.db.LookupSessionByCode(ctx, code)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return false
+		return ""
 	}
 
 	// Compare stored code challenge with code verifier
@@ -626,13 +610,13 @@ func (h tokenEndpointHandler) validateAuthorizationCodeRequest(w http.ResponseWr
 				Details:   "Code verifier does not match previously supplied.",
 			},
 		)
-		return false
+		return ""
 	}
 
-	return true
+	return session.Scope
 }
 
-func (h tokenEndpointHandler) validateRefreshTokenRequest(w http.ResponseWriter, r *http.Request, clientInfo *model.ClientInfo) bool {
+func (h tokenEndpointHandler) validateRefreshTokenRequest(w http.ResponseWriter, r *http.Request, clientInfo *model.ClientInfo) string {
 	// REQUIRED
 	refreshToken := r.FormValue(paramRefreshToken)
 	if refreshToken == "" {
@@ -641,12 +625,12 @@ func (h tokenEndpointHandler) validateRefreshTokenRequest(w http.ResponseWriter,
 			model.TokenRequestErrInvalidGrant,
 			model.RequestErrorDetails{},
 		)
-		return false
+		return ""
 	}
 
 	// Validate refresh token with database
 
-	return true
+	return ""
 }
 
 func handleAuthorizationRequestError(
@@ -665,7 +649,9 @@ func handleAuthorizationRequestError(
 	query.Add("state", state)
 
 	// url.URL cannot handle '#' values in path
-	// e.g. localhost:8080/#/token results in Fragment = "/token"
+	// e.g. localhost:8080/#/token results in
+	// 	Path = "/"
+	//	Fragment = "/token"
 	uri := fmt.Sprintf("%s?%s", redirectURI, query.Encode())
 	http.Redirect(w, r, uri, http.StatusFound)
 }

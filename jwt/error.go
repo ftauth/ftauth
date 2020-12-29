@@ -23,6 +23,8 @@ func errUnsupportedValue(name, value string) error {
 
 // Token errors
 var (
-	ErrMustEncodeFirst   = errors.New("must encode token first")
-	ErrMissingPrivateKey = errors.New("missing private key")
+	ErrMustEncodeFirst     = errors.New("must encode token first")
+	ErrMissingPrivateKey   = errors.New("missing private key")
+	ErrMissingPublicKey    = errors.New("missing public key")
+	ErrMissingSymmetricKey = errors.New("missing symmetric key")
 )

@@ -3,10 +3,11 @@ package jwt
 import (
 	"bytes"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,7 +33,6 @@ func (bi *bigInt) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
-	fmt.Printf("Decoding %s\n", s)
 	_bi, err := base64urluint.Decode(s)
 	if _bi == nil || err != nil {
 		return err
@@ -179,7 +179,7 @@ type EllipticCurve string
 const (
 	EllipticCurveP256 EllipticCurve = "P-256"
 	EllipticCurveP384 EllipticCurve = "P-384"
-	EllipticCurveP512 EllipticCurve = "P-512"
+	EllipticCurveP521 EllipticCurve = "P-521"
 )
 
 // IsValid returns true if the curve is supported
@@ -187,7 +187,7 @@ func (crv EllipticCurve) IsValid() bool {
 	switch crv {
 	case EllipticCurveP256,
 		EllipticCurveP384,
-		EllipticCurveP512:
+		EllipticCurveP521:
 		return true
 	}
 	return false
@@ -228,7 +228,9 @@ func (key *Key) HasPrivateKeyInfo() error {
 			}
 		}
 	case KeyTypeEllipticCurve:
-		// TODO
+		if key.D == nil {
+			return errMissingParameter("d")
+		}
 	}
 	return nil
 }
@@ -247,7 +249,7 @@ func (key *Key) generateKey() error {
 			N: (*big.Int)(key.N),
 			E: int((*big.Int)(key.E).Int64()),
 		}
-		key.PublicKey = pub
+		key.PublicKey = &pub
 		if key.HasPrivateKeyInfo() == nil {
 			primes := []*big.Int{(*big.Int)(key.P), (*big.Int)(key.Q)}
 			precomp := rsa.PrecomputedValues{
@@ -267,12 +269,35 @@ func (key *Key) generateKey() error {
 				}
 				precomp.CRTValues = extraCRT
 			}
-			key.PrivateKey = rsa.PrivateKey{
+			key.PrivateKey = &rsa.PrivateKey{
 				PublicKey:   pub,
 				D:           (*big.Int)(key.D),
 				Primes:      primes,
 				Precomputed: precomp,
 			}
+		}
+	case KeyTypeEllipticCurve:
+		var curve elliptic.Curve
+		switch key.Curve {
+		case EllipticCurveP256:
+			curve = elliptic.P256()
+		case EllipticCurveP384:
+			curve = elliptic.P384()
+		case EllipticCurveP521:
+			curve = elliptic.P521()
+		}
+		pub := ecdsa.PublicKey{
+			Curve: curve,
+			X:     (*big.Int)(key.X),
+			Y:     (*big.Int)(key.Y),
+		}
+		key.PublicKey = &pub
+		if key.HasPrivateKeyInfo() == nil {
+			priv := &ecdsa.PrivateKey{
+				PublicKey: pub,
+				D:         (*big.Int)(key.D),
+			}
+			key.PrivateKey = priv
 		}
 	}
 	return nil
@@ -286,9 +311,11 @@ func ParseJWK(jwk string) (*Key, error) {
 		return nil, err
 	}
 
-	// Set default so we can create Signer
 	if key.Algorithm == "" {
-		key.Algorithm = AlgorithmHMACSHA256
+		err = key.tryParseAlgorithm()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = key.IsValid()
@@ -302,6 +329,29 @@ func ParseJWK(jwk string) (*Key, error) {
 	}
 
 	return &key, nil
+}
+
+func (key *Key) tryParseAlgorithm() error {
+	switch key.KeyType {
+	case KeyTypeEllipticCurve:
+		switch key.Curve {
+		case EllipticCurveP256:
+			key.Algorithm = AlgorithmECDSASHA256
+		case EllipticCurveP384:
+			key.Algorithm = AlgorithmECDSASHA384
+		case EllipticCurveP521:
+			key.Algorithm = AlgorithmECDSASHA512
+		}
+	case KeyTypeRSA:
+	case KeyTypeOctet:
+		key.Algorithm = AlgorithmHMACSHA256 // Default symmetric key algo
+	}
+
+	if key.Algorithm == "" {
+		return errMissingParameter("alg")
+	}
+
+	return nil
 }
 
 // NewJWKFromRSAPrivateKey creates a JWK from an RSA private key.
@@ -524,64 +574,244 @@ func (key *Key) RetrieveX509Certificate() (cert []byte, err error) {
 	return
 }
 
-// Signer returns a signing/hashing function based off
-// the algorithm and private key.
-func (key *Key) Signer() func([]byte) ([]byte, error) {
+// Signer is a function for cryptographically signing tokens.
+type Signer func(b []byte) ([]byte, error)
+
+// Signer returns a signing function based off the algorithm and private key.
+func (key *Key) Signer() Signer {
 	switch key.Algorithm {
 	case AlgorithmHMACSHA256:
-		return func(b []byte) ([]byte, error) {
-			mac := hmac.New(sha256.New, key.SymmetricKey)
-			_, err := mac.Write(b)
-			if err != nil {
-				return nil, err
-			}
-			return mac.Sum(nil), nil
-		}
+		return key.createHMACSigner(crypto.SHA256)
+	case AlgorithmHMACSHA384:
+		return key.createHMACSigner(crypto.SHA384)
+	case AlgorithmHMACSHA512:
+		return key.createHMACSigner(crypto.SHA512)
 	case AlgorithmRSASHA256:
-		return func(b []byte) ([]byte, error) {
-			if key.PrivateKey == nil {
-				return nil, ErrMissingPrivateKey
-			}
-			rng := rand.Reader
-			privateKey := key.PrivateKey.(*rsa.PrivateKey)
-			hashed := sha256.Sum256(b)
-			return rsa.SignPSS(rng, privateKey, crypto.SHA256, hashed[:], &rsa.PSSOptions{
-				SaltLength: rsa.PSSSaltLengthAuto,
-				Hash:       crypto.SHA256,
-			})
-		}
+		return key.createRSASigner(crypto.SHA256)
+	case AlgorithmRSASHA384:
+		return key.createRSASigner(crypto.SHA384)
+	case AlgorithmRSASHA512:
+		return key.createRSASigner(crypto.SHA512)
+	case AlgorithmPSSSHA256:
+		return key.createPSSSigner(crypto.SHA256)
+	case AlgorithmPSSSHA384:
+		return key.createPSSSigner(crypto.SHA384)
+	case AlgorithmPSSSHA512:
+		return key.createPSSSigner(crypto.SHA512)
+	case AlgorithmECDSASHA256:
+		return key.createECDSASigner(crypto.SHA256)
+	case AlgorithmECDSASHA384:
+		return key.createECDSASigner(crypto.SHA384)
+	case AlgorithmECDSASHA512:
+		return key.createECDSASigner(crypto.SHA512)
 	}
 	return func(b []byte) ([]byte, error) {
 		return nil, errUnsupportedValue("alg", string(key.Algorithm))
 	}
 }
 
+func (key *Key) createHMACSigner(hash crypto.Hash) Signer {
+	return func(b []byte) ([]byte, error) {
+		mac := hmac.New(hash.New, key.SymmetricKey)
+		_, err := mac.Write(b)
+		if err != nil {
+			return nil, err
+		}
+		return mac.Sum(nil), nil
+	}
+}
+
+func (key *Key) createRSASigner(hash crypto.Hash) Signer {
+	return func(b []byte) ([]byte, error) {
+		if key.PrivateKey == nil {
+			return nil, ErrMissingPrivateKey
+		}
+		rng := rand.Reader
+		priv := key.PrivateKey.(*rsa.PrivateKey)
+		hasher := hash.New()
+		hasher.Write(b)
+		hashed := hasher.Sum(nil)
+		return rsa.SignPKCS1v15(rng, priv, hash, hashed)
+	}
+}
+
+func (key *Key) createPSSSigner(hash crypto.Hash) Signer {
+	return func(b []byte) ([]byte, error) {
+		if key.PrivateKey == nil {
+			return nil, ErrMissingPrivateKey
+		}
+		rng := rand.Reader
+		privateKey := key.PrivateKey.(*rsa.PrivateKey)
+		hasher := hash.New()
+		hasher.Write(b)
+		hashed := hasher.Sum(nil)
+		return rsa.SignPSS(rng, privateKey, hash, hashed[:], &rsa.PSSOptions{
+			SaltLength: rsa.PSSSaltLengthAuto,
+			Hash:       hash,
+		})
+	}
+}
+
+func (key *Key) createECDSASigner(hash crypto.Hash) Signer {
+	var octets int
+	switch hash {
+	case crypto.SHA256:
+		octets = 32
+	case crypto.SHA384:
+		octets = 48
+	case crypto.SHA512:
+		octets = 66
+	}
+	return func(b []byte) ([]byte, error) {
+		if key.PrivateKey == nil {
+			return nil, ErrMissingPrivateKey
+		}
+		rnd := rand.Reader
+		privateKey := key.PrivateKey.(*ecdsa.PrivateKey)
+		hasher := hash.New()
+		hasher.Write(b)
+		hashed := hasher.Sum(nil)
+		r, s, err := ecdsa.Sign(rnd, privateKey, hashed)
+		if err != nil {
+			return nil, err
+		}
+
+		rb := r.Bytes()
+		sb := s.Bytes()
+
+		var buf []byte
+		// Pad with 0 bytes that r.Bytes removes
+		for i := 0; i < octets-len(rb); i++ {
+			buf = append(buf, 0)
+		}
+		buf = append(buf, rb...)
+
+		// Pad with 0 bytes that s.Bytes removes
+		for i := 0; i < octets-len(sb); i++ {
+			buf = append(buf, 0)
+		}
+		buf = append(buf, sb...)
+		return buf, nil
+	}
+}
+
+// Verifier is a function for verifying a signature against a public key.
+type Verifier func(msg, sig []byte) error
+
 // Verifier returns a function for verifying a signature against the public key.
-func (key *Key) Verifier() func(msg []byte, sig []byte) error {
+func (key *Key) Verifier() Verifier {
 	switch key.Algorithm {
 	case AlgorithmHMACSHA256:
-		return func(msg []byte, sig []byte) error {
-			mac := hmac.New(sha256.New, key.SymmetricKey)
-			_, err := mac.Write(msg)
-			if err != nil {
-				return err
-			}
-			if !bytes.Equal(sig, mac.Sum(nil)) {
-				return ErrInvalidSignature
-			}
-			return nil
-		}
+		return key.createHMACVerifier(crypto.SHA256)
+	case AlgorithmHMACSHA384:
+		return key.createHMACVerifier(crypto.SHA384)
+	case AlgorithmHMACSHA512:
+		return key.createHMACVerifier(crypto.SHA512)
 	case AlgorithmRSASHA256:
-		return func(msg []byte, sig []byte) error {
-			publicKey := key.PublicKey.(*rsa.PublicKey)
-			hashed := sha256.Sum256(msg)
-			return rsa.VerifyPSS(publicKey, crypto.SHA256, hashed[:], sig, &rsa.PSSOptions{
-				SaltLength: rsa.PSSSaltLengthAuto,
-				Hash:       crypto.SHA256,
-			})
-		}
+		return key.createRSAVerifier(crypto.SHA256)
+	case AlgorithmRSASHA384:
+		return key.createRSAVerifier(crypto.SHA384)
+	case AlgorithmRSASHA512:
+		return key.createRSAVerifier(crypto.SHA512)
+	case AlgorithmPSSSHA256:
+		return key.createPSSVerifier(crypto.SHA256)
+	case AlgorithmPSSSHA384:
+		return key.createPSSVerifier(crypto.SHA384)
+	case AlgorithmPSSSHA512:
+		return key.createPSSVerifier(crypto.SHA512)
+	case AlgorithmECDSASHA256:
+		return key.createECDSAVerifier(crypto.SHA256)
+	case AlgorithmECDSASHA384:
+		return key.createECDSAVerifier(crypto.SHA384)
+	case AlgorithmECDSASHA512:
+		return key.createECDSAVerifier(crypto.SHA512)
 	}
 	return func(msg []byte, sig []byte) error {
 		return errUnsupportedValue("alg", string(key.Algorithm))
+	}
+}
+
+func (key *Key) createHMACVerifier(hash crypto.Hash) Verifier {
+	return func(msg, sig []byte) error {
+		if key.SymmetricKey == nil {
+			return ErrMissingSymmetricKey
+		}
+		mac := hmac.New(hash.New, key.SymmetricKey)
+		_, err := mac.Write(msg)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(sig, mac.Sum(nil)) {
+			return ErrInvalidSignature
+		}
+		return nil
+	}
+}
+
+func (key *Key) createRSAVerifier(hash crypto.Hash) Verifier {
+	return func(msg, sig []byte) error {
+		if key.PublicKey == nil {
+			return ErrMissingPublicKey
+		}
+		publicKey := key.PublicKey.(*rsa.PublicKey)
+		hasher := hash.New()
+		hasher.Write(msg)
+		hashed := hasher.Sum(nil)
+		return rsa.VerifyPKCS1v15(publicKey, hash, hashed, sig)
+	}
+}
+
+func (key *Key) createPSSVerifier(hash crypto.Hash) Verifier {
+	return func(msg, sig []byte) error {
+		if key.PublicKey == nil {
+			return ErrMissingPublicKey
+		}
+		publicKey := key.PublicKey.(*rsa.PublicKey)
+		hasher := hash.New()
+		hasher.Write(msg)
+		hashed := hasher.Sum(nil)
+		return rsa.VerifyPSS(publicKey, hash, hashed, sig, &rsa.PSSOptions{
+			SaltLength: rsa.PSSSaltLengthAuto,
+			Hash:       hash,
+		})
+	}
+}
+
+func (key *Key) createECDSAVerifier(hash crypto.Hash) Verifier {
+	var expectedOctets int
+	switch hash {
+	case crypto.SHA256:
+		expectedOctets = 32
+	case crypto.SHA384:
+		expectedOctets = 48
+	case crypto.SHA512:
+		expectedOctets = 66
+	}
+	return func(msg, sig []byte) error {
+		if key.PublicKey == nil {
+			return ErrMissingPublicKey
+		}
+
+		octets := len(sig)
+		if octets != expectedOctets*2 {
+			return ErrInvalidSignature
+		}
+		half := expectedOctets
+
+		r := &big.Int{}
+		r = r.SetBytes(sig[:half])
+
+		s := &big.Int{}
+		s = s.SetBytes(sig[half:])
+
+		pub := key.PublicKey.(*ecdsa.PublicKey)
+		hasher := hash.New()
+		hasher.Write(msg)
+		hashed := hasher.Sum(nil)
+
+		if !ecdsa.Verify(pub, hashed, r, s) {
+			return ErrInvalidSignature
+		}
+		return nil
 	}
 }

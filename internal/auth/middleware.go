@@ -15,6 +15,7 @@ import (
 // Middleware errors
 var (
 	ErrEmptyAuthHeader = errors.New("empty auth header")
+	ErrEmptyDPoPHeader = errors.New("empty DPoP header")
 )
 
 // SuppressReferrer follows best practices to avoid leaking
@@ -61,16 +62,16 @@ func BearerAuthenticatedWithScope(scope string) mux.MiddlewareFunc {
 				w.Write([]byte(err.Error()))
 			}
 			authHeader := r.Header.Get("Authorization")
-			token, err := decodeAndVerifyAuthHeader(authHeader)
+			t, err := decodeAndVerifyAuthHeader(authHeader)
 			if err != nil {
 				log.Printf("Error decoding/verifying auth header: %v\n", err)
 				handleErr(err)
 				return
 			}
 
-			grantedScopes, err := model.ParseScope(token.Claims.Scope)
+			grantedScopes, err := model.ParseScope(t.Claims.Scope)
 			if err != nil {
-				log.Printf("Error parsing scopes '%s': %v", token.Claims.Scope, err)
+				log.Printf("Error parsing scopes '%s': %v", t.Claims.Scope, err)
 				handleErr(err)
 				return
 			}
@@ -87,6 +88,32 @@ func BearerAuthenticatedWithScope(scope string) mux.MiddlewareFunc {
 			}
 
 			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// DPoPAuthenticated protects token retrieval endpoints by binding access tokens
+// to a client, identified via DPoP proofs.
+func DPoPAuthenticated() mux.MiddlewareFunc {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handleErr := func(err error) {
+				if errors.Is(err, ErrEmptyDPoPHeader) {
+					w.Header().Set("WWW-Authenticate", "DPoP")
+				}
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte(err.Error()))
+			}
+
+			// Verify DPoP information
+			dpopEnc := r.Header.Get("DPoP")
+			dpop, err := decodeAndVerifyDPoP(dpopEnc)
+			if err != nil {
+				log.Printf("Error decoding/verifying DPoP token: %v\n", err)
+				handleErr(err)
+				return
+			}
+			_ = dpop
 		})
 	}
 }
@@ -108,12 +135,24 @@ func decodeAndVerifyAuthHeader(authHeader string) (*jwt.Token, error) {
 		return nil, err
 	}
 
-	log.Printf("Got token: %s\n", bearer)
-
 	err = token.Verify(config.Current.OAuth.Tokens.PublicKey)
 	if err != nil {
 		return nil, err
 	}
 
 	return token, nil
+}
+
+func decodeAndVerifyDPoP(dpopEnc string) (*jwt.Token, error) {
+	if dpopEnc == "" {
+		return nil, ErrEmptyDPoPHeader
+	}
+
+	dpop, err := jwt.Decode(dpopEnc)
+	if err != nil {
+		return nil, err
+	}
+
+	// err = dpop.Verify()
+	return dpop, nil
 }
