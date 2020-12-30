@@ -1,11 +1,11 @@
+import 'package:admin/app_state.dart';
 import 'package:admin/bloc/observer.dart';
 import 'package:admin/config/config.dart';
 import 'package:admin/repo/auth/auth_repo_impl.dart';
 import 'package:admin/repo/config/config_repo_impl.dart';
 import 'package:admin/repo/metadata/metadata_repo_impl.dart';
 import 'package:admin/repo/secure_storage/secure_storage_repo_impl.dart';
-import 'package:admin/routes.dart';
-import 'package:admin/screens/auth/auth_screen.dart';
+import 'package:admin/routes/routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:admin/bloc/auth/auth_cubit.dart';
@@ -24,15 +24,9 @@ AppConfig config = AppConfig.dev();
 class AdminApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final app = MaterialApp(
-      title: 'Admin',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: AuthScreen(AuthRouteInfo.empty()),
-    );
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider.value(value: AppState()),
         Provider(
           create: (_) => SecureStorageRepositoryImpl(),
         ),
@@ -58,7 +52,21 @@ class AdminApp extends StatelessWidget {
             ),
           ),
         ],
-        child: app,
+        child: Builder(
+          builder: (context) {
+            final authCubit =
+                BlocProvider.of<AuthCubit>(context, listen: false);
+            final appState = Provider.of<AppState>(context, listen: false);
+            return MaterialApp.router(
+              title: 'Admin',
+              theme: ThemeData(
+                primarySwatch: Colors.blue,
+              ),
+              routerDelegate: AdminRouterDelegate(authCubit, appState),
+              routeInformationParser: AdminRouteInformationParser(appState),
+            );
+          },
+        ),
       ),
     );
   }

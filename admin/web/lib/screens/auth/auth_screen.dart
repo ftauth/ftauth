@@ -1,5 +1,5 @@
 import 'package:admin/bloc/auth/auth_cubit.dart';
-import 'package:admin/routes.dart';
+import 'package:admin/routes/routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -18,9 +18,9 @@ class _AuthScreenState extends State<AuthScreen> {
   void initState() {
     super.initState();
     final cubit = BlocProvider.of<AuthCubit>(context, listen: false);
-    final initialize = cubit.initialize();
+    final isInitialized = cubit.initialize();
     if (!widget.routeInfo.isEmpty) {
-      initialize.then((_) {
+      isInitialized.then((_) {
         cubit.exchangeToken({
           'code': widget.routeInfo.code,
           'state': widget.routeInfo.state,
@@ -38,7 +38,9 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+      ),
       body: Center(
         child: BlocBuilder<AuthCubit, AuthState>(
           builder: (context, state) {

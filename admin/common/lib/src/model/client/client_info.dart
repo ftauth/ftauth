@@ -51,6 +51,23 @@ class ClientInfo extends Equatable {
     return scopes;
   }
 
+  ClientInfo copyWith({
+    List<String>? redirectUris,
+  }) {
+    return ClientInfo(
+      clientId: clientId,
+      clientType: clientType,
+      clientName: clientName,
+      clientSecret: clientSecret,
+      clientSecretExpiresAt: clientSecretExpiresAt,
+      redirectUris: redirectUris ?? this.redirectUris,
+      scopes: scopes,
+      jwksUri: jwksUri,
+      logoUri: logoUri,
+      grantTypes: grantTypes,
+    );
+  }
+
   factory ClientInfo.fromJson(Map<String, dynamic> json) =>
       _$ClientInfoFromJson(json);
 

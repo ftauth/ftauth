@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+part of 'routes.dart';
 
-class AuthRouteInfo {
-  final String state;
+class AuthRouteInfo extends RouteInfo {
   final String code;
+  final String state;
 
   AuthRouteInfo(this.code, this.state);
 
@@ -14,37 +14,26 @@ class AuthRouteInfo {
 }
 
 class AuthRouteInfoParser extends RouteInformationParser<AuthRouteInfo> {
+  final AppState _appState;
+
+  AuthRouteInfoParser(this._appState);
+
   @override
   Future<AuthRouteInfo> parseRouteInformation(
       RouteInformation routeInformation) async {
     final uri = Uri.parse(routeInformation.location);
     if (uri.queryParameters.containsKey('code') &&
         uri.queryParameters.containsKey('state')) {
-      return AuthRouteInfo(
+      return _appState.authRouteInfo = AuthRouteInfo(
         uri.queryParameters['code'],
         uri.queryParameters['state'],
       );
     }
     return AuthRouteInfo.empty();
   }
-}
-
-class AuthRouterDelegate extends RouterDelegate<AuthRouteInfo>
-    with ChangeNotifier, PopNavigatorRouterDelegateMixin<AuthRouteInfo> {
-  @override
-  Widget build(BuildContext context) {
-    return Navigator(
-      pages: [],
-    );
-  }
 
   @override
-  // TODO: implement navigatorKey
-  GlobalKey<NavigatorState> get navigatorKey => throw UnimplementedError();
-
-  @override
-  Future<void> setNewRoutePath(AuthRouteInfo configuration) {
-    // TODO: implement setNewRoutePath
-    throw UnimplementedError();
+  RouteInformation restoreRouteInformation(RouteInfo configuration) {
+    return RouteInformation(location: '/auth');
   }
 }
