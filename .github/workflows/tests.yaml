@@ -28,8 +28,12 @@ jobs:
         uses: subosito/flutter-action@v1
         with:
           channel: dev
-      
-      - run: cd admin/web
+
       - run: flutter pub get
+        working-directory: admin/web
+
       - run: flutter test
+        working-directory: admin/web
+
       - run: flutter build web
+        working-directory: admin/web
