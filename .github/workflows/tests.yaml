@@ -16,3 +16,19 @@ jobs:
 
       - run: go build ./...
       - run: go test -v ./...
+
+  flutter-test:
+    name: Test frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Add Flutter
+        uses: subosito/flutter-action@v1
+        with:
+          channel: dev
+      
+      - run: flutter pub get
+      - run: flutter test
+      - run: flutter build web

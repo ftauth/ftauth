@@ -33,6 +33,6 @@ func Decode(str string) (*big.Int, error) {
 	if err != nil {
 		return nil, err
 	}
-	bint := big.Int{}
+	bint := &big.Int{}
 	return bint.SetBytes(b), nil
 }

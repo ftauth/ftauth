@@ -14,6 +14,13 @@ class AuthLoading extends AuthState {
   final String message;
 
   const AuthLoading(this.message);
+
+  const AuthLoading.initializing() : message = 'Checking if logged in...';
+  const AuthLoading.loadingUrl() : message = null;
+  const AuthLoading.loggingIn() : message = 'Logging in...';
+
+  @override
+  List<Object> get props => [message];
 }
 
 class AuthStarted extends AuthState {}
@@ -28,4 +35,7 @@ class AuthFailure extends AuthState {
   const AuthFailure([this.message = 'An unknown error occurred.']);
 
   factory AuthFailure.fromException(Exception e) => AuthFailure(e.toString());
+
+  @override
+  List<Object> get props => [message];
 }

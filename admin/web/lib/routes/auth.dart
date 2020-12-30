@@ -14,22 +14,20 @@ class AuthRouteInfo extends RouteInfo {
 }
 
 class AuthRouteInfoParser extends RouteInformationParser<AuthRouteInfo> {
-  final AppState _appState;
-
-  AuthRouteInfoParser(this._appState);
-
   @override
-  Future<AuthRouteInfo> parseRouteInformation(
-      RouteInformation routeInformation) async {
+  SynchronousFuture<AuthRouteInfo> parseRouteInformation(
+      RouteInformation routeInformation) {
     final uri = Uri.parse(routeInformation.location);
     if (uri.queryParameters.containsKey('code') &&
         uri.queryParameters.containsKey('state')) {
-      return _appState.authRouteInfo = AuthRouteInfo(
-        uri.queryParameters['code'],
-        uri.queryParameters['state'],
+      return SynchronousFuture(
+        AuthRouteInfo(
+          uri.queryParameters['code'],
+          uri.queryParameters['state'],
+        ),
       );
     }
-    return AuthRouteInfo.empty();
+    return SynchronousFuture(AuthRouteInfo.empty());
   }
 
   @override

@@ -11,6 +11,7 @@ import (
 	"github.com/dnys1/ftoauth/internal/config"
 	"github.com/dnys1/ftoauth/internal/database"
 	"github.com/dnys1/ftoauth/internal/model"
+	"github.com/dnys1/ftoauth/jwt"
 	"github.com/dnys1/ftoauth/util/cors"
 	"github.com/gorilla/mux"
 )
@@ -82,7 +83,8 @@ func (h *discoveryHandler) loadMetadata(ctx context.Context) {
 
 func handleJWKS(w http.ResponseWriter, r *http.Request) {
 	jwk := config.Current.OAuth.Tokens.PublicKey
-	b, err := json.Marshal(jwk)
+	jwks := jwt.KeySet{Keys: []*jwt.Key{jwk}}
+	b, err := json.Marshal(jwks)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return

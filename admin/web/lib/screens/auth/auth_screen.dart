@@ -17,6 +17,7 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   void initState() {
     super.initState();
+    print('Init state');
     final cubit = BlocProvider.of<AuthCubit>(context, listen: false);
     final isInitialized = cubit.initialize();
     if (!widget.routeInfo.isEmpty) {

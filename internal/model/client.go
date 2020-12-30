@@ -54,6 +54,7 @@ type ClientInfo struct {
 // e.g. when communicating with a DB.
 type ClientInfoEntity struct {
 	ID               string     `db:"id"`
+	Name             string     `db:"name"`
 	Type             ClientType `db:"type"`
 	Secret           string     `db:"secret"`
 	SecretExpiry     time.Time  `db:"secret_expiry"`
@@ -78,6 +79,7 @@ func (clientInfo *ClientInfo) ToEntity() *ClientInfoEntity {
 	}
 	return &ClientInfoEntity{
 		ID:               clientInfo.ID,
+		Name:             clientInfo.Name,
 		Type:             clientInfo.Type,
 		Secret:           clientInfo.Secret,
 		SecretExpiry:     clientInfo.SecretExpiry,
@@ -95,6 +97,7 @@ func (clientInfo *ClientInfo) ToEntity() *ClientInfoEntity {
 func (entity *ClientInfoEntity) ToModel(scopes []*Scope) *ClientInfo {
 	return &ClientInfo{
 		ID:               entity.ID,
+		Name:             entity.Name,
 		Type:             entity.Type,
 		Secret:           entity.Secret,
 		RedirectURIs:     sqlutil.ParseArray(entity.RedirectURIs),
@@ -120,8 +123,8 @@ func parseGrantTypes(grants string) []GrantType {
 
 // Scope identifies an access scope for a client
 type Scope struct {
-	Name    string `db:"name"`    // Primary key
-	Ruleset string `db:"ruleset"` // Set of rules - in JSON format
+	Name    string `db:"name" json:"name"`       // Primary key
+	Ruleset string `db:"ruleset" json:"ruleset"` // Set of rules - in JSON format
 }
 
 // ValidateScopes affirms whether the client supports the given scopes.

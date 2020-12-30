@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 
@@ -262,6 +263,20 @@ func (db *SQLDatabase) GetRequestInfo(ctx context.Context, sessionID string) (*m
 	return &request, nil
 }
 
+// UpdateRequestInfo updates the information pertinent to this request.
+func (db *SQLDatabase) UpdateRequestInfo(ctx context.Context, requestInfo *model.AuthorizationRequest) error {
+	query := sqlx.Rebind(db.Bindvar(), `
+		UPDATE
+			requests
+		SET
+			"user" = ?
+		WHERE
+			id = ?
+	`)
+	_, err := db.DB.ExecContext(ctx, query, requestInfo.UserID, requestInfo.ID)
+	return err
+}
+
 // LookupSessionByCode retrieves a request session's data based off the authorization code.
 func (db *SQLDatabase) LookupSessionByCode(ctx context.Context, code string) (*model.AuthorizationRequest, error) {
 	query := sqlx.Rebind(db.Bindvar(), "SELECT * from requests WHERE code=?")
@@ -322,11 +337,15 @@ func (db *SQLDatabase) CreateUser(ctx context.Context, username, password string
 	if err != nil {
 		return err
 	}
+	uuid, err := uuid.NewV4()
+	if err != nil {
+		return err
+	}
 	query := sqlx.Rebind(db.Bindvar(), `
-		INSERT INTO users(username, password_hash)
-		VALUES (?, ?)`,
+		INSERT INTO users(id, username, password_hash)
+		VALUES (?, ?, ?)`,
 	)
-	_, err = db.DB.ExecContext(ctx, query, username, hash)
+	_, err = db.DB.ExecContext(ctx, query, uuid.String(), username, hash)
 	if err != nil {
 		return err
 	}
@@ -334,9 +353,26 @@ func (db *SQLDatabase) CreateUser(ctx context.Context, username, password string
 	return nil
 }
 
-// VerifyUsernameAndPassword returns an error if the username and password
-// combo do not match.
+// GetUserByUsername retrieves user's info based off a username
+func (db *SQLDatabase) GetUserByUsername(ctx context.Context, username string) (*model.User, error) {
+	query := sqlx.Rebind(db.Bindvar(), "SELECT * FROM users WHERE username = ?")
+	var user model.User
+	err := db.DB.GetContext(ctx, &user, query, username)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+// VerifyUsernameAndPassword returns an error if the username and password combo do not match what's in the DB.
 func (db *SQLDatabase) VerifyUsernameAndPassword(ctx context.Context, username, password string) error {
+	user, err := db.GetUserByUsername(ctx, username)
+	if err != nil {
+		return err
+	}
+	if !passwordutil.CheckPasswordHash(password, user.PasswordHash) {
+		return errors.New("invalid password")
+	}
 	return nil
 }
 

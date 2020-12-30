@@ -6,7 +6,7 @@ import (
 	"github.com/dnys1/ftoauth/internal/config"
 	"github.com/dnys1/ftoauth/internal/model"
 	"github.com/dnys1/ftoauth/jwt"
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid"
 )
 
 // Type identifies the format of the token.
@@ -18,11 +18,14 @@ const (
 )
 
 // IssueAccessToken provisions and signs a new JWT for the given client and scopes.
-func IssueAccessToken(clientInfo *model.ClientInfo, scopes string) *jwt.Token {
+func IssueAccessToken(clientInfo *model.ClientInfo, username, scopes string) (*jwt.Token, error) {
 	now := time.Now().UTC()
 	iat := now.Unix()
 	exp := now.Add(time.Second * time.Duration(clientInfo.AccessTokenLife)).Unix()
-	id := uuid.New()
+	id, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
+	}
 	token := &jwt.Token{
 		Header: &jwt.Header{
 			Type:      jwt.TypeAccess,
@@ -32,7 +35,7 @@ func IssueAccessToken(clientInfo *model.ClientInfo, scopes string) *jwt.Token {
 		Claims: &jwt.Claims{
 			Issuer:         "http://localhost:8080",
 			Subject:        clientInfo.ID,
-			Audience:       "",
+			Audience:       username,
 			ClientID:       clientInfo.ID,
 			IssuedAt:       iat,
 			ExpirationTime: exp,
@@ -41,15 +44,18 @@ func IssueAccessToken(clientInfo *model.ClientInfo, scopes string) *jwt.Token {
 		},
 	}
 
-	return token
+	return token, nil
 }
 
 // IssueRefreshToken creates a new refresh token for the given access token.
-func IssueRefreshToken(clientInfo *model.ClientInfo, accessToken *jwt.Token) *jwt.Token {
+func IssueRefreshToken(clientInfo *model.ClientInfo, accessToken *jwt.Token) (*jwt.Token, error) {
 	now := time.Now().UTC()
 	iat := now.Unix()
 	exp := now.Add(time.Second * time.Duration(clientInfo.RefreshTokenLife)).Unix()
-	id := uuid.New()
+	id, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
+	}
 	token := &jwt.Token{
 		Header: &jwt.Header{
 			Type:      jwt.TypeAccess,
@@ -58,7 +64,7 @@ func IssueRefreshToken(clientInfo *model.ClientInfo, accessToken *jwt.Token) *jw
 		},
 		Claims: &jwt.Claims{
 			Audience:       accessToken.Claims.JwtID,
-			ClientID:       string(clientInfo.ID),
+			ClientID:       clientInfo.ID,
 			IssuedAt:       iat,
 			ExpirationTime: exp,
 			JwtID:          id.String(),
@@ -66,5 +72,5 @@ func IssueRefreshToken(clientInfo *model.ClientInfo, accessToken *jwt.Token) *jw
 		},
 	}
 
-	return token
+	return token, nil
 }

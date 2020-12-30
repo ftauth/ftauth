@@ -30,9 +30,12 @@ class AuthCubit extends Cubit<AuthState> {
     yield* this;
   }
 
+  Future<void> get isAuthenticated =>
+      states.firstWhere((state) => state is AuthSignedIn);
+
   Future<void> initialize() async {
     if (state is AuthInitial) {
-      emit(AuthLoading('Checking if logged in...'));
+      emit(AuthLoading.initializing());
       try {
         print('Initializing...');
         final currentState = await _authRepo.initialize();
@@ -45,7 +48,7 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   Future<String> loadLoginUrl() async {
-    emit(AuthLoading('Retrieving login URL...'));
+    emit(AuthLoading.loadingUrl());
     try {
       final authUrl = await _authRepo.getAuthorizationURL();
       emit(AuthStarted());
@@ -62,7 +65,7 @@ class AuthCubit extends Cubit<AuthState> {
       return;
     }
 
-    emit(AuthLoading('Logging in...'));
+    emit(AuthLoading.loggingIn());
     try {
       await _authRepo.exchangeToken(queryParameters);
       emit(AuthSignedIn());

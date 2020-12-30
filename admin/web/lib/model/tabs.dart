@@ -1,0 +1,4 @@
+enum Tabs {
+  clients,
+  templates,
+}

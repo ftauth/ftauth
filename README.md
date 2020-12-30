@@ -9,10 +9,15 @@ Features include:
 
 JWTs improve performance by allowing clients to introspect the token without querying the authorization server. JWKs allow clients to validate the claims embedded within the JWT by verifying the signature of the JWT.
 
-- Demonstrated Proof-of-Possession ([DPoP](https://tools.ietf.org/html/draft-ietf-oauth-dpop-01))
+- Demonstrated Proof-of-Possession ([DPoP](https://tools.ietf.org/html/draft-ietf-oauth-dpop-02))
 
 While OAuth best practices require that clients mutually authenticate (e.g. via mutual TLS ([mTLS](https://tools.ietf.org/html/rfc8705))), this is not possible for public clients (i.e. Web apps, native apps) which encompass the majority of common use cases.
 
-As an alternative, DPoP or Demonstrated Proof-of-Possession is implemented for all clients (public and confidential) which protects against some common attacks [^1].
+As an alternative, DPoP or Demonstrated Proof-of-Possession is implemented for all clients (public and confidential) which protects against some [common attacks](https://tools.ietf.org/html/draft-ietf-oauth-security-topics-16).
 
-[^1]: https://tools.ietf.org/html/draft-ietf-oauth-security-topics-16
+## Quick Start
+Run the following command to create a fully-functioning PostgreSQL-backed instance of FTOAuth:
+
+```sh
+docker-compose up
+```

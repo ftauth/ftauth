@@ -25,6 +25,7 @@ type AuthorizationRequest struct {
 	Expiry              int64               `db:"exp"`
 	CodeChallenge       string              `db:"code_challenge"`
 	CodeChallengeMethod CodeChallengeMethod `db:"code_challenge_method"`
+	UserID              string              `db:"user"`
 }
 
 // TokenRequest holds information for the request of an access token.

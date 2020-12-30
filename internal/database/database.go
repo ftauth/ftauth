@@ -45,6 +45,7 @@ type ClientDB interface {
 type AuthorizationDB interface {
 	CreateSession(ctx context.Context, request *model.AuthorizationRequest) (string, error)
 	GetRequestInfo(ctx context.Context, requestID string) (*model.AuthorizationRequest, error)
+	UpdateRequestInfo(ctx context.Context, requestInfo *model.AuthorizationRequest) error
 	LookupSessionByCode(ctx context.Context, code string) (*model.AuthorizationRequest, error)
 	RegisterTokens(ctx context.Context, accessToken, refreshToken *jwt.Token) (func() error, func() error, error)
 }
@@ -53,6 +54,7 @@ type AuthorizationDB interface {
 // which may or may not be the same as other databases.
 type AuthenticationDB interface {
 	CreateUser(ctx context.Context, username, password string) error
+	GetUserByUsername(ctx context.Context, username string) (*model.User, error)
 	VerifyUsernameAndPassword(ctx context.Context, username, password string) error
 }
 

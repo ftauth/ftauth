@@ -52,19 +52,29 @@ class ClientInfo extends Equatable {
   }
 
   ClientInfo copyWith({
+    String? clientId,
+    String? clientName,
+    ClientType? clientType,
+    String? clientSecret,
+    DateTime? clientSecretExpiresAt,
     List<String>? redirectUris,
+    List<String>? scopes,
+    String? jwksUri,
+    String? logoUri,
+    List<String>? grantTypes,
   }) {
     return ClientInfo(
-      clientId: clientId,
-      clientType: clientType,
-      clientName: clientName,
-      clientSecret: clientSecret,
-      clientSecretExpiresAt: clientSecretExpiresAt,
+      clientId: clientId ?? this.clientId,
+      clientType: clientType ?? this.clientType,
+      clientName: clientName ?? this.clientName,
+      clientSecret: clientSecret ?? this.clientSecret,
+      clientSecretExpiresAt:
+          clientSecretExpiresAt ?? this.clientSecretExpiresAt,
       redirectUris: redirectUris ?? this.redirectUris,
-      scopes: scopes,
-      jwksUri: jwksUri,
-      logoUri: logoUri,
-      grantTypes: grantTypes,
+      scopes: scopes ?? this.scopes,
+      jwksUri: jwksUri ?? this.jwksUri,
+      logoUri: logoUri ?? this.logoUri,
+      grantTypes: grantTypes ?? this.grantTypes,
     );
   }
 
