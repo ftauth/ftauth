@@ -29,6 +29,7 @@ jobs:
         with:
           channel: dev
       
+      - run: cd admin/web
       - run: flutter pub get
       - run: flutter test
       - run: flutter build web
