@@ -48,6 +48,8 @@ type AuthorizationDB interface {
 	UpdateRequestInfo(ctx context.Context, requestInfo *model.AuthorizationRequest) error
 	LookupSessionByCode(ctx context.Context, code string) (*model.AuthorizationRequest, error)
 	RegisterTokens(ctx context.Context, accessToken, refreshToken *jwt.Token) (func() error, func() error, error)
+	IsTokenSeen(ctx context.Context, token *jwt.Token) error
+	GetTokenByID(ctx context.Context, tokenID string) (string, error)
 }
 
 // AuthenticationDB handles interactions with the authentication databse,

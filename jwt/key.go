@@ -8,6 +8,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -814,4 +815,53 @@ func (key *Key) createECDSAVerifier(hash crypto.Hash) Verifier {
 		}
 		return nil
 	}
+}
+
+// Thumbprint returns the SHA-256 thumbprint of the key.
+func (key *Key) Thumbprint() (string, error) {
+	// Fields used in computation per RFC7638
+	var s interface{}
+	switch key.KeyType {
+	case KeyTypeRSA:
+		s = struct {
+			E       *bigInt `json:"e"`
+			KeyType KeyType `json:"kty"`
+			N       *bigInt `json:"n"`
+		}{
+			E:       key.E,
+			KeyType: key.KeyType,
+			N:       key.N,
+		}
+	case KeyTypeEllipticCurve:
+		s = struct {
+			Curve   EllipticCurve `json:"crv"`
+			KeyType KeyType       `json:"kty"`
+			X       *bigInt       `json:"x"`
+			Y       *bigInt       `json:"y"`
+		}{
+			Curve:   key.Curve,
+			KeyType: key.KeyType,
+			X:       key.X,
+			Y:       key.Y,
+		}
+	case KeyTypeOctet:
+		s = struct {
+			K       string  `json:"k"`
+			KeyType KeyType `json:"kty"`
+		}{
+			K:       key.K,
+			KeyType: key.KeyType,
+		}
+	}
+
+	b, err := json.Marshal(s)
+	if err != nil {
+		return "", err
+	}
+
+	fmt.Println(string(b))
+
+	digest := sha256.Sum256(b)
+
+	return base64url.Encode(digest[:]), nil
 }

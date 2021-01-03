@@ -15,10 +15,11 @@ type Type string
 // Supported token types
 const (
 	TypeBearer = "bearer"
+	TypeDPoP   = "DPoP"
 )
 
 // IssueAccessToken provisions and signs a new JWT for the given client and scopes.
-func IssueAccessToken(clientInfo *model.ClientInfo, username, scopes string) (*jwt.Token, error) {
+func IssueAccessToken(clientInfo *model.ClientInfo, userID, scopes string) (*jwt.Token, error) {
 	now := time.Now().UTC()
 	iat := now.Unix()
 	exp := now.Add(time.Second * time.Duration(clientInfo.AccessTokenLife)).Unix()
@@ -35,7 +36,7 @@ func IssueAccessToken(clientInfo *model.ClientInfo, username, scopes string) (*j
 		Claims: &jwt.Claims{
 			Issuer:         "http://localhost:8080",
 			Subject:        clientInfo.ID,
-			Audience:       username,
+			Audience:       userID,
 			ClientID:       clientInfo.ID,
 			IssuedAt:       iat,
 			ExpirationTime: exp,
@@ -69,6 +70,9 @@ func IssueRefreshToken(clientInfo *model.ClientInfo, accessToken *jwt.Token) (*j
 			ExpirationTime: exp,
 			JwtID:          id.String(),
 			Scope:          accessToken.Claims.Scope,
+			CustomClaims: jwt.CustomClaims{
+				"userID": accessToken.Claims.Audience,
+			},
 		},
 	}
 

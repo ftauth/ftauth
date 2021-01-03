@@ -14,9 +14,12 @@ import (
 	"github.com/dnys1/ftoauth/internal/database"
 	"github.com/dnys1/ftoauth/internal/model"
 	"github.com/dnys1/ftoauth/internal/token"
+	"github.com/dnys1/ftoauth/jwt"
 	"github.com/dnys1/ftoauth/util/base64url"
 	"github.com/gorilla/mux"
 )
+
+type dpopKey string
 
 const (
 	// TokenEndpoint is used by the client to exchange
@@ -47,6 +50,11 @@ const (
 	paramCodeChallengeMethod = "code_challenge_method"
 	paramCodeVerifier        = "code_verifier"
 	paramRefreshToken        = "refresh_token"
+	paramError               = "error"
+	paramErrorDescription    = "error_description"
+	paramErrorURI            = "error_uri"
+
+	dpopContextKey dpopKey = "dpop"
 )
 
 // SetupRoutes configures routing for the given mux.
@@ -56,8 +64,17 @@ func SetupRoutes(
 	authenticationDB database.AuthenticationDB,
 	clientDB database.ClientDB,
 ) {
-	r.Handle(AuthorizationEndpoint, authorizationEndpointHandler{db: authorizationDB, clientDB: clientDB})
-	r.Handle(TokenEndpoint, tokenEndpointHandler{db: authorizationDB, clientDB: clientDB})
+	mi := middlewareInjector{db: authorizationDB}
+	dpopMiddleware := mi.DPoPAuthenticated()
+
+	r.Handle(
+		AuthorizationEndpoint,
+		authorizationEndpointHandler{db: authorizationDB, clientDB: clientDB},
+	)
+	r.Handle(
+		TokenEndpoint,
+		dpopMiddleware(tokenEndpointHandler{db: authorizationDB, clientDB: clientDB}),
+	)
 	r.Handle(LoginEndpoint, loginEndpointHandler{authenticationDB, authorizationDB})
 	r.Handle(RegisterEndpoint, registerHandler{authenticationDB: authenticationDB})
 }
@@ -414,8 +431,8 @@ type tokenEndpointHandler struct {
 }
 
 type tokenRequestInfo struct {
-	scope    string
-	username string
+	scope  string
+	userID string
 }
 
 func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -511,7 +528,7 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	// 	If it fails, rollback changes in the database
 	// 	to prevent token rotation without client involvement
 
-	accessToken, err := token.IssueAccessToken(clientInfo, reqInfo.username, reqInfo.scope)
+	accessToken, err := token.IssueAccessToken(clientInfo, reqInfo.userID, reqInfo.scope)
 	if err != nil {
 		log.Printf("Error generating access token: %v\n", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -522,6 +539,31 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		log.Printf("Error generating refresh token: %v\n", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
+	}
+
+	tokenType := token.TypeBearer
+
+	// Bind to DPoP key if DPoP request
+	if dpop := r.Context().Value(dpopContextKey); dpop != nil {
+		dpopToken, ok := dpop.(*jwt.Token)
+		if !ok {
+			log.Println("Context value expected to be DPoP")
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		thumbprint, err := dpopToken.Header.JWK.Thumbprint()
+		if err != nil {
+			log.Printf("Error thumbprinting DPoP JWT: %v\n", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		accessToken.Claims.Confirmation = &jwt.ConfirmationClaim{
+			SHA256Thumbprint: thumbprint,
+		}
+		refreshToken.Claims.Confirmation = &jwt.ConfirmationClaim{
+			SHA256Thumbprint: thumbprint,
+		}
+		tokenType = token.TypeDPoP
 	}
 
 	accessJWT, err := accessToken.Encode(config.Current.OAuth.Tokens.PrivateKey)
@@ -539,7 +581,7 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	response := model.TokenResponse{
 		AccessToken:  accessJWT,
-		TokenType:    token.TypeBearer,
+		TokenType:    tokenType,
 		RefreshToken: refreshJWT,
 		ExpiresIn:    clientInfo.AccessTokenLife,
 	}
@@ -663,15 +705,15 @@ func (h tokenEndpointHandler) validateAuthorizationCodeRequest(w http.ResponseWr
 	}
 
 	return &tokenRequestInfo{
-		scope:    session.Scope,
-		username: session.UserID,
+		scope:  session.Scope,
+		userID: session.UserID,
 	}
 }
 
 func (h tokenEndpointHandler) validateRefreshTokenRequest(w http.ResponseWriter, r *http.Request, clientInfo *model.ClientInfo) *tokenRequestInfo {
 	// REQUIRED
-	refreshToken := r.FormValue(paramRefreshToken)
-	if refreshToken == "" {
+	refreshTokenEnc := r.FormValue(paramRefreshToken)
+	if refreshTokenEnc == "" {
 		handleTokenRequestError(
 			w,
 			model.TokenRequestErrInvalidGrant,
@@ -680,9 +722,54 @@ func (h tokenEndpointHandler) validateRefreshTokenRequest(w http.ResponseWriter,
 		return nil
 	}
 
-	// Validate refresh token with database
+	refreshToken, err := jwt.Decode(refreshTokenEnc)
+	if err != nil {
+		handleTokenRequestError(
+			w,
+			model.TokenRequestErrInvalidGrant,
+			model.RequestErrorDetails{},
+		)
+		return nil
+	}
 
-	return nil
+	// Check if token is expired
+	expiry := time.Unix(refreshToken.Claims.ExpirationTime, 0)
+	if expiry.Before(time.Now()) {
+		handleTokenRequestError(
+			w,
+			model.TokenRequestErrInvalidGrant,
+			model.RequestErrorDetails{
+				Details: "token expired",
+			},
+		)
+		return nil
+	}
+
+	// Validate refresh token against DPoP public key, if present
+	if dpop := r.Context().Value(dpopContextKey); dpop != nil {
+		dpopToken, ok := dpop.(*jwt.Token)
+		if !ok {
+			log.Println("Context value expected to be DPoP")
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return nil
+		}
+
+		err = refreshToken.Verify(dpopToken.Header.JWK)
+		if err != nil {
+			handleTokenRequestError(
+				w,
+				model.TokenRequestErrInvalidGrant,
+				model.RequestErrorDetails{},
+			)
+			return nil
+		}
+	}
+
+	userID, _ := refreshToken.Claims.CustomClaims["userID"].(string)
+	return &tokenRequestInfo{
+		scope:  refreshToken.Claims.Scope,
+		userID: userID,
+	}
 }
 
 func handleAuthorizationRequestError(
@@ -695,10 +782,10 @@ func handleAuthorizationRequestError(
 ) {
 	errorURI, _ := url.Parse(redirectURI)
 	query := errorURI.Query()
-	query.Add("error", string(err.(model.AuthorizationRequestError)))
-	query.Add("error_description", err.Description(details))
-	query.Add("error_uri", err.URI())
-	query.Add("state", state)
+	query.Add(paramError, string(err.(model.AuthorizationRequestError)))
+	query.Add(paramErrorDescription, err.Description(details))
+	query.Add(paramErrorURI, err.URI())
+	query.Add(paramState, state)
 
 	// url.URL cannot handle '#' values in path
 	// e.g. localhost:8080/#/token results in

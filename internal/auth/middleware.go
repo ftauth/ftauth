@@ -1,12 +1,15 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/dnys1/ftoauth/internal/config"
+	"github.com/dnys1/ftoauth/internal/database"
 	"github.com/dnys1/ftoauth/internal/model"
 	"github.com/dnys1/ftoauth/jwt"
 	"github.com/gorilla/mux"
@@ -16,6 +19,8 @@ import (
 var (
 	ErrEmptyAuthHeader = errors.New("empty auth header")
 	ErrEmptyDPoPHeader = errors.New("empty DPoP header")
+	ErrInvalidPayload  = errors.New("invalid payload")
+	ErrExpiredToken    = errors.New("expired token")
 )
 
 // SuppressReferrer follows best practices to avoid leaking
@@ -92,28 +97,42 @@ func BearerAuthenticatedWithScope(scope string) mux.MiddlewareFunc {
 	}
 }
 
+type middlewareInjector struct {
+	db database.AuthorizationDB
+}
+
 // DPoPAuthenticated protects token retrieval endpoints by binding access tokens
 // to a client, identified via DPoP proofs.
-func DPoPAuthenticated() mux.MiddlewareFunc {
+func (in *middlewareInjector) DPoPAuthenticated() mux.MiddlewareFunc {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handleErr := func(err error) {
-				if errors.Is(err, ErrEmptyDPoPHeader) {
-					w.Header().Set("WWW-Authenticate", "DPoP")
-				}
-				w.WriteHeader(http.StatusUnauthorized)
-				w.Write([]byte(err.Error()))
+				handleTokenRequestError(
+					w,
+					model.TokenRequestErrInvalidDPoP,
+					model.RequestErrorDetails{
+						Details: err.Error(),
+					},
+				)
 			}
 
-			// Verify DPoP information
-			dpopEnc := r.Header.Get("DPoP")
-			dpop, err := decodeAndVerifyDPoP(dpopEnc)
-			if err != nil {
-				log.Printf("Error decoding/verifying DPoP token: %v\n", err)
-				handleErr(err)
-				return
+			// Verify DPoP information, if present
+			header := r.Header.Get("Authorization")
+			dpopEnc, err := ParseDPoPAuthorizationHeader(header)
+			if dpopEnc != "" && err == nil {
+				dpop, err := in.decodeAndVerifyDPoP(dpopEnc, r)
+				if err != nil {
+					log.Printf("Error decoding/verifying DPoP token: %v\n", err)
+					handleErr(err)
+					return
+				}
+
+				// Attach token to context
+				ctx := context.WithValue(r.Context(), dpopContextKey, dpop)
+				r = r.WithContext(ctx)
 			}
-			_ = dpop
+
+			h.ServeHTTP(w, r)
 		})
 	}
 }
@@ -143,16 +162,43 @@ func decodeAndVerifyAuthHeader(authHeader string) (*jwt.Token, error) {
 	return token, nil
 }
 
-func decodeAndVerifyDPoP(dpopEnc string) (*jwt.Token, error) {
-	if dpopEnc == "" {
-		return nil, ErrEmptyDPoPHeader
-	}
-
+func (in *middlewareInjector) decodeAndVerifyDPoP(dpopEnc string, r *http.Request) (*jwt.Token, error) {
 	dpop, err := jwt.Decode(dpopEnc)
 	if err != nil {
 		return nil, err
 	}
 
-	// err = dpop.Verify()
+	// Verify the DPoP signature matches the provided JWK
+	err = dpop.Verify(dpop.Header.JWK)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify the HTTP method and URI match what's encoded in the token
+	uri := r.URL.String()
+	method := r.Method
+
+	if uri != dpop.Claims.HTTPURI || method != dpop.Claims.HTTPMethod {
+		return nil, ErrInvalidPayload
+	}
+
+	// Verify the token was created recently
+	issuedAt := time.Unix(dpop.Claims.IssuedAt, 0)
+	const tokenValidFor = 10 * time.Minute
+	const buffer = 5 * time.Second // to protect against clock differences
+	diff := time.Now().UTC().Sub(issuedAt)
+	if diff > tokenValidFor || diff < -buffer {
+		return nil, ErrExpiredToken
+	}
+
+	// Verify the same token has not been used before
+	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
+	defer cancel()
+
+	err = in.db.IsTokenSeen(ctx, dpop)
+	if err == nil {
+		return nil, ErrExpiredToken
+	}
+
 	return dpop, nil
 }

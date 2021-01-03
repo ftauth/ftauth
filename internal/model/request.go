@@ -177,6 +177,9 @@ const (
 	// TokenRequestErrInvalidScope means the requested scope is invalid, unknown, malformed,
 	// or exceeds the scope granted by the resource owner.
 	TokenRequestErrInvalidScope TokenRequestError = "invalid_scope"
+
+	// TokenRequestErrInvalidDPoP means the client has provided an invalid DPoP proof
+	TokenRequestErrInvalidDPoP TokenRequestError = "invalid_dpop_proof"
 )
 
 // IsValid returns true if this error code is valid.
@@ -187,7 +190,8 @@ func (err TokenRequestError) IsValid() bool {
 		TokenRequestErrInvalidGrant,
 		TokenRequestErrUnauthorizedClient,
 		TokenRequestErrUnsupportedGrantType,
-		TokenRequestErrInvalidScope:
+		TokenRequestErrInvalidScope,
+		TokenRequestErrInvalidDPoP:
 		return true
 	}
 
@@ -215,6 +219,8 @@ func (err TokenRequestError) Description(details RequestErrorDetails) string {
 		return "The authorization grant type is not supported by the authorization server."
 	case TokenRequestErrInvalidScope:
 		return `The requested scope is invalid, unknown, malformed, or exceeds the scope granted by the resource owner.`
+	case TokenRequestErrInvalidDPoP:
+		return `The provided DPoP proof failed validation: ` + details.Details
 	}
 
 	return "An unknown error occurred"

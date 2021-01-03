@@ -80,21 +80,30 @@ func isRegisteredClaim(claim string) bool {
 
 // Claims holds all the claims this token provides.
 type Claims struct {
-	Issuer         string `mapstructure:"iss,omitempty" json:"iss,omitempty"` // Required
-	Subject        string `mapstructure:"sub,omitempty" json:"sub,omitempty"` // Required
-	Audience       string `mapstructure:"aud,omitempty" json:"aud,omitempty"` // Required
-	ExpirationTime int64  `mapstructure:"exp,omitempty" json:"exp,omitempty"` // Required for non-DPoP tokens
-	NotBefore      int64  `mapstructure:"nbf,omitempty" json:"nbf,omitempty"`
-	IssuedAt       int64  `mapstructure:"iat,omitempty" json:"iat,omitempty"`             // Required
-	JwtID          string `mapstructure:"jti,omitempty" json:"jti,omitempty"`             // Required for DPoP tokens
-	ClientID       string `mapstructure:"client_id,omitempty" json:"client_id,omitempty"` // Required for non-DPoP tokens
-	Scope          string `mapstructure:"scope,omitempty" json:"scope,omitempty"`         // Required for non-DPoP tokens
+	Issuer         string             `mapstructure:"iss,omitempty" json:"iss,omitempty"` // Required
+	Subject        string             `mapstructure:"sub,omitempty" json:"sub,omitempty"` // Required
+	Audience       string             `mapstructure:"aud,omitempty" json:"aud,omitempty"` // Required
+	ExpirationTime int64              `mapstructure:"exp,omitempty" json:"exp,omitempty"` // Required for non-DPoP tokens
+	NotBefore      int64              `mapstructure:"nbf,omitempty" json:"nbf,omitempty"`
+	IssuedAt       int64              `mapstructure:"iat,omitempty" json:"iat,omitempty"` // Required
+	JwtID          string             `mapstructure:"jti,omitempty" json:"jti,omitempty"` // Required for DPoP tokens
+	Nonce          string             `mapstructure:"nonce,omitempty" json:"nonce,omitempty"`
+	Confirmation   *ConfirmationClaim `mapstructure:"cnf,omitempty" json:"cnf,omitempty"`
+	ClientID       string             `mapstructure:"client_id,omitempty" json:"client_id,omitempty"` // Required for non-DPoP tokens
+	Scope          string             `mapstructure:"scope,omitempty" json:"scope,omitempty"`         // Required for non-DPoP tokens
 
 	// DPoP claims
 	HTTPMethod string `mapstructure:"htm,omitempty" json:"htm,omitempty"` // The HTTP method for the request to which the JWT is attached
 	HTTPURI    string `mapstructure:"htu,omitempty" json:"htu,omitempty"` // The HTTP URI used for the request, without query and fragment parts
 
 	CustomClaims CustomClaims `mapstructure:",remain" json:"-"`
+}
+
+// ConfirmationClaim holds public key information for cryptographically verifying
+// a sender holds the corresponding private key.
+type ConfirmationClaim struct {
+	JWK              *Key   `mapstructure:"jwk,omitempty" json:"jwk,omitempty"`
+	SHA256Thumbprint string `mapstructure:"jkt,omitempty" json:"jkt,omitempty"`
 }
 
 // IsValid checks whether the payload contains all required fields

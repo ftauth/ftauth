@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/dnys1/ftoauth/internal/config"
 	"github.com/dnys1/ftoauth/internal/model"
@@ -331,6 +332,17 @@ func (db *SQLDatabase) RegisterTokens(ctx context.Context, accessToken, refreshT
 	return tx.Commit, tx.Rollback, nil
 }
 
+// GetTokenByID looks up and returns the encoded token corresponding to the provided ID.
+func (db *SQLDatabase) GetTokenByID(ctx context.Context, tokenID string) (string, error) {
+	query := sqlx.Rebind(db.Bindvar(), "SELECT token FROM tokens WHERE id = ?")
+	var token string
+	err := db.DB.SelectContext(ctx, &token, query, tokenID)
+	if err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
 // CreateUser registers a new user in the authentication database.
 func (db *SQLDatabase) CreateUser(ctx context.Context, username, password string) error {
 	hash, err := passwordutil.GeneratePasswordHash(password)
@@ -384,4 +396,20 @@ func (db *SQLDatabase) DescribeSelf(ctx context.Context) (*model.AuthorizationSe
 		return nil, err
 	}
 	return entity.NewAuthorizationServerMetadata(), nil
+}
+
+// IsTokenSeen returns true if the token has been before. If false, it firse
+// records the token information so that subsequent calls return true.
+func (db *SQLDatabase) IsTokenSeen(ctx context.Context, token *jwt.Token) error {
+	query := sqlx.Rebind(db.Bindvar(), "SELECT * FROM seen WHERE id = ?")
+	row := db.DB.QueryRowxContext(ctx, query, token.Claims.JwtID)
+	if row.Err() != nil {
+		insert := sqlx.Rebind(db.Bindvar(), "INSERT INTO seen(id, t) VALUES (?, ?)")
+		_, err := db.DB.ExecContext(ctx, insert, token.Claims.JwtID, time.Now().UTC().Unix())
+		if err != nil {
+			return err
+		}
+		return row.Err()
+	}
+	return nil
 }
