@@ -37,5 +37,5 @@ jobs:
         with:
           channel: dev
 
-      - run: scripts/ci.sh
+      - run: bash scripts/ci.sh
         working-directory: admin/web
