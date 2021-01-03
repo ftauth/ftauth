@@ -38,4 +38,4 @@ jobs:
           channel: dev
 
       - run: bash scripts/ci.sh
-        working-directory: admin/web
+        working-directory: web/admin
