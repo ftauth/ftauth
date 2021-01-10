@@ -19,7 +19,7 @@ const (
 )
 
 // IssueAccessToken provisions and signs a new JWT for the given client and scopes.
-func IssueAccessToken(clientInfo *model.ClientInfo, userID, scopes string) (*jwt.Token, error) {
+func IssueAccessToken(clientInfo *model.ClientInfo, user *model.User, scope string) (*jwt.Token, error) {
 	now := time.Now().UTC()
 	iat := now.Unix()
 	exp := now.Add(time.Second * time.Duration(clientInfo.AccessTokenLife)).Unix()
@@ -36,12 +36,15 @@ func IssueAccessToken(clientInfo *model.ClientInfo, userID, scopes string) (*jwt
 		Claims: &jwt.Claims{
 			Issuer:         "http://localhost:8080",
 			Subject:        clientInfo.ID,
-			Audience:       userID,
+			Audience:       user.ID,
 			ClientID:       clientInfo.ID,
 			IssuedAt:       iat,
 			ExpirationTime: exp,
 			JwtID:          id.String(),
-			Scope:          scopes,
+			Scope:          scope,
+			CustomClaims: jwt.CustomClaims{
+				"userInfo": user,
+			},
 		},
 	}
 
@@ -71,7 +74,7 @@ func IssueRefreshToken(clientInfo *model.ClientInfo, accessToken *jwt.Token) (*j
 			JwtID:          id.String(),
 			Scope:          accessToken.Claims.Scope,
 			CustomClaims: jwt.CustomClaims{
-				"userID": accessToken.Claims.Audience,
+				"userInfo": model.User{ID: accessToken.Claims.Audience},
 			},
 		},
 	}

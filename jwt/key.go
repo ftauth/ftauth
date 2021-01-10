@@ -859,8 +859,6 @@ func (key *Key) Thumbprint() (string, error) {
 		return "", err
 	}
 
-	fmt.Println(string(b))
-
 	digest := sha256.Sum256(b)
 
 	return base64url.Encode(digest[:]), nil

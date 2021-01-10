@@ -528,7 +528,9 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	// 	If it fails, rollback changes in the database
 	// 	to prevent token rotation without client involvement
 
-	accessToken, err := token.IssueAccessToken(clientInfo, reqInfo.userID, reqInfo.scope)
+	// TODO: Pull userInfo from DB to include with token
+	user := &model.User{ID: reqInfo.userID}
+	accessToken, err := token.IssueAccessToken(clientInfo, user, reqInfo.scope)
 	if err != nil {
 		log.Printf("Error generating access token: %v\n", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
