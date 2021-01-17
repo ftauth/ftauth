@@ -19,6 +19,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
+type jwtKey string
 type dpopKey string
 
 const (
@@ -54,6 +55,8 @@ const (
 	paramErrorDescription    = "error_description"
 	paramErrorURI            = "error_uri"
 
+	// JwtContextKey allows attachment/retrieval of JWT tokens from contexts.
+	JwtContextKey  jwtKey  = "jwt"
 	dpopContextKey dpopKey = "dpop"
 )
 
@@ -767,7 +770,11 @@ func (h tokenEndpointHandler) validateRefreshTokenRequest(w http.ResponseWriter,
 		}
 	}
 
-	userID, _ := refreshToken.Claims.CustomClaims["userID"].(string)
+	var userID string
+	userInfo, ok := refreshToken.Claims.CustomClaims["userInfo"]
+	if ok {
+		userID, _ = userInfo.(map[string]interface{})["id"].(string)
+	}
 	return &tokenRequestInfo{
 		scope:  refreshToken.Claims.Scope,
 		userID: userID,

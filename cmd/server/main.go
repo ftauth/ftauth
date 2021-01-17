@@ -15,6 +15,7 @@ import (
 	"github.com/dnys1/ftoauth/internal/database"
 	"github.com/dnys1/ftoauth/internal/discovery"
 	"github.com/dnys1/ftoauth/internal/model"
+	"github.com/dnys1/ftoauth/internal/user"
 	"github.com/gorilla/mux"
 )
 
@@ -30,6 +31,7 @@ func main() {
 	auth.SetupRoutes(r, sqlDB, sqlDB, sqlDB)
 	discovery.SetupRoutes(r, sqlDB)
 	admin.SetupRoutes(r, sqlDB)
+	user.SetupRoutes(r)
 
 	// Static file handling
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("template")))

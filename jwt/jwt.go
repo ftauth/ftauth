@@ -275,18 +275,11 @@ func (t *Token) Verify(key *Key) error {
 	}
 
 	// Compare signature with expected based off client Key
-	headerJSON, err := json.Marshal(t.Header)
+	body, err := t.encodeUnsigned()
 	if err != nil {
-		return ErrInvalidHeaderFormat
+		return err
 	}
-	header := base64url.Encode(headerJSON)
-	payloadJSON, err := json.Marshal(t.Claims)
-	if err != nil {
-		return ErrInvalidPayloadFormat
-	}
-	payload := base64url.Encode(payloadJSON)
 
-	body := fmt.Sprintf("%s.%s", header, payload)
 	verifier := key.Verifier()
 	err = verifier([]byte(body), t.Signature)
 	if err != nil {

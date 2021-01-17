@@ -756,7 +756,10 @@ func (key *Key) createRSAVerifier(hash crypto.Hash) Verifier {
 		}
 		publicKey := key.PublicKey.(*rsa.PublicKey)
 		hasher := hash.New()
-		hasher.Write(msg)
+		_, err := hasher.Write(msg)
+		if err != nil {
+			return err
+		}
 		hashed := hasher.Sum(nil)
 		return rsa.VerifyPKCS1v15(publicKey, hash, hashed, sig)
 	}
@@ -769,7 +772,10 @@ func (key *Key) createPSSVerifier(hash crypto.Hash) Verifier {
 		}
 		publicKey := key.PublicKey.(*rsa.PublicKey)
 		hasher := hash.New()
-		hasher.Write(msg)
+		_, err := hasher.Write(msg)
+		if err != nil {
+			return err
+		}
 		hashed := hasher.Sum(nil)
 		return rsa.VerifyPSS(publicKey, hash, hashed, sig, &rsa.PSSOptions{
 			SaltLength: rsa.PSSSaltLengthAuto,

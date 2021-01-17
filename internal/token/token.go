@@ -35,8 +35,8 @@ func IssueAccessToken(clientInfo *model.ClientInfo, user *model.User, scope stri
 		},
 		Claims: &jwt.Claims{
 			Issuer:         "http://localhost:8080",
-			Subject:        clientInfo.ID,
-			Audience:       user.ID,
+			Subject:        user.ID,
+			Audience:       clientInfo.ID,
 			ClientID:       clientInfo.ID,
 			IssuedAt:       iat,
 			ExpirationTime: exp,
@@ -67,7 +67,9 @@ func IssueRefreshToken(clientInfo *model.ClientInfo, accessToken *jwt.Token) (*j
 			KeyID:     config.Current.OAuth.Tokens.PublicKey.KeyID,
 		},
 		Claims: &jwt.Claims{
-			Audience:       accessToken.Claims.JwtID,
+			Issuer:         "http://localhost:8080",
+			Subject:        accessToken.Claims.JwtID,
+			Audience:       clientInfo.ID,
 			ClientID:       clientInfo.ID,
 			IssuedAt:       iat,
 			ExpirationTime: exp,

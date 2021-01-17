@@ -4,7 +4,9 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"math/big"
 	"reflect"
 	"testing"
@@ -290,6 +292,21 @@ func TestSigner(t *testing.T) {
 			   }`,
 			payload: "eyJhbGciOiJFUzUxMiJ9.UGF5bG9hZA",
 		},
+		{
+			jwk: `{
+				"kty":"RSA",
+				"alg":"RS256",
+				"n":"3Ax2o3178fqgLNjYaLg-qbySGSr06-U3W4yvh7hPdxDLZKhP6t0QKnquzhFlJaNgnO1UrWpYRhSBKhgrxq0tqANia8fuAMQRfAVmSLKSsljaMnvEty879z2c692dIv0pFWycW8GyeGepVGnL6Ir1zi8Y9QBQqv1qTl608-e7xmFr9aksPXwpiJNsk2jIXdVSKA0ekwady5ed6sl4UOPd8kzNlRisGspjIa_AFevqLRIYG1RINt6MKiiIn64_Ld3FKXxsGsWslPfUKw3J1QKWzM2h1R90njXaiB0ljKL-6yG7FCbRXbXCS392zxdzhpYJ_PqaotD_1G4RZGQsy2ZZwQ",
+				"e":"AQAB",
+				"d":"ae0l_zWcwLNg_7WzF1X59ENuIOdo11WT_GIQ7UhwGGThRCcxsWGRMqG0HEaLZj7rdx9YL9KNg87DDrxr9kvPOp3GdxPbIktAD2-Z-UzdCTV0c_DYlUYLm8zxCSm5RuqPKF0MN69adlOQU65KFjsucH6DiQ0JyAYNcoRsnyziW3ANkHXUos_a9VtoC5m37YxmFPWpJISFxXyrwCbkWnjcLNgOVmxhXoBJws8puKEK7l3dvT66iflNjM3pWnMnPKYuL-TE4vrWLeHV_g-WyrFHgOBwDNFoKf6hzvxu_9aTzoFtEO-UtAyy4jy7bHw3790c4WPohhhLSTIIBqOq8qeK8Q",
+				"p":"91dvYONbsSlPJG0W8DELirOLbwLI4VVgcpE_NW_D9i-Te5wS1kB3mFHogRxbKkfakF7ahG076mfSrBYlDfHpspXXNO5Uk57VrNcYVxaGFul7Jsdec7zE079Nc91PQ0R1RY6Ab9KBsrj1A_D1ji_E0mvezUjLLzpkMiuZ1e_bfi8",
+				"q":"48BxIIzjTdd5Rm_8czPciwnyjy9GMHO6lWrZ-aRaPoIhMagMnvExdItZLMzAE97InmZDG0HtfCe1JF1rtNKMmrkktMHqUgzSXyhKD4AA0KCOOq2qPfjrM6lO8pmAj6DrI84PPbZtOpaqiWJOZJuvhOUjH0sFL9rx4A9w1qC1Gw8",
+				"dp":"bHeHfHG4ECURc-PzHzoi2ZyLFQ-fkFGkjhlsIr70rM2IW7jB-fsjd0TUNWp-ADiqfI1cPp64m78UACtl7Iud9JcJXUj3BhWtlrJtFiPmgb26J_NeVFr_5ewKxzjSPamT1AD-CgvCnOHHcQcGaGhCZBSyDExT7k4pCmdcexlIpDk",
+				"dq":"hkUVLLiC5YhsAh_ReGWR1xK1Qr7_JV-FF8PX4DqJzaJQSYMmdaoCmw_wMd5AOzazldb6Jx62EOUkAN1mu0MKC8mtHzfXmine-KS7DOpNELInR-bMoB6ZI2rklVf0GDkph4FbMOnU-Z6LydUAHIZAcxvXmgJTe4Qb5xmTT6WNP_c",
+				"qi":"MsV7NmbXeKeCS0TXMhv_EhGV0kCO-OCO_l55_eLGzvq1-OGqHG3JVuWLIF5m1EMsG2Z8gFhEQENtZ0AOFQx2O9XiNg2dT5I-_itnX_9TWFpbI06mCqrQx21VkovMpFwxY_wsbDDtoSBzLIXZQ21q2sL7ObjFc_DKcj2WrBx10Ps"
+				}`,
+			payload: "eyJ0eXAiOiJhdCtqd3QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJlZTFkZTVhZC1jNGE4LTQxNWMtOGZmNi03NjljYTBmZDNiZjEiLCJjbGllbnRfaWQiOiJlZTFkZTVhZC1jNGE4LTQxNWMtOGZmNi03NjljYTBmZDNiZjEiLCJleHAiOjE2MTA4NDc1NzAsImlhdCI6MTYxMDg0Mzk3MCwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgwIiwianRpIjoiMTllMmFmN2ItMzY2NS00MmVjLWFkZGEtMDg3ZDY4MDJlNzJlIiwic2NvcGUiOiJkZWZhdWx0Iiwic3ViIjoiZGlsbG9ubnlzIiwidXNlckluZm8iOnsiaWQiOiJkaWxsb25ueXMifX0",
+		},
 	}
 
 	for _, test := range tt {
@@ -304,6 +321,59 @@ func TestSigner(t *testing.T) {
 		err = verifier([]byte(test.payload), signature)
 		require.NoError(t, err)
 	}
+}
+
+func TestSomeTest(t *testing.T) {
+	const payload = "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ"
+
+	const privatePem = `
+-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEA3Ax2o3178fqgLNjYaLg+qbySGSr06+U3W4yvh7hPdxDLZKhP
+6t0QKnquzhFlJaNgnO1UrWpYRhSBKhgrxq0tqANia8fuAMQRfAVmSLKSsljaMnvE
+ty879z2c692dIv0pFWycW8GyeGepVGnL6Ir1zi8Y9QBQqv1qTl608+e7xmFr9aks
+PXwpiJNsk2jIXdVSKA0ekwady5ed6sl4UOPd8kzNlRisGspjIa/AFevqLRIYG1RI
+Nt6MKiiIn64/Ld3FKXxsGsWslPfUKw3J1QKWzM2h1R90njXaiB0ljKL+6yG7FCbR
+XbXCS392zxdzhpYJ/PqaotD/1G4RZGQsy2ZZwQIDAQABAoIBAGntJf81nMCzYP+1
+sxdV+fRDbiDnaNdVk/xiEO1IcBhk4UQnMbFhkTKhtBxGi2Y+63cfWC/SjYPOww68
+a/ZLzzqdxncT2yJLQA9vmflM3Qk1dHPw2JVGC5vM8QkpuUbqjyhdDDevWnZTkFOu
+ShY7LnB+g4kNCcgGDXKEbJ8s4ltwDZB11KLP2vVbaAuZt+2MZhT1qSSEhcV8q8Am
+5Fp43CzYDlZsYV6AScLPKbihCu5d3b0+uon5TYzN6VpzJzymLi/kxOL61i3h1f4P
+lsqxR4DgcAzRaCn+oc78bv/Wk86BbRDvlLQMsuI8u2x8N+/dHOFj6IYYS0kyCAaj
+qvKnivECgYEA91dvYONbsSlPJG0W8DELirOLbwLI4VVgcpE/NW/D9i+Te5wS1kB3
+mFHogRxbKkfakF7ahG076mfSrBYlDfHpspXXNO5Uk57VrNcYVxaGFul7Jsdec7zE
+079Nc91PQ0R1RY6Ab9KBsrj1A/D1ji/E0mvezUjLLzpkMiuZ1e/bfi8CgYEA48Bx
+IIzjTdd5Rm/8czPciwnyjy9GMHO6lWrZ+aRaPoIhMagMnvExdItZLMzAE97InmZD
+G0HtfCe1JF1rtNKMmrkktMHqUgzSXyhKD4AA0KCOOq2qPfjrM6lO8pmAj6DrI84P
+PbZtOpaqiWJOZJuvhOUjH0sFL9rx4A9w1qC1Gw8CgYBsd4d8cbgQJRFz4/MfOiLZ
+nIsVD5+QUaSOGWwivvSszYhbuMH5+yN3RNQ1an4AOKp8jVw+nribvxQAK2Xsi530
+lwldSPcGFa2Wsm0WI+aBvbon815UWv/l7ArHONI9qZPUAP4KC8Kc4cdxBwZoaEJk
+FLIMTFPuTikKZ1x7GUikOQKBgQCGRRUsuILliGwCH9F4ZZHXErVCvv8lX4UXw9fg
+OonNolBJgyZ1qgKbD/Ax3kA7NrOV1vonHrYQ5SQA3Wa7QwoLya0fN9eaKd74pLsM
+6k0QsidH5sygHpkjauSVV/QYOSmHgVsw6dT5novJ1QAchkBzG9eaAlN7hBvnGZNP
+pY0/9wKBgDLFezZm13ingktE1zIb/xIRldJAjvjgjv5eef3ixs76tfjhqhxtyVbl
+iyBeZtRDLBtmfIBYREBDbWdADhUMdjvV4jYNnU+SPv4rZ1//U1haWyNOpgqq0Mdt
+VZKLzKRcMWP8LGww7aEgcyyF2UNtatrC+zm4xXPwynI9lqwcddD7
+-----END RSA PRIVATE KEY-----
+	`
+
+	p, _ := pem.Decode([]byte(privatePem))
+
+	rsaKey, err := x509.ParsePKCS1PrivateKey(p.Bytes)
+	require.NoError(t, err)
+
+	privKey, err := NewJWKFromRSAPrivateKey(rsaKey)
+	require.NoError(t, err)
+
+	pubKey, err := NewJWKFromRSAPublicKey(&rsaKey.PublicKey)
+	require.NoError(t, err)
+
+	signer := privKey.Signer()
+	sig, err := signer([]byte(payload))
+	require.NoError(t, err)
+
+	verifier := pubKey.Verifier()
+	err = verifier([]byte(payload), sig)
+	require.NoError(t, err)
 }
 
 func TestVerifier(t *testing.T) {
@@ -357,6 +427,22 @@ func TestVerifier(t *testing.T) {
 			   }`,
 			payload:   "eyJhbGciOiJFUzUxMiJ9.UGF5bG9hZA",
 			signature: "AdwMgeerwtHoh-l192l60hp9wAHZFVJbLfD_UxMi70cwnZOYaRI1bKPWROc-mZZqwqT2SI-KGDKB34XO0aw_7XdtAG8GaSwFKdCAPZgoXD2YBJZCPEX3xKpRwcdOO8KpEHwJjyqOgzDO7iKvU8vcnwNrmxYbSW9ERBXukOXolLzeO_Jn",
+		},
+		{
+			jwk: `{
+				"kty":"RSA",
+				"alg":"RS256",
+				"n":"3Ax2o3178fqgLNjYaLg-qbySGSr06-U3W4yvh7hPdxDLZKhP6t0QKnquzhFlJaNgnO1UrWpYRhSBKhgrxq0tqANia8fuAMQRfAVmSLKSsljaMnvEty879z2c692dIv0pFWycW8GyeGepVGnL6Ir1zi8Y9QBQqv1qTl608-e7xmFr9aksPXwpiJNsk2jIXdVSKA0ekwady5ed6sl4UOPd8kzNlRisGspjIa_AFevqLRIYG1RINt6MKiiIn64_Ld3FKXxsGsWslPfUKw3J1QKWzM2h1R90njXaiB0ljKL-6yG7FCbRXbXCS392zxdzhpYJ_PqaotD_1G4RZGQsy2ZZwQ",
+				"e":"AQAB",
+				"d":"ae0l_zWcwLNg_7WzF1X59ENuIOdo11WT_GIQ7UhwGGThRCcxsWGRMqG0HEaLZj7rdx9YL9KNg87DDrxr9kvPOp3GdxPbIktAD2-Z-UzdCTV0c_DYlUYLm8zxCSm5RuqPKF0MN69adlOQU65KFjsucH6DiQ0JyAYNcoRsnyziW3ANkHXUos_a9VtoC5m37YxmFPWpJISFxXyrwCbkWnjcLNgOVmxhXoBJws8puKEK7l3dvT66iflNjM3pWnMnPKYuL-TE4vrWLeHV_g-WyrFHgOBwDNFoKf6hzvxu_9aTzoFtEO-UtAyy4jy7bHw3790c4WPohhhLSTIIBqOq8qeK8Q",
+				"p":"91dvYONbsSlPJG0W8DELirOLbwLI4VVgcpE_NW_D9i-Te5wS1kB3mFHogRxbKkfakF7ahG076mfSrBYlDfHpspXXNO5Uk57VrNcYVxaGFul7Jsdec7zE079Nc91PQ0R1RY6Ab9KBsrj1A_D1ji_E0mvezUjLLzpkMiuZ1e_bfi8",
+				"q":"48BxIIzjTdd5Rm_8czPciwnyjy9GMHO6lWrZ-aRaPoIhMagMnvExdItZLMzAE97InmZDG0HtfCe1JF1rtNKMmrkktMHqUgzSXyhKD4AA0KCOOq2qPfjrM6lO8pmAj6DrI84PPbZtOpaqiWJOZJuvhOUjH0sFL9rx4A9w1qC1Gw8",
+				"dp":"bHeHfHG4ECURc-PzHzoi2ZyLFQ-fkFGkjhlsIr70rM2IW7jB-fsjd0TUNWp-ADiqfI1cPp64m78UACtl7Iud9JcJXUj3BhWtlrJtFiPmgb26J_NeVFr_5ewKxzjSPamT1AD-CgvCnOHHcQcGaGhCZBSyDExT7k4pCmdcexlIpDk",
+				"dq":"hkUVLLiC5YhsAh_ReGWR1xK1Qr7_JV-FF8PX4DqJzaJQSYMmdaoCmw_wMd5AOzazldb6Jx62EOUkAN1mu0MKC8mtHzfXmine-KS7DOpNELInR-bMoB6ZI2rklVf0GDkph4FbMOnU-Z6LydUAHIZAcxvXmgJTe4Qb5xmTT6WNP_c",
+				"qi":"MsV7NmbXeKeCS0TXMhv_EhGV0kCO-OCO_l55_eLGzvq1-OGqHG3JVuWLIF5m1EMsG2Z8gFhEQENtZ0AOFQx2O9XiNg2dT5I-_itnX_9TWFpbI06mCqrQx21VkovMpFwxY_wsbDDtoSBzLIXZQ21q2sL7ObjFc_DKcj2WrBx10Ps"
+				}`,
+			payload:   "eyJ0eXAiOiJhdCtqd3QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJlZTFkZTVhZC1jNGE4LTQxNWMtOGZmNi03NjljYTBmZDNiZjEiLCJjbGllbnRfaWQiOiJlZTFkZTVhZC1jNGE4LTQxNWMtOGZmNi03NjljYTBmZDNiZjEiLCJleHAiOjE2MTA4NDc1NzAsImlhdCI6MTYxMDg0Mzk3MCwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgwIiwianRpIjoiMTllMmFmN2ItMzY2NS00MmVjLWFkZGEtMDg3ZDY4MDJlNzJlIiwic2NvcGUiOiJkZWZhdWx0Iiwic3ViIjoiZGlsbG9ubnlzIiwidXNlckluZm8iOnsiaWQiOiJkaWxsb25ueXMifX0",
+			signature: "xKCZr8gVwrrh24UmtQKJkx_qul8JLg6eInZH9NBYgn4K1NlaS9IEs0LU3EWdvDTW6S-93RADzF68G7BSG5gkb3_OMchTE19anhC-IR6pXMuwkC9PnDo_UaKxsGsK9KjRj8jGhIh8NZESx_qU9ACOZ2VKfJLIP9oYaAUQXFHsnEMUcDyG1YUvA7re97PigsWCpVuKGRW1TSzzYxqQfKjf7Ur5C49umaZoQkpnpMUUl89SoNCmeDFfYoifh0L7QghNKeyNs0B236iASr7XI0cPPPGAloR0nw-FsaG3hswQAi33LpTz4m2QIS_xYW3vKAoPMRZYVs28_cU5tlqAy8QRrw",
 		},
 	}
 

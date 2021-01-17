@@ -40,7 +40,7 @@ func SuppressReferrer(next http.Handler) http.Handler {
 func BearerAuthenticated(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
-		_, err := decodeAndVerifyAuthHeader(authHeader)
+		token, err := decodeAndVerifyAuthHeader(authHeader)
 		if err != nil {
 			log.Printf("Error decoding/verifying auth header: %v\n", err)
 			if errors.Is(err, ErrEmptyAuthHeader) {
@@ -49,6 +49,10 @@ func BearerAuthenticated(next http.Handler) http.Handler {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
+
+		// Attach token to context
+		ctx := context.WithValue(r.Context(), JwtContextKey, token)
+		r = r.WithContext(ctx)
 
 		next.ServeHTTP(w, r)
 	})
@@ -117,7 +121,7 @@ func (in *middlewareInjector) DPoPAuthenticated() mux.MiddlewareFunc {
 			}
 
 			// Verify DPoP information, if present
-			header := r.Header.Get("Authorization")
+			header := r.Header.Get("DPoP")
 			dpopEnc, err := ParseDPoPAuthorizationHeader(header)
 			if dpopEnc != "" && err == nil {
 				dpop, err := in.decodeAndVerifyDPoP(dpopEnc, r)
@@ -146,6 +150,8 @@ func decodeAndVerifyAuthHeader(authHeader string) (*jwt.Token, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	log.Printf("Checking token: %s", bearer)
 
 	// Decode and verify JWT token
 	token, err := jwt.Decode(bearer)
