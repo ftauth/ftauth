@@ -12,9 +12,9 @@ import (
 
 	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/internal/database"
-	"github.com/ftauth/ftauth/internal/model"
 	"github.com/ftauth/ftauth/internal/token"
 	"github.com/ftauth/ftauth/jwt"
+	"github.com/ftauth/ftauth/model"
 	"github.com/ftauth/ftauth/util/base64url"
 	"github.com/gofrs/uuid"
 	"github.com/gorilla/mux"

@@ -8,8 +8,8 @@ import (
 
 	badger "github.com/dgraph-io/badger/v3"
 	"github.com/ftauth/ftauth/internal/config"
-	"github.com/ftauth/ftauth/internal/model"
 	"github.com/ftauth/ftauth/jwt"
+	"github.com/ftauth/ftauth/model"
 	"github.com/ftauth/ftauth/util/passwordutil"
 	"github.com/gofrs/uuid"
 )

@@ -10,8 +10,8 @@ import (
 
 	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/internal/database"
-	"github.com/ftauth/ftauth/internal/model"
 	"github.com/ftauth/ftauth/mock"
+	"github.com/ftauth/ftauth/model"
 	"github.com/stretchr/testify/require"
 )
 

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/ftauth/ftauth/internal/config"
-	"github.com/ftauth/ftauth/internal/model"
 	"github.com/ftauth/ftauth/jwt"
+	"github.com/ftauth/ftauth/model"
 	"github.com/ftauth/ftauth/util/passwordutil"
 	"github.com/ftauth/ftauth/util/sqlutil"
 	"github.com/gofrs/uuid"
