@@ -3,7 +3,7 @@ package base64urluint
 import (
 	"math/big"
 
-	"github.com/dnys1/ftoauth/util/base64url"
+	"github.com/ftauth/ftauth/util/base64url"
 )
 
 // Encode returns the base64-url encoded representation

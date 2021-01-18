@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/dnys1/ftoauth/internal/auth"
-	"github.com/dnys1/ftoauth/jwt"
+	"github.com/ftauth/ftauth/internal/auth"
+	"github.com/ftauth/ftauth/jwt"
 	"github.com/gorilla/mux"
 )
 

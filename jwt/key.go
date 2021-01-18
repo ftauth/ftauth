@@ -17,8 +17,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/dnys1/ftoauth/util/base64url"
-	"github.com/dnys1/ftoauth/util/base64urluint"
+	"github.com/ftauth/ftauth/util/base64url"
+	"github.com/ftauth/ftauth/util/base64urluint"
 )
 
 type bigInt big.Int

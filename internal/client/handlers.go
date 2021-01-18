@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/dnys1/ftoauth/internal/database"
-	"github.com/dnys1/ftoauth/internal/model"
+	"github.com/ftauth/ftauth/internal/database"
+	"github.com/ftauth/ftauth/internal/model"
 	"github.com/gorilla/mux"
 )
 
@@ -60,7 +60,7 @@ func (h clientRegistrationHandler) handleRegisterClient(w http.ResponseWriter, r
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	clientInfo, err := h.db.RegisterClient(ctx, &request)
+	clientInfo, err := h.db.RegisterClient(ctx, &request, model.ClientOptionNone)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return

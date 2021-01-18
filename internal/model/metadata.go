@@ -3,7 +3,7 @@ package model
 import (
 	"database/sql"
 
-	"github.com/dnys1/ftoauth/util/sqlutil"
+	"github.com/ftauth/ftauth/util/sqlutil"
 )
 
 // AuthorizationServerMetadataPostgresEntity holds AuthorizationServerMetadata info for
@@ -33,17 +33,18 @@ type AuthorizationServerMetadataOracleEntity struct {
 // AuthorizationServerMetadata holds metadata related to this authorization server
 // which is returned to clients requesting information via RFC 8414: https://tools.ietf.org/html/rfc8414
 type AuthorizationServerMetadata struct {
-	Issuer                 string   `json:"issuer"`                          // Required, the auth server's issuer identifier
-	AuthorizationEndpoint  string   `json:"authorization_endpoint"`          // Required, URL of the auth server's authorization endpoint
-	TokenEndpoint          string   `json:"token_endpoint"`                  // Required, URL of the auth server's token endpoint
-	JwksURI                string   `json:"jwks_uri,omitempty"`              // Optional, URL of the auth server's JWK Set document
-	RegistrationEndpoint   string   `json:"registration_endpoint,omitempty"` // Optional, URL of dynamic client registration endpoint
-	ScopesSupported        []string `json:"scopes"`                          // Recommended, JSON array containing valid "scope"
-	ResponseTypesSupported []string `json:"response_types_supported"`        // Required, JSON array containing "response_type" values
+	Issuer                 string                      `json:"issuer"`                          // Required, the auth server's issuer identifier
+	AuthorizationEndpoint  string                      `json:"authorization_endpoint"`          // Required, URL of the auth server's authorization endpoint
+	TokenEndpoint          string                      `json:"token_endpoint"`                  // Required, URL of the auth server's token endpoint
+	JwksURI                string                      `json:"jwks_uri,omitempty"`              // Optional, URL of the auth server's JWK Set document
+	RegistrationEndpoint   string                      `json:"registration_endpoint,omitempty"` // Optional, URL of dynamic client registration endpoint
+	ScopesSupported        []string                    `json:"scopes"`                          // Recommended, JSON array containing valid "scope"
+	ResponseTypesSupported []AuthorizationResponseType `json:"response_types_supported"`        // Required, JSON array containing "response_type" values
 }
 
 // NewAuthorizationServerMetadata creates a metadata object from an entity.
 func (entity *AuthorizationServerMetadataPostgresEntity) NewAuthorizationServerMetadata() *AuthorizationServerMetadata {
+	responseTypes := sqlutil.ParseArray(entity.ResponseTypesSupported)
 	return &AuthorizationServerMetadata{
 		Issuer:                 entity.Issuer,
 		AuthorizationEndpoint:  entity.AuthorizationEndpoint,
@@ -51,12 +52,13 @@ func (entity *AuthorizationServerMetadataPostgresEntity) NewAuthorizationServerM
 		JwksURI:                entity.JwksURI.String,
 		RegistrationEndpoint:   entity.RegistrationEndpoint.String,
 		ScopesSupported:        sqlutil.ParseArray(entity.ScopesSupported),
-		ResponseTypesSupported: sqlutil.ParseArray(entity.ResponseTypesSupported),
+		ResponseTypesSupported: parseAuthorizationResponseTypes(responseTypes),
 	}
 }
 
 // NewAuthorizationServerMetadata creates a metadata object from an entity.
 func (entity *AuthorizationServerMetadataOracleEntity) NewAuthorizationServerMetadata() *AuthorizationServerMetadata {
+	responseTypes := sqlutil.ParseArray(entity.ResponseTypesSupported)
 	return &AuthorizationServerMetadata{
 		Issuer:                 entity.Issuer,
 		AuthorizationEndpoint:  entity.AuthorizationEndpoint,
@@ -64,6 +66,17 @@ func (entity *AuthorizationServerMetadataOracleEntity) NewAuthorizationServerMet
 		JwksURI:                entity.JwksURI.String,
 		RegistrationEndpoint:   entity.RegistrationEndpoint.String,
 		ScopesSupported:        sqlutil.ParseArray(entity.ScopesSupported),
-		ResponseTypesSupported: sqlutil.ParseArray(entity.ResponseTypesSupported),
+		ResponseTypesSupported: parseAuthorizationResponseTypes(responseTypes),
 	}
+}
+
+func parseAuthorizationResponseTypes(responseTypes []string) []AuthorizationResponseType {
+	var authorizationResponseTypes []AuthorizationResponseType
+	for _, typ := range responseTypes {
+		authResponseType := AuthorizationResponseType(typ)
+		if authResponseType.IsValid() {
+			authorizationResponseTypes = append(authorizationResponseTypes, authResponseType)
+		}
+	}
+	return authorizationResponseTypes
 }

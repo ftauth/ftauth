@@ -10,12 +10,13 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/dnys1/ftoauth/internal/config"
-	"github.com/dnys1/ftoauth/internal/database"
-	"github.com/dnys1/ftoauth/internal/model"
-	"github.com/dnys1/ftoauth/internal/token"
-	"github.com/dnys1/ftoauth/jwt"
-	"github.com/dnys1/ftoauth/util/base64url"
+	"github.com/ftauth/ftauth/internal/config"
+	"github.com/ftauth/ftauth/internal/database"
+	"github.com/ftauth/ftauth/internal/model"
+	"github.com/ftauth/ftauth/internal/token"
+	"github.com/ftauth/ftauth/jwt"
+	"github.com/ftauth/ftauth/util/base64url"
+	"github.com/gofrs/uuid"
 	"github.com/gorilla/mux"
 )
 
@@ -270,7 +271,19 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	ctx, cancel = context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	sessionID, err := h.db.CreateSession(ctx, authRequest)
+	sessionUUID, err := uuid.NewV4()
+	if err != nil {
+		handleAuthorizationRequestError(
+			w, r, redirectURI, state,
+			model.AuthorizationRequestErrServerError,
+			model.RequestErrorDetails{},
+		)
+		return
+	}
+	sessionID := sessionUUID.String()
+	authRequest.ID = sessionID
+
+	err = h.db.CreateSession(ctx, authRequest)
 	if err != nil {
 		handleAuthorizationRequestError(
 			w, r, redirectURI, state,
@@ -330,8 +343,15 @@ func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	err = h.authenticationDB.CreateUser(ctx, username, password)
+	id, err := uuid.NewV4()
 	if err != nil {
+		log.Printf("Error generating UUID: %v\n", err)
+		http.Error(w, "An unknown error occurred", http.StatusInternalServerError)
+		return
+	}
+	err = h.authenticationDB.CreateUser(ctx, id.String(), username, password)
+	if err != nil {
+		log.Printf("Error creating user: %v\n", err)
 		http.Error(w, "An unknown error occurred", http.StatusInternalServerError)
 		return
 	}
@@ -531,7 +551,6 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	// 	If it fails, rollback changes in the database
 	// 	to prevent token rotation without client involvement
 
-	// TODO: Pull userInfo from DB to include with token
 	user := &model.User{ID: reqInfo.userID}
 	accessToken, err := token.IssueAccessToken(clientInfo, user, reqInfo.scope)
 	if err != nil {

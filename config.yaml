@@ -8,9 +8,8 @@ database:
   dbname: oauth
 oauth:
   tokens:
-    # The paths to the RSA private and public keys for signing JWT tokens
-    publicKeyFile: /etc/ftoauth/public.pem
-    privateKeyFile: /etc/ftoauth/private.pem
+    # The paths to the RSA private key for signing JWT tokens
+    privateKeyFile: ~/.ftauth/private.pem
   scopes:
     default: default
   authentication:
@@ -26,14 +25,6 @@ oauth:
     # https://tools.ietf.org/html/draft-ietf-oauth-security-topics-16
     ropc: false
   template:
-    # login page
-    # * template
-    # * url/host
-    login:
-      enabled: false
-      path: templates/login.html
-    register:
-      enabled: false
-      path: templates/register.html
     options:
+      dir: template
       primaryColor: "#4d87ca"

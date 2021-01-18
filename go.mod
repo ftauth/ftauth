@@ -1,10 +1,11 @@
-module github.com/dnys1/ftoauth
+module github.com/ftauth/ftauth
 
 go 1.15
 
 require (
 	github.com/chromedp/cdproto v0.0.0-20201204063249-be40c824ad18 // indirect
 	github.com/chromedp/chromedp v0.5.4
+	github.com/dgraph-io/badger/v3 v3.2011.0
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/godror/godror v0.22.2
@@ -13,6 +14,7 @@ require (
 	github.com/jackc/pgx/v4 v4.10.0
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/magiconair/properties v1.8.4 // indirect
+	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/mapstructure v1.3.3
 	github.com/pelletier/go-toml v1.8.1 // indirect
 	github.com/spf13/afero v1.4.1 // indirect

@@ -8,11 +8,11 @@ import (
 	"log"
 	"time"
 
-	"github.com/dnys1/ftoauth/internal/config"
-	"github.com/dnys1/ftoauth/internal/model"
-	"github.com/dnys1/ftoauth/jwt"
-	"github.com/dnys1/ftoauth/util/passwordutil"
-	"github.com/dnys1/ftoauth/util/sqlutil"
+	"github.com/ftauth/ftauth/internal/config"
+	"github.com/ftauth/ftauth/internal/model"
+	"github.com/ftauth/ftauth/jwt"
+	"github.com/ftauth/ftauth/util/passwordutil"
+	"github.com/ftauth/ftauth/util/sqlutil"
 	"github.com/gofrs/uuid"
 	"github.com/jmoiron/sqlx"
 
@@ -21,23 +21,23 @@ import (
 )
 
 // InitializeOracleDB connects to a running Oracle DB instance.
-func InitializeOracleDB() *sqlx.DB {
+func InitializeOracleDB() Database {
 	db, err := sqlx.Connect("godror", `user="admin" password="Thisisasentence123!!" connectString="adwtest_medium"
 		libDir="/Users/nysd2/bin/instantclient_19_8"`)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return db
+	return &SQLDatabase{Type: model.DatabaseTypePostgres, DB: db}
 }
 
 // InitializePostgresDB creates a new PostgreSQL database object.
-func InitializePostgresDB() *sqlx.DB {
+func InitializePostgresDB() Database {
 	host := config.Current.Database.Host
 	port := config.Current.Database.Port
 	dbname := config.Current.Database.DBName
 
-	dsn := fmt.Sprintf("host=%s port=%s dbname=%s sslmode=disable", host, port, dbname)
+	dsn := fmt.Sprintf("host=%s port=%d dbname=%s sslmode=disable", host, port, dbname)
 	log.Printf("Connecting to database %s\n", dsn)
 
 	db, err := sqlx.Connect("pgx", dsn)
@@ -49,7 +49,12 @@ func InitializePostgresDB() *sqlx.DB {
 		log.Fatalf("Error connecting to DB: %v", err)
 	}
 
-	return db
+	return &SQLDatabase{Type: model.DatabaseTypePostgres, DB: db}
+}
+
+// Close handles closing all connections to the database.
+func (db *SQLDatabase) Close() error {
+	return db.DB.Close()
 }
 
 // ListClients lists all clients in the database.
@@ -77,7 +82,7 @@ func (db *SQLDatabase) ListClients(ctx context.Context) ([]*model.ClientInfo, er
 }
 
 // RegisterClient registers the client with the provided information.
-func (db *SQLDatabase) RegisterClient(ctx context.Context, clientInfo *model.ClientInfo) (*model.ClientInfo, error) {
+func (db *SQLDatabase) RegisterClient(ctx context.Context, clientInfo *model.ClientInfo, opt model.ClientOption) (*model.ClientInfo, error) {
 	query := sqlx.Rebind(db.Bindvar(), `
 		INSERT INTO
 			clients(id, secret, redirect_uris, scopes, jwks_uri, logo_uri, grant_types, access_token_life, refresh_token_life)
@@ -215,11 +220,7 @@ func (db *SQLDatabase) GetScopes(ctx context.Context, scopes ...string) (map[str
 // CreateSession creates a session for the given client which includes
 // the authorization code and code verifier information (PKCE), so that it can
 // be verified later.
-func (db *SQLDatabase) CreateSession(ctx context.Context, request *model.AuthorizationRequest) (string, error) {
-	uuid, err := uuid.NewV4()
-	if err != nil {
-		return "", err
-	}
+func (db *SQLDatabase) CreateSession(ctx context.Context, request *model.AuthorizationRequest) error {
 	stmt := sqlx.Rebind(db.Bindvar(), `
 	INSERT INTO requests (
 		id,
@@ -233,10 +234,10 @@ func (db *SQLDatabase) CreateSession(ctx context.Context, request *model.Authori
 		exp
 	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
-	_, err = db.DB.ExecContext(
+	_, err := db.DB.ExecContext(
 		ctx,
 		stmt,
-		uuid.String(),
+		request.ID,
 		request.ClientID,
 		request.Scope,
 		request.State,
@@ -247,10 +248,10 @@ func (db *SQLDatabase) CreateSession(ctx context.Context, request *model.Authori
 		request.Expiry,
 	)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	return uuid.String(), nil
+	return nil
 }
 
 // GetRequestInfo returns the session info associated with this ID.
@@ -344,12 +345,8 @@ func (db *SQLDatabase) GetTokenByID(ctx context.Context, tokenID string) (string
 }
 
 // CreateUser registers a new user in the authentication database.
-func (db *SQLDatabase) CreateUser(ctx context.Context, username, password string) error {
+func (db *SQLDatabase) CreateUser(ctx context.Context, id, username, password string) error {
 	hash, err := passwordutil.GeneratePasswordHash(password)
-	if err != nil {
-		return err
-	}
-	uuid, err := uuid.NewV4()
 	if err != nil {
 		return err
 	}
@@ -357,7 +354,7 @@ func (db *SQLDatabase) CreateUser(ctx context.Context, username, password string
 		INSERT INTO users(id, username, password_hash)
 		VALUES (?, ?, ?)`,
 	)
-	_, err = db.DB.ExecContext(ctx, query, uuid.String(), username, hash)
+	_, err = db.DB.ExecContext(ctx, query, id, username, hash)
 	if err != nil {
 		return err
 	}

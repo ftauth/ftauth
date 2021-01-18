@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dnys1/ftoauth/util/sqlutil"
+	"github.com/ftauth/ftauth/util/sqlutil"
 )
 
 // ClientType identifies the level of confidentiality the
@@ -179,3 +179,12 @@ func (err ClientRegistrationError) Description(invalidParameter string) string {
 
 	return "An unknown error occurred."
 }
+
+// ClientOption is a bitmask for different client flagss.
+type ClientOption byte
+
+// Flags for clients
+const (
+	ClientOptionNone  ClientOption = 0
+	ClientOptionAdmin ClientOption = (1 << iota) // the admin client
+)

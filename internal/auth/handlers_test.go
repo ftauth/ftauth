@@ -8,9 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dnys1/ftoauth/internal/config"
-	"github.com/dnys1/ftoauth/internal/model"
-	"github.com/dnys1/ftoauth/mock"
+	"github.com/ftauth/ftauth/internal/config"
+	"github.com/ftauth/ftauth/internal/database"
+	"github.com/ftauth/ftauth/internal/model"
+	"github.com/ftauth/ftauth/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -56,7 +57,9 @@ func Test_handleTokenRequestError(t *testing.T) {
 }
 
 func TestAuthorizationEndpoint(t *testing.T) {
-	db := &mock.DB{}
+	db, err := database.InitializeBadgerDB(true)
+	require.NoError(t, err)
+
 	handler := authorizationEndpointHandler{
 		db:       db,
 		clientDB: db,
@@ -64,7 +67,7 @@ func TestAuthorizationEndpoint(t *testing.T) {
 
 	config.LoadConfig()
 
-	client := mock.Clients[0]
+	client := mock.DefaultClient
 	clientID := client.ID
 	state := "state"
 

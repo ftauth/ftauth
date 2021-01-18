@@ -6,13 +6,15 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
+	"path"
 	"sync"
 
-	"github.com/dnys1/ftoauth/internal/config"
-	"github.com/dnys1/ftoauth/internal/database"
-	"github.com/dnys1/ftoauth/internal/model"
-	"github.com/dnys1/ftoauth/jwt"
-	"github.com/dnys1/ftoauth/util/cors"
+	"github.com/ftauth/ftauth/internal/config"
+	"github.com/ftauth/ftauth/internal/database"
+	"github.com/ftauth/ftauth/internal/model"
+	"github.com/ftauth/ftauth/jwt"
+	"github.com/ftauth/ftauth/util/cors"
 	"github.com/gorilla/mux"
 )
 
@@ -67,18 +69,48 @@ func (h *discoveryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *discoveryHandler) loadMetadata(ctx context.Context) {
-	ctx, cancel := context.WithTimeout(ctx, database.DefaultTimeout)
-	defer cancel()
-
 	cond.L.Lock()
 	var metadata *model.AuthorizationServerMetadata
-	metadata, h.metadataErr = h.discoveryDB.DescribeSelf(ctx)
+	metadata, h.metadataErr = createMetadata()
 	if h.metadataErr == nil {
 		h.metadataJSON, h.metadataErr = json.Marshal(metadata)
 	}
 	h.needsRefresh = h.metadataErr != nil
 	cond.Broadcast()
 	cond.L.Unlock()
+}
+
+func createMetadata() (*model.AuthorizationServerMetadata, error) {
+	host := config.Current.Server.URL()
+	authEndpoint, err := url.Parse(host)
+	if err != nil {
+		return nil, err
+	}
+	authEndpoint.Path = path.Join(authEndpoint.Path, "authorize")
+
+	tokenEndpoint, err := url.Parse(host)
+	if err != nil {
+		return nil, err
+	}
+	tokenEndpoint.Path = path.Join(tokenEndpoint.Path, "token")
+
+	jwksEndpoint, err := url.Parse(host)
+	if err != nil {
+		return nil, err
+	}
+	jwksEndpoint.Path = path.Join(jwksEndpoint.Path, "jwks.json")
+
+	return &model.AuthorizationServerMetadata{
+		Issuer:                host,
+		AuthorizationEndpoint: authEndpoint.String(),
+		TokenEndpoint:         tokenEndpoint.String(),
+		JwksURI:               jwksEndpoint.String(),
+		ScopesSupported:       []string{"default", "admin"},
+		ResponseTypesSupported: []model.AuthorizationResponseType{
+			model.AuthorizationResponseTypeCode,
+			model.AuthorizationResponseTypeToken,
+		},
+	}, nil
 }
 
 func handleJWKS(w http.ResponseWriter, r *http.Request) {

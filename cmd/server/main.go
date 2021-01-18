@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,13 +10,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dnys1/ftoauth/internal/admin"
-	"github.com/dnys1/ftoauth/internal/auth"
-	"github.com/dnys1/ftoauth/internal/config"
-	"github.com/dnys1/ftoauth/internal/database"
-	"github.com/dnys1/ftoauth/internal/discovery"
-	"github.com/dnys1/ftoauth/internal/model"
-	"github.com/dnys1/ftoauth/internal/user"
+	"github.com/ftauth/ftauth/internal/admin"
+	"github.com/ftauth/ftauth/internal/auth"
+	"github.com/ftauth/ftauth/internal/config"
+	"github.com/ftauth/ftauth/internal/database"
+	"github.com/ftauth/ftauth/internal/discovery"
+	"github.com/ftauth/ftauth/internal/user"
 	"github.com/gorilla/mux"
 )
 
@@ -23,20 +23,20 @@ func main() {
 	config.LoadConfig()
 
 	// Setup database
-	db := database.InitializePostgresDB()
-	sqlDB := &database.SQLDatabase{Type: model.DatabaseTypePostgres, DB: db}
+	db, err := database.InitializeBadgerDB(false)
 
 	// Setup routing
 	r := mux.NewRouter()
-	auth.SetupRoutes(r, sqlDB, sqlDB, sqlDB)
-	discovery.SetupRoutes(r, sqlDB)
-	admin.SetupRoutes(r, sqlDB)
+	auth.SetupRoutes(r, db, db, db)
+	discovery.SetupRoutes(r, db)
+	admin.SetupRoutes(r, db)
 	user.SetupRoutes(r)
 
 	// Static file handling
-	r.PathPrefix("/").Handler(http.FileServer(http.Dir("template")))
+	templateDir := config.Current.OAuth.Template.Options.Dir
+	r.PathPrefix("/").Handler(http.FileServer(http.Dir(templateDir)))
 
-	addr := fmt.Sprintf("%s:%s", config.Current.Server.Host, config.Current.Server.Port)
+	addr := fmt.Sprintf("%s:%d", "localhost", config.Current.Server.Port)
 	srv := http.Server{
 		Addr:    addr,
 		Handler: r,
@@ -55,11 +55,16 @@ func main() {
 
 	<-c
 
-	err := srv.Close()
+	log.Println("Shutting down server...")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = srv.Shutdown(ctx)
 	if err != nil {
 		log.Printf("Error shutting down server: %v\n", err)
 	}
 
+	log.Println("Closing database connection...")
 	err = db.Close()
 	if err != nil {
 		log.Printf("Error closing database: %v\n", err)

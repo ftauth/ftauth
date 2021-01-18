@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/dnys1/ftoauth/internal/database"
-	"github.com/dnys1/ftoauth/internal/model"
+	"github.com/ftauth/ftauth/internal/database"
+	"github.com/ftauth/ftauth/internal/model"
 	"github.com/gorilla/mux"
 )
 
@@ -80,7 +80,7 @@ func (h clientHandler) AddClient(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	clientInfo, err := h.db.RegisterClient(ctx, &req)
+	clientInfo, err := h.db.RegisterClient(ctx, &req, model.ClientOptionNone)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

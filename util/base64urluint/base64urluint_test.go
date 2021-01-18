@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/dnys1/ftoauth/util/base64urluint"
+	"github.com/ftauth/ftauth/util/base64urluint"
 	"github.com/stretchr/testify/require"
 )
 

@@ -3,9 +3,9 @@ package admin
 import (
 	"net/http"
 
-	"github.com/dnys1/ftoauth/internal/auth"
-	"github.com/dnys1/ftoauth/internal/database"
-	"github.com/dnys1/ftoauth/util/cors"
+	"github.com/ftauth/ftauth/internal/auth"
+	"github.com/ftauth/ftauth/internal/database"
+	"github.com/ftauth/ftauth/util/cors"
 	"github.com/gorilla/mux"
 )
 

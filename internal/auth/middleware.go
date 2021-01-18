@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dnys1/ftoauth/internal/config"
-	"github.com/dnys1/ftoauth/internal/database"
-	"github.com/dnys1/ftoauth/internal/model"
-	"github.com/dnys1/ftoauth/jwt"
+	"github.com/ftauth/ftauth/internal/config"
+	"github.com/ftauth/ftauth/internal/database"
+	"github.com/ftauth/ftauth/internal/model"
+	"github.com/ftauth/ftauth/jwt"
 	"github.com/gorilla/mux"
 )
 
@@ -150,8 +150,6 @@ func decodeAndVerifyAuthHeader(authHeader string) (*jwt.Token, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	log.Printf("Checking token: %s", bearer)
 
 	// Decode and verify JWT token
 	token, err := jwt.Decode(bearer)

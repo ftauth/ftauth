@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/chromedp/chromedp"
-	"github.com/dnys1/ftoauth/util/base64url"
+	"github.com/ftauth/ftauth/util/base64url"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
