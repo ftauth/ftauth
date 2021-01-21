@@ -3,7 +3,7 @@ import 'package:hive/hive.dart';
 import 'secure_storage_repo.dart';
 
 class SecureStorageRepositoryImpl extends SecureStorageRepository {
-  Future<Box<String>> openBox() => Hive.openBox<String>('ftoauth');
+  Future<Box<String>> openBox() => Hive.openBox<String>('ftauth');
 
   @override
   Future<String> getString(String key) async {

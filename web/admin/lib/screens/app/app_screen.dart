@@ -20,7 +20,7 @@ class AppScreen extends StatelessWidget {
         final bool showDrawer = constraints.maxWidth < 100;
         return Scaffold(
           appBar: AppBar(
-            title: Text('FTOAuth Admin'),
+            title: Text('FTAuth Admin'),
           ),
           drawer: showDrawer ? Drawer(child: HomeDrawerListView()) : null,
           body: Center(

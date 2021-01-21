@@ -46,7 +46,7 @@ type DatabaseConfig struct {
 	Dir    string // Path to store data in
 }
 
-// OAuthConfig holds configuration variables for FTOAuth
+// OAuthConfig holds configuration variables for FTAuth
 type OAuthConfig struct {
 	Tokens struct {
 		PrivateKeyFile string

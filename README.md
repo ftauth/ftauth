@@ -1,15 +1,15 @@
-# FTOAuth [![codecov](https://codecov.io/gh/ftauth/ftauth/branch/main/graph/badge.svg?token=G9KXI1UAGB)](https://codecov.io/gh/ftauth/ftauth)
-FTOAuth (Fault-Tolerant OAuth) is a secure, lightweight OAuth 2.1 server, written in Go.
+# FTAuth [![codecov](https://codecov.io/gh/ftauth/ftauth/branch/main/graph/badge.svg?token=G9KXI1UAGB)](https://codecov.io/gh/ftauth/ftauth)
+FTAuth (Fault-Tolerant Auth) is a secure, lightweight OAuth 2.1 server, written in Go.
 
 ## Quick Start
-Run the following command to create a fully-functioning PostgreSQL-backed instance of FTOAuth:
+Run the following command to create a local instance of FTAuth:
 
 ```sh
 docker-compose up
 ```
 
 ## Features
-FTOAuth supports the OAuth 2.1 protocol, currently in [draft](https://tools.ietf.org/html/draft-ietf-oauth-v2-1-00), which slims the original OAuth 2.0 spec to incorporate best practices for security.
+FTAuth supports the OAuth 2.1 protocol, currently in [draft](https://tools.ietf.org/html/draft-ietf-oauth-v2-1-00), which slims the original OAuth 2.0 spec to incorporate best practices for security.
 
 Features include:
 - JSON Web Tokens (JWT) & JSON Web Keys (JWK)

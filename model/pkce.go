@@ -8,7 +8,7 @@ const (
 	CodeChallengeMethodSHA256 CodeChallengeMethod = "S256"
 
 	// CodeChallengeMethodPlain uses the plaintext of the code challenge.
-	// Only S256 is supported in FTOAuth, although the PKCE RFC supports
+	// Only S256 is supported in FTAuth, although the PKCE RFC supports
 	// this method as well.
 	CodeChallengeMethodPlain CodeChallengeMethod = "plain"
 )

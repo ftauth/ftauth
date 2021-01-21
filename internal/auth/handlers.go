@@ -158,7 +158,7 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	}
 
 	// RECOMMENDED per RFC 6749
-	// REQUIRED per FTOAuth
+	// REQUIRED per FTAuth
 	state := query.Get(paramState)
 	if state == "" {
 		handleAuthorizationRequestError(

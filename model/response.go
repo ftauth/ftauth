@@ -21,7 +21,7 @@ type TokenResponse struct {
 	// The access token
 	AccessToken string `json:"access_token"`
 
-	// The type of token (always JWT for FTOAuth)
+	// The type of token (always JWT for FTAuth)
 	TokenType string `json:"token_type"`
 
 	// The refresh token
@@ -43,7 +43,7 @@ const (
 
 	// AuthorizationResponseTypeToken is used with the implicit code flow.
 	// As this has important security implications and is omitted in OAuth 2.1,
-	// we have chosen to deprecate it in FTOAuth.
+	// we have chosen to deprecate it in FTAuth.
 	AuthorizationResponseTypeToken AuthorizationResponseType = "token"
 )
 
