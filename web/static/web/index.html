@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/style.css">
+    <link href="packages/codemirror/codemirror.css" rel="stylesheet">
+    <title>FTAuth</title>
+</head>
+<body>
+    <nav>
+        <h1 class="nav-title"><a href="/">FTAuth</a></h1>
+        <span class="flex-spacer"></span>
+        <label for="menu">&#9776;</label>
+        <input type="checkbox" id="menu"/>
+        <ul class="nav-links">
+            <li class="nav-link active"><a href="/">Home</a></li>
+            <li class="nav-link"><a href="/about">About</a></li>
+            <li class="nav-link"><a href="/docs">Docs</a></li>
+            <li class="nav-link"><a href="/blog">Blog</a></li>
+        </ul>
+    </nav>
+    <header>
+        <h1 class="header-title">FTAuth</h1>
+        <h3 class="header-subtitle">Secure, reliable, open authentication</h3>
+        <span class="flex-spacer"></span>
+        <div class="email">
+            <p>Sign up for updates</p>
+            <div class="email_submit">
+                <input id="email" type="email" name="email" placeholder="E-mail address">
+                <button id="submitEmail">
+                    <span>&#x2794;</span>
+                </button>
+            </div>
+        </div>
+        <p id="emailResult"></p>
+    </header>
+    <section class="highlights-wrapper">
+        <div class="highlights">
+            <article class="highlight">
+                <img src="img/Oauth_logo.svg">
+                <h2>OAuth 2.1</h2>
+                <h5>Secure authentication standards</h5>
+                <hr>
+            </article>
+            <article class="highlight">
+                <img src="img/bulletproof.png">
+                <h2>Bulletproof</h2>
+                <h5>Robust through experience</h5>
+                <hr>
+            </article>
+            <article class="highlight">
+                <img src="img/sdks.png">
+                <h2>SDKs</h2>
+                <h5>Native SDKs for web and mobile</h5>
+                <hr>
+            </article>
+        </div>
+    </section>
+    <section class="getting-started">
+        <!-- <div class="img-wrapper"></div> -->
+        <div id="codeContainer"></div>
+        <h3>Get Started</h3>
+        <h5>Get started authenticating users in under 5 minutes</h5>
+        <a class="link" href="/docs">
+            <h5>Read the Docs</h5>
+        </a>
+    </section>
+    <script defer src="packages/codemirror/codemirror.js"></script>
+    <script defer src="js/main.js"></script>
+    <script>
+        document.onscroll = function(e) {
+            document.getElementById('menu').checked = false;
+        }
+    </script>
+</body>
+</html>
