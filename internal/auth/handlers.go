@@ -99,12 +99,7 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	// REQUIRED
 	clientID := query.Get(paramClientID)
 
-	// Get client info
-	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
-	defer cancel()
-	clientInfo, err := h.clientDB.GetClient(ctx, clientID)
-
-	if clientID == "" || err != nil {
+	invalidClientID := func() {
 		// Even if the redirect URI is present, we should not redirect to it if
 		// we cannot identify the client and confirm its registration.
 		http.Error(
@@ -114,6 +109,21 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 			),
 			http.StatusBadRequest,
 		)
+	}
+
+	if clientID == "" {
+		invalidClientID()
+		return
+	}
+
+	// Get client info
+	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
+	defer cancel()
+	clientInfo, err := h.clientDB.GetClient(ctx, clientID)
+
+	if err != nil {
+		log.Printf("Error retrieving client ID %s: %v\n", clientID, err)
+		invalidClientID()
 		return
 	}
 
@@ -122,9 +132,7 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	// If they do, use that
 	// If not, consider this a required parameter
 	redirectURI := query.Get(paramRedirectURI)
-	if redirectURI == "" && len(clientInfo.RedirectURIs) == 1 {
-		redirectURI = clientInfo.RedirectURIs[0]
-	} else {
+	{
 		// Verify redirect URI
 		valid := false
 		redirect, err := url.Parse(redirectURI)

@@ -10,7 +10,6 @@ import (
 
 	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/internal/database"
-	"github.com/ftauth/ftauth/mock"
 	"github.com/ftauth/ftauth/model"
 	"github.com/stretchr/testify/require"
 )
@@ -57,7 +56,9 @@ func Test_handleTokenRequestError(t *testing.T) {
 }
 
 func TestAuthorizationEndpoint(t *testing.T) {
-	db, err := database.InitializeBadgerDB(true)
+	config.LoadConfig()
+
+	db, client, err := database.InitializeBadgerDB(true)
 	require.NoError(t, err)
 
 	handler := authorizationEndpointHandler{
@@ -65,9 +66,6 @@ func TestAuthorizationEndpoint(t *testing.T) {
 		clientDB: db,
 	}
 
-	config.LoadConfig()
-
-	client := mock.DefaultClient
 	clientID := client.ID
 	state := "state"
 
@@ -107,15 +105,15 @@ func TestAuthorizationEndpoint(t *testing.T) {
 			},
 		},
 		{
-			name: "Invalid: Default redirectURI and missing state",
+			name: "Invalid: Missing redirect URI",
 			query: map[string]string{
 				paramClientID: clientID,
 			},
 			want: want{
-				statusCode: http.StatusFound,
+				statusCode: http.StatusBadRequest,
 				err:        model.AuthorizationRequestErrInvalidRequest,
 				errDetails: model.RequestErrorDetails{
-					ParamName: paramState,
+					ParamName: paramRedirectURI,
 				},
 			},
 		},
@@ -138,6 +136,7 @@ func TestAuthorizationEndpoint(t *testing.T) {
 			query: map[string]string{
 				paramClientID:     clientID,
 				paramState:        state,
+				paramRedirectURI:  "http://localhost:8080/token",
 				paramResponseType: "",
 			},
 			want: want{
@@ -153,6 +152,7 @@ func TestAuthorizationEndpoint(t *testing.T) {
 			query: map[string]string{
 				paramClientID:     clientID,
 				paramState:        state,
+				paramRedirectURI:  "http://localhost:8080/token",
 				paramResponseType: "some_response_type",
 			},
 			want: want{
@@ -165,6 +165,7 @@ func TestAuthorizationEndpoint(t *testing.T) {
 			query: map[string]string{
 				paramClientID:     clientID,
 				paramState:        state,
+				paramRedirectURI:  "http://localhost:8080/token",
 				paramResponseType: string(model.AuthorizationResponseTypeCode),
 				paramScope:        "invalid_scope?!#$%^",
 			},
@@ -178,6 +179,7 @@ func TestAuthorizationEndpoint(t *testing.T) {
 			query: map[string]string{
 				paramClientID:     clientID,
 				paramState:        state,
+				paramRedirectURI:  "http://localhost:8080/token",
 				paramResponseType: string(model.AuthorizationResponseTypeCode),
 				paramScope:        "non_default_scope",
 			},
@@ -191,6 +193,7 @@ func TestAuthorizationEndpoint(t *testing.T) {
 			query: map[string]string{
 				paramClientID:      clientID,
 				paramState:         state,
+				paramRedirectURI:   "http://localhost:8080/token",
 				paramResponseType:  string(model.AuthorizationResponseTypeCode),
 				paramCodeChallenge: "",
 			},
@@ -207,6 +210,7 @@ func TestAuthorizationEndpoint(t *testing.T) {
 			query: map[string]string{
 				paramClientID:            clientID,
 				paramState:               state,
+				paramRedirectURI:         "http://localhost:8080/token",
 				paramResponseType:        string(model.AuthorizationResponseTypeCode),
 				paramCodeChallenge:       "code_challenge",
 				paramCodeChallengeMethod: "",
@@ -224,6 +228,7 @@ func TestAuthorizationEndpoint(t *testing.T) {
 			query: map[string]string{
 				paramClientID:            clientID,
 				paramState:               state,
+				paramRedirectURI:         "http://localhost:8080/token",
 				paramResponseType:        string(model.AuthorizationResponseTypeCode),
 				paramCodeChallenge:       "code_challenge",
 				paramCodeChallengeMethod: string(model.CodeChallengeMethodPlain),
@@ -241,6 +246,7 @@ func TestAuthorizationEndpoint(t *testing.T) {
 			query: map[string]string{
 				paramClientID:            clientID,
 				paramState:               state,
+				paramRedirectURI:         "http://localhost:8080/token",
 				paramResponseType:        string(model.AuthorizationResponseTypeCode),
 				paramCodeChallenge:       "code_challenge",
 				paramCodeChallengeMethod: string(model.CodeChallengeMethodSHA256),
@@ -267,7 +273,7 @@ func TestAuthorizationEndpoint(t *testing.T) {
 
 			handler.ServeHTTP(w, r)
 
-			require.Equal(t, test.want.statusCode, w.Result().StatusCode)
+			require.Equal(t, test.want.statusCode, w.Result().StatusCode, w.Body.String())
 			switch w.Result().StatusCode {
 			case http.StatusFound:
 				if test.want.err != "" {

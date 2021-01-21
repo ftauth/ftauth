@@ -23,7 +23,7 @@ func main() {
 	config.LoadConfig()
 
 	// Setup database
-	db, err := database.InitializeBadgerDB(false)
+	db, _, err := database.InitializeBadgerDB(false)
 
 	// Setup routing
 	r := mux.NewRouter()

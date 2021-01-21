@@ -64,14 +64,14 @@ func makeKey(prefix, id string) []byte {
 
 // InitializeBadgerDB creates a new database with a Badger backend.
 // Pass `true` to create an in-memory database (useful in tests, for example).
-func InitializeBadgerDB(inMemory bool) (*BadgerDB, error) {
+func InitializeBadgerDB(inMemory bool) (*BadgerDB, *model.ClientInfo, error) {
 	path := config.Current.Database.Dir
 	if inMemory {
 		path = ""
 	}
 	db, err := badger.Open(badger.DefaultOptions(path).WithInMemory(inMemory))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// TODO: If empty, seed with default client and server metadata.
@@ -79,12 +79,13 @@ func InitializeBadgerDB(inMemory bool) (*BadgerDB, error) {
 	if badgerDB.isEmpty() {
 		clientInfo, err := badgerDB.createAdminClient()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		fmt.Printf("Created admin client:\n%#v", clientInfo)
+		fmt.Printf("Created admin client:\n%#v\n", clientInfo)
+		return badgerDB, clientInfo, nil
 	}
 
-	return badgerDB, nil
+	return badgerDB, nil, nil
 }
 
 // Close handles closing all connections to the database.
