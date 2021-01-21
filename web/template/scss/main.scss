@@ -1,0 +1,51 @@
+@import 'normalize.css';
+@import 'milligram/_milligram.sass';
+
+body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+
+    height: 100vh;
+}
+
+.login {
+    max-width: 400px;
+    margin: 20px;
+}
+
+.navigation {
+    width: 100%;
+    z-index: 2;
+    display: block;
+    height: 5.2rem;
+    position: fixed;
+    top: 0;
+
+    .navigation-list {
+        display: flex;
+        list-style: none;
+    }
+
+    .navigation-item {
+        float: left;
+        margin-left: 2.5rem;
+        margin-bottom: 0;
+        position: relative;
+    }
+
+    .navigation-title {
+        line-height: 5.2rem;
+        font-size: 2rem;
+        color: #606c76;
+
+        &:hover {
+            color: #606c76;
+        }
+    }
+
+    .navigation-link {
+        line-height: 5.2rem;
+    }
+}
