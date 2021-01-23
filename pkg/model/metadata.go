@@ -3,7 +3,7 @@ package model
 import (
 	"database/sql"
 
-	"github.com/ftauth/ftauth/util/sqlutil"
+	"github.com/ftauth/ftauth/pkg/util/sqlutil"
 )
 
 // AuthorizationServerMetadataPostgresEntity holds AuthorizationServerMetadata info for

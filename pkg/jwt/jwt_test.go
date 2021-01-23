@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,7 +45,7 @@ func TestEncode(t *testing.T) {
 		enc, err := test.token.Encode(key)
 		require.NoError(t, err)
 
-		require.Equal(t, test.want, enc)
+		assert.Equal(t, test.want, enc)
 	}
 }
 
@@ -82,7 +83,7 @@ func TestDecode(t *testing.T) {
 		t.Logf("Got Claims: %+v\n", token.Claims)
 		t.Logf("Want Claims: %+v\n", test.want.Claims)
 
-		require.True(t, reflect.DeepEqual(token.Header, test.want.Header))
-		require.True(t, reflect.DeepEqual(token.Claims, test.want.Claims))
+		assert.True(t, reflect.DeepEqual(token.Header, test.want.Header))
+		assert.True(t, reflect.DeepEqual(token.Claims, test.want.Claims))
 	}
 }

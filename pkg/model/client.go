@@ -3,9 +3,11 @@ package model
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"time"
 
-	"github.com/ftauth/ftauth/util/sqlutil"
+	"github.com/ftauth/ftauth/pkg/util"
+	"github.com/ftauth/ftauth/pkg/util/sqlutil"
 )
 
 // ClientType identifies the level of confidentiality the
@@ -50,6 +52,111 @@ type ClientInfo struct {
 	RefreshTokenLife int         `json:"refresh_token_life"` // Lifetime of refresh token, in seconds
 }
 
+// Update creates a new copy of client and updates fields from clientUpdate.
+// If clientUpdate is empty, no new copy is created, and the original instance
+// is returned.
+func (client *ClientInfo) Update(clientUpdate ClientInfoUpdate) *ClientInfo {
+	var changedValues bool
+	updatedClient := *client
+	if clientUpdate.Name != nil {
+		changedValues = true
+		updatedClient.Name = *clientUpdate.Name
+	}
+	if clientUpdate.RedirectURIs != nil {
+		changedValues = true
+		updatedClient.RedirectURIs = *clientUpdate.RedirectURIs
+	}
+	if clientUpdate.Scopes != nil {
+		changedValues = true
+		updatedClient.Scopes = *clientUpdate.Scopes
+	}
+	if clientUpdate.JWKsURI != nil {
+		changedValues = true
+		updatedClient.JWKsURI = *clientUpdate.JWKsURI
+	}
+	if clientUpdate.LogoURI != nil {
+		changedValues = true
+		updatedClient.LogoURI = *clientUpdate.LogoURI
+	}
+	if clientUpdate.AccessTokenLife != nil {
+		changedValues = true
+		updatedClient.AccessTokenLife = *clientUpdate.AccessTokenLife
+	}
+	if clientUpdate.RefreshTokenLife != nil {
+		changedValues = true
+		updatedClient.RefreshTokenLife = *clientUpdate.RefreshTokenLife
+	}
+	if changedValues {
+		return &updatedClient
+	}
+	return client
+}
+
+// IsValid checks whether the client info has required and valid parameters,
+// returning an error if not.
+func (client *ClientInfo) IsValid() error {
+	if client.ID == "" {
+		return util.ErrMissingParameter("client_id")
+	}
+	if client.Name == "" {
+		return util.ErrMissingParameter("client_name")
+	}
+	if client.Type == "" {
+		return util.ErrMissingParameter("client_type")
+	}
+	if client.Type == ClientTypeConfidential {
+		if client.Secret == "" {
+			return util.ErrMissingParameter("client_secret")
+		}
+	}
+	if len(client.RedirectURIs) == 0 {
+		return util.ErrMissingParameter("redirect_uris")
+	}
+	for _, uri := range client.RedirectURIs {
+		if uri == "localhost" {
+			continue
+		}
+		redirectURI, err := url.Parse(uri)
+		if err != nil {
+			return fmt.Errorf("Invalid redirect URI: %s: %v", uri, err)
+		}
+		if redirectURI.Hostname() == "localhost" {
+			continue
+		}
+		if redirectURI.Scheme != "https" {
+			return fmt.Errorf("invalid redirect URI: %s: Only HTTPS is allowed", uri)
+		}
+		if redirectURI.Hostname() == "" {
+			return fmt.Errorf("invalid redirect URI: %s: Missing host", uri)
+		}
+	}
+	if len(client.Scopes) == 0 {
+		return util.ErrMissingParameter("scopes")
+	}
+	if len(client.GrantTypes) == 0 {
+		return util.ErrMissingParameter("grant_types")
+	}
+	if client.AccessTokenLife <= 0 {
+		return util.ErrInvalidParameter("access_token")
+	}
+	if client.RefreshTokenLife <= 0 {
+		return util.ErrInvalidParameter("refresh_token")
+	}
+
+	return nil
+}
+
+// ClientInfoUpdate holds updateable parameters for ClientInfo.
+type ClientInfoUpdate struct {
+	Name             *string   `json:"client_name"`
+	RedirectURIs     *[]string `json:"redirect_uris"`
+	Scopes           *[]*Scope `json:"scopes"`
+	JWKsURI          *string   `json:"jwks_uri"`
+	LogoURI          *string   `json:"logo_uri"`
+	AccessTokenLife  *int      `json:"access_token_life"`
+	RefreshTokenLife *int      `json:"refresh_token_life"`
+}
+
 // ClientInfoEntity holds client info for transfer on the wire,
 // e.g. when communicating with a DB.
 type ClientInfoEntity struct {
@@ -68,28 +175,28 @@ type ClientInfoEntity struct {
 }
 
 // ToEntity converts the model type to the entity type.
-func (clientInfo *ClientInfo) ToEntity() *ClientInfoEntity {
+func (client *ClientInfo) ToEntity() *ClientInfoEntity {
 	var scopes []string
-	for _, scope := range clientInfo.Scopes {
+	for _, scope := range client.Scopes {
 		scopes = append(scopes, scope.Name)
 	}
 	var grants []string
-	for _, grant := range clientInfo.GrantTypes {
+	for _, grant := range client.GrantTypes {
 		grants = append(grants, string(grant))
 	}
 	return &ClientInfoEntity{
-		ID:               clientInfo.ID,
-		Name:             clientInfo.Name,
-		Type:             clientInfo.Type,
-		Secret:           clientInfo.Secret,
-		SecretExpiry:     clientInfo.SecretExpiry,
-		RedirectURIs:     sqlutil.GenerateArrayString(clientInfo.RedirectURIs),
+		ID:               client.ID,
+		Name:             client.Name,
+		Type:             client.Type,
+		Secret:           client.Secret,
+		SecretExpiry:     client.SecretExpiry,
+		RedirectURIs:     sqlutil.GenerateArrayString(client.RedirectURIs),
 		Scopes:           sqlutil.GenerateArrayString(scopes),
-		JWKsURI:          clientInfo.JWKsURI,
-		LogoURI:          clientInfo.LogoURI,
+		JWKsURI:          client.JWKsURI,
+		LogoURI:          client.LogoURI,
 		GrantTypes:       sqlutil.GenerateArrayString(grants),
-		AccessTokenLife:  clientInfo.AccessTokenLife,
-		RefreshTokenLife: clientInfo.RefreshTokenLife,
+		AccessTokenLife:  client.AccessTokenLife,
+		RefreshTokenLife: client.RefreshTokenLife,
 	}
 }
 
@@ -128,7 +235,7 @@ type Scope struct {
 }
 
 // ValidateScopes affirms whether the client supports the given scopes.
-func (clientInfo *ClientInfo) ValidateScopes(scopes string) error {
+func (client *ClientInfo) ValidateScopes(scopes string) error {
 	// Parse scope
 	scopeTokens, err := ParseScope(scopes)
 	if err != nil {
@@ -137,7 +244,7 @@ func (clientInfo *ClientInfo) ValidateScopes(scopes string) error {
 	// Validate scope tokens
 	for _, scopeToken := range scopeTokens {
 		valid := false
-		for _, scope := range clientInfo.Scopes {
+		for _, scope := range client.Scopes {
 			if scopeToken == scope.Name {
 				valid = true
 				break

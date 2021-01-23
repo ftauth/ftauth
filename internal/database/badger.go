@@ -8,9 +8,9 @@ import (
 
 	badger "github.com/dgraph-io/badger/v3"
 	"github.com/ftauth/ftauth/internal/config"
-	"github.com/ftauth/ftauth/jwt"
-	"github.com/ftauth/ftauth/model"
-	"github.com/ftauth/ftauth/util/passwordutil"
+	"github.com/ftauth/ftauth/pkg/jwt"
+	"github.com/ftauth/ftauth/pkg/model"
+	"github.com/ftauth/ftauth/pkg/util/passwordutil"
 	"github.com/gofrs/uuid"
 )
 
@@ -93,6 +93,30 @@ func (db *BadgerDB) Close() error {
 	return db.DB.Close()
 }
 
+// Reset clears all non-mandatory keys from the database.
+func (db *BadgerDB) Reset() error {
+	if !db.DB.Opts().InMemory {
+		return fmt.Errorf("cannot clear db on disk")
+	}
+	return db.DB.Update(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Rewind(); it.Valid(); it.Next() {
+			item := it.Item()
+			if item.UserMeta()>>7 == 0 {
+				err := txn.Delete(item.Key())
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		return nil
+	})
+}
+
 func (db *BadgerDB) isEmpty() (empty bool) {
 	db.DB.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
@@ -126,7 +150,7 @@ func (db *BadgerDB) createAdminClient() (*model.ClientInfo, error) {
 		AccessTokenLife:  60 * 60,      // 1 hour
 		RefreshTokenLife: 60 * 60 * 24, // 1 day
 	}
-	opt := model.ClientOptionAdmin
+	opt := model.ClientOptionAdmin | model.ClientOption(model.MasterSystemFlag)
 	return db.RegisterClient(context.Background(), adminClient, opt)
 }
 
@@ -148,6 +172,7 @@ func (db *BadgerDB) ListClients(ctx context.Context) ([]*model.ClientInfo, error
 			if err != nil {
 				return err
 			}
+			clients = append(clients, &client)
 		}
 
 		return nil
@@ -175,10 +200,10 @@ func (db *BadgerDB) GetClient(ctx context.Context, clientID string) (client *mod
 }
 
 // UpdateClient updates the client with the provided information.
-func (db *BadgerDB) UpdateClient(ctx context.Context, clientInfo *model.ClientInfo) (*model.ClientInfo, error) {
-	key := makeClientKey(clientInfo.ID)
+func (db *BadgerDB) UpdateClient(ctx context.Context, client *model.ClientInfo) (*model.ClientInfo, error) {
+	key := makeClientKey(client.ID)
 	err := db.DB.Update(func(txn *badger.Txn) error {
-		b, err := json.Marshal(clientInfo)
+		b, err := json.Marshal(client)
 		if err != nil {
 			return err
 		}
@@ -187,7 +212,7 @@ func (db *BadgerDB) UpdateClient(ctx context.Context, clientInfo *model.ClientIn
 	if err != nil {
 		return nil, err
 	}
-	return clientInfo, nil
+	return client, nil
 }
 
 // RegisterClient registers the client with the provided information.

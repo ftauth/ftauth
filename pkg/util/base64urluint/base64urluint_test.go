@@ -5,7 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ftauth/ftauth/util/base64urluint"
+	"github.com/ftauth/ftauth/pkg/util/base64urluint"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,7 +33,7 @@ func TestEncode(t *testing.T) {
 	for _, test := range tt {
 		got := base64urluint.Encode(test.input())
 
-		require.Equal(t, test.want, got)
+		assert.Equal(t, test.want, got)
 	}
 }
 
@@ -80,6 +81,6 @@ func Test_Base64UrlUintDecode(t *testing.T) {
 			continue
 		}
 
-		require.Truef(t, reflect.DeepEqual(got, test.want()), "Input: %s, Got: %+v, Want: %+v", test.input, got, test.want())
+		assert.Truef(t, reflect.DeepEqual(got, test.want()), "Input: %s, Got: %+v, Want: %+v", test.input, got, test.want())
 	}
 }

@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"io"
 
-	"github.com/ftauth/ftauth/util/base64url"
+	"github.com/ftauth/ftauth/pkg/util/base64url"
 )
 
 // GenerateAuthorizationCode generates a unique, random authorization code.

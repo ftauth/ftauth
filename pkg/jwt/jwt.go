@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ftauth/ftauth/util/base64url"
+	"github.com/ftauth/ftauth/pkg/util/base64url"
 	"github.com/mitchellh/mapstructure"
 )
 

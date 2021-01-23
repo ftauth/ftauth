@@ -3,7 +3,7 @@ package mock
 import (
 	"time"
 
-	"github.com/ftauth/ftauth/model"
+	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/gofrs/uuid"
 )
 

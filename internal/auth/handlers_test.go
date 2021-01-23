@@ -10,7 +10,8 @@ import (
 
 	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/internal/database"
-	"github.com/ftauth/ftauth/model"
+	"github.com/ftauth/ftauth/pkg/model"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,8 +20,7 @@ func Test_handleAuthorizationRequestError(t *testing.T) {
 	requestErr := model.AuthorizationRequestErrInvalidRequest
 
 	w := httptest.NewRecorder()
-	r, err := http.NewRequest(http.MethodGet, "/authorize", nil)
-	require.NoError(t, err)
+	r := httptest.NewRequest(http.MethodGet, "/authorize", nil)
 
 	state := "state"
 	handleAuthorizationRequestError(w, r, redirectURI, state, requestErr, model.RequestErrorDetails{
@@ -31,13 +31,13 @@ func Test_handleAuthorizationRequestError(t *testing.T) {
 	loc := w.Header().Get("Location")
 
 	var uri *url.URL
-	uri, err = url.Parse(loc)
+	uri, err := url.Parse(loc)
 	require.NoError(t, err)
 
 	query := uri.Query()
-	require.NotEmpty(t, query.Get("error"))
-	require.NotEmpty(t, query.Get("error_description"))
-	require.NotEmpty(t, query.Get("error_uri"))
+	assert.NotEmpty(t, query.Get("error"))
+	assert.NotEmpty(t, query.Get("error_description"))
+	assert.NotEmpty(t, query.Get("error_uri"))
 }
 
 func Test_handleTokenRequestError(t *testing.T) {
@@ -52,13 +52,14 @@ func Test_handleTokenRequestError(t *testing.T) {
 	var resp map[string]interface{}
 	err := json.NewDecoder(w.Body).Decode(&resp)
 	require.NoError(t, err)
-	require.NotEmpty(t, resp["error"])
+
+	assert.NotEmpty(t, resp["error"])
 }
 
 func TestAuthorizationEndpoint(t *testing.T) {
 	config.LoadConfig()
 
-	db, client, err := database.InitializeBadgerDB(true)
+	db, admin, err := database.InitializeBadgerDB(true)
 	require.NoError(t, err)
 
 	handler := authorizationEndpointHandler{
@@ -66,7 +67,7 @@ func TestAuthorizationEndpoint(t *testing.T) {
 		clientDB: db,
 	}
 
-	clientID := client.ID
+	clientID := admin.ID
 	state := "state"
 
 	type want struct {
@@ -268,8 +269,7 @@ func TestAuthorizationEndpoint(t *testing.T) {
 			}
 			uri.RawQuery = query.Encode()
 			w := httptest.NewRecorder()
-			r, err := http.NewRequest(http.MethodGet, uri.String(), nil)
-			require.NoError(t, err)
+			r := httptest.NewRequest(http.MethodGet, uri.String(), nil)
 
 			handler.ServeHTTP(w, r)
 
@@ -282,22 +282,21 @@ func TestAuthorizationEndpoint(t *testing.T) {
 					query := uri.Query()
 
 					reqErr := model.AuthorizationRequestError(query.Get(paramError))
-					require.True(t, reqErr.IsValid())
-					require.Equal(t, test.want.err, reqErr)
+					assert.True(t, reqErr.IsValid())
+					assert.Equal(t, test.want.err, reqErr)
 
 					if reqErr == model.AuthorizationRequestErrInvalidRequest {
 						errDesc := query.Get(paramErrorDescription)
 						details := test.want.errDetails
-						require.NotNil(t, test.want.errDetails)
-						require.True(t, strings.Contains(errDesc, "Invalid: "+details.ParamName))
+						assert.True(t, strings.Contains(errDesc, "Invalid: "+details.ParamName))
 					}
 				} else {
 					// Check redirect to login page
-					require.Equal(t, w.Header().Get("Location"), LoginEndpoint)
+					assert.Equal(t, w.Header().Get("Location"), LoginEndpoint)
 
 					// Check that session was created
 					cookies := w.Result().Cookies()
-					require.NotEmpty(t, cookies)
+					assert.NotEmpty(t, cookies)
 				}
 			}
 		})

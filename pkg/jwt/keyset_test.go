@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ftauth/ftauth/util/base64urluint"
-	"github.com/stretchr/testify/require"
+	"github.com/ftauth/ftauth/pkg/util/base64urluint"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDecodeKeySet(t *testing.T) {
@@ -37,10 +37,10 @@ func TestDecodeKeySet(t *testing.T) {
 			valid: true,
 			want: func() *KeySet {
 				x, err := base64urluint.Decode("MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4")
-				require.NoError(t, err)
+				assert.NoError(t, err)
 
 				y, err := base64urluint.Decode("4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM")
-				require.NoError(t, err)
+				assert.NoError(t, err)
 
 				key1 := &Key{
 					PublicKey: &ecdsa.PublicKey{
@@ -58,10 +58,10 @@ func TestDecodeKeySet(t *testing.T) {
 				}
 
 				n, err := base64urluint.Decode("0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw")
-				require.NoError(t, err)
+				assert.NoError(t, err)
 
 				e, err := base64urluint.Decode("AQAB")
-				require.NoError(t, err)
+				assert.NoError(t, err)
 
 				key2 := &Key{
 					PublicKey: &rsa.PublicKey{
@@ -85,12 +85,12 @@ func TestDecodeKeySet(t *testing.T) {
 	for _, test := range tt {
 		keySet, err := DecodeKeySet(test.jwks)
 		if test.valid {
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		} else {
-			require.Error(t, err)
+			assert.Error(t, err)
 			continue
 		}
 
-		require.True(t, reflect.DeepEqual(keySet, test.want()))
+		assert.True(t, reflect.DeepEqual(keySet, test.want()))
 	}
 }

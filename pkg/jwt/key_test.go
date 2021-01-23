@@ -11,8 +11,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ftauth/ftauth/util/base64url"
-	"github.com/ftauth/ftauth/util/base64urluint"
+	"github.com/ftauth/ftauth/pkg/util/base64url"
+	"github.com/ftauth/ftauth/pkg/util/base64urluint"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,7 +26,7 @@ func TestMarshal(t *testing.T) {
 	require.NoError(t, key.IsValid())
 
 	_, err := json.Marshal(key)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func TestParseJWK(t *testing.T) {
@@ -241,7 +242,7 @@ func TestParseJWK(t *testing.T) {
 		t.Logf("Got: %+v\n", key)
 		t.Logf("Want: %+v\n", test.want())
 
-		require.True(t, reflect.DeepEqual(key, test.want()))
+		assert.True(t, reflect.DeepEqual(key, test.want()))
 	}
 }
 
@@ -315,11 +316,11 @@ func TestSigner(t *testing.T) {
 
 		signer := key.Signer()
 		signature, err := signer([]byte(test.payload))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 
 		verifier := key.Verifier()
 		err = verifier([]byte(test.payload), signature)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}
 }
 
@@ -369,11 +370,11 @@ VZKLzKRcMWP8LGww7aEgcyyF2UNtatrC+zm4xXPwynI9lqwcddD7
 
 	signer := privKey.Signer()
 	sig, err := signer([]byte(payload))
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	verifier := pubKey.Verifier()
 	err = verifier([]byte(payload), sig)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func TestVerifier(t *testing.T) {
@@ -455,7 +456,7 @@ func TestVerifier(t *testing.T) {
 
 		verifier := key.Verifier()
 		err = verifier([]byte(test.payload), sig)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}
 }
 
@@ -481,7 +482,7 @@ func TestThumbprint(t *testing.T) {
 		require.NoError(t, err)
 
 		got, err := key.Thumbprint()
-		require.NoError(t, err)
-		require.Equal(t, test.want, got)
+		assert.NoError(t, err)
+		assert.Equal(t, test.want, got)
 	}
 }

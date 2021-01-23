@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/ftauth/ftauth/internal/config"
-	"github.com/ftauth/ftauth/jwt"
-	"github.com/ftauth/ftauth/model"
+	"github.com/ftauth/ftauth/pkg/jwt"
+	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/gofrs/uuid"
 )
 

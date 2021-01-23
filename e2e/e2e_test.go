@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/chromedp/chromedp"
-	"github.com/ftauth/ftauth/util/base64url"
+	"github.com/ftauth/ftauth/pkg/util/base64url"
 	"github.com/gorilla/mux"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2"
 )
 
@@ -110,16 +110,16 @@ func TestEndToEnd(t *testing.T) {
 	if ctx.Err() != nil {
 		// Ignore if we canceled context
 	} else {
-		require.NoError(t, chromeErr)
+		assert.NoError(t, chromeErr)
 	}
 
 	<-ch
 
 	srv.Close()
 
-	require.Emptyf(t, err, "Got error: %s - %s", err, errDesc)
-	require.Equal(t, state, recState)
-	require.NotEmpty(t, code)
+	assert.Emptyf(t, err, "Got error: %s - %s", err, errDesc)
+	assert.Equal(t, state, recState)
+	assert.NotEmpty(t, code)
 
 	t.Logf("Got code: %s", code)
 	t.Logf("Got state: %s", state)

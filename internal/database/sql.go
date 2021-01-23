@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/ftauth/ftauth/internal/config"
-	"github.com/ftauth/ftauth/jwt"
-	"github.com/ftauth/ftauth/model"
-	"github.com/ftauth/ftauth/util/passwordutil"
-	"github.com/ftauth/ftauth/util/sqlutil"
+	"github.com/ftauth/ftauth/pkg/jwt"
+	"github.com/ftauth/ftauth/pkg/model"
+	"github.com/ftauth/ftauth/pkg/util/passwordutil"
+	"github.com/ftauth/ftauth/pkg/util/sqlutil"
 	"github.com/gofrs/uuid"
 	"github.com/jmoiron/sqlx"
 

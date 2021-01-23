@@ -5,7 +5,7 @@ import (
 
 	"github.com/ftauth/ftauth/internal/auth"
 	"github.com/ftauth/ftauth/internal/database"
-	"github.com/ftauth/ftauth/util/cors"
+	"github.com/ftauth/ftauth/pkg/util/cors"
 	"github.com/gorilla/mux"
 )
 

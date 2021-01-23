@@ -3,7 +3,7 @@ package base64url
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -13,11 +13,11 @@ const (
 
 func Test_Base64UrlEncode(t *testing.T) {
 	enc := Encode([]byte(plaintext))
-	require.Equal(t, base64enc, enc)
+	assert.Equal(t, base64enc, enc)
 }
 
 func Test_Base64UrlDecode(t *testing.T) {
 	dec, err := Decode(base64enc)
-	require.NoError(t, err)
-	require.Equal(t, []byte(plaintext), dec)
+	assert.NoError(t, err)
+	assert.Equal(t, []byte(plaintext), dec)
 }

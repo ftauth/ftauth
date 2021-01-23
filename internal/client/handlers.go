@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/ftauth/ftauth/internal/database"
-	"github.com/ftauth/ftauth/model"
+	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/gorilla/mux"
 )
 

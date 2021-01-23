@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/ftauth/ftauth/jwt"
-	"github.com/ftauth/ftauth/model"
+	"github.com/ftauth/ftauth/pkg/jwt"
+	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -44,7 +44,7 @@ type Database interface {
 type ClientDB interface {
 	ListClients(ctx context.Context) ([]*model.ClientInfo, error)
 	GetClient(ctx context.Context, clientID string) (*model.ClientInfo, error)
-	UpdateClient(ctx context.Context, clientInfo *model.ClientInfo) (*model.ClientInfo, error)
+	UpdateClient(ctx context.Context, client *model.ClientInfo) (*model.ClientInfo, error)
 	RegisterClient(ctx context.Context, clientInfo *model.ClientInfo, opt model.ClientOption) (*model.ClientInfo, error)
 	DeleteClient(ctx context.Context, clientID string) error
 }

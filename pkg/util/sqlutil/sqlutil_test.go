@@ -3,7 +3,7 @@ package sqlutil
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParseArray(t *testing.T) {
@@ -27,7 +27,7 @@ func TestParseArray(t *testing.T) {
 
 	for _, test := range tt {
 		got := ParseArray(test.input)
-		require.Equal(t, test.want, got)
+		assert.Equal(t, test.want, got)
 	}
 }
 
@@ -56,6 +56,6 @@ func TestGenerateArrayString(t *testing.T) {
 
 	for _, test := range tt {
 		got := GenerateArrayString(test.input)
-		require.Equal(t, test.want, got)
+		assert.Equal(t, test.want, got)
 	}
 }

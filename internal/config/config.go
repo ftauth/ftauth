@@ -13,7 +13,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ftauth/ftauth/jwt"
+	"github.com/ftauth/ftauth/pkg/jwt"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 )

@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/ftauth/ftauth/internal/database"
-	"github.com/ftauth/ftauth/model"
+	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/gorilla/mux"
 )
 
@@ -77,6 +77,11 @@ func (h clientHandler) AddClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := req.IsValid(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
@@ -103,7 +108,13 @@ func (h clientHandler) UpdateClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req model.ClientInfo
+	vars := mux.Vars(r)
+	clientID := vars["id"]
+	if clientID == "" {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}
+
+	var req model.ClientInfoUpdate
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -112,7 +123,16 @@ func (h clientHandler) UpdateClient(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	clientInfo, err := h.db.UpdateClient(ctx, &req)
+	client, err := h.db.GetClient(ctx, clientID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	ctx, cancel = context.WithTimeout(r.Context(), database.DefaultTimeout)
+	defer cancel()
+
+	clientInfo, err := h.db.UpdateClient(ctx, client.Update(req))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
