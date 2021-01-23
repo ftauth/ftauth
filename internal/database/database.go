@@ -42,7 +42,7 @@ type Database interface {
 
 // ClientDB handles interactions with the client database.
 type ClientDB interface {
-	ListClients(ctx context.Context) ([]*model.ClientInfo, error)
+	ListClients(ctx context.Context, opt ...model.ClientOption) ([]*model.ClientInfo, error)
 	GetClient(ctx context.Context, clientID string) (*model.ClientInfo, error)
 	UpdateClient(ctx context.Context, client *model.ClientInfo) (*model.ClientInfo, error)
 	RegisterClient(ctx context.Context, clientInfo *model.ClientInfo, opt model.ClientOption) (*model.ClientInfo, error)
@@ -72,5 +72,4 @@ type AuthenticationDB interface {
 // DiscoveryDB handles interactions with the discovery database, which contains
 // metadata about this program. It should be the same as AuthorizationDB.
 type DiscoveryDB interface {
-	DescribeSelf(ctx context.Context) (*model.AuthorizationServerMetadata, error)
 }

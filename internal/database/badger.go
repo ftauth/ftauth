@@ -81,11 +81,14 @@ func InitializeBadgerDB(inMemory bool) (*BadgerDB, *model.ClientInfo, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		fmt.Printf("Created admin client:\n%#v\n", clientInfo)
 		return badgerDB, clientInfo, nil
 	}
 
-	return badgerDB, nil, nil
+	admin, err := badgerDB.getAdminClient()
+	if err != nil {
+		return badgerDB, nil, err
+	}
+	return badgerDB, admin, nil
 }
 
 // Close handles closing all connections to the database.
@@ -158,25 +161,44 @@ func (db *BadgerDB) createAdminClient() (*model.ClientInfo, error) {
 	return db.RegisterClient(context.Background(), adminClient, opt)
 }
 
+func (db *BadgerDB) getAdminClient() (*model.ClientInfo, error) {
+	opt := model.ClientOptionAdmin | model.ClientOption(model.MasterSystemFlag)
+	clients, err := db.ListClients(context.Background(), opt)
+	if err != nil {
+		return nil, err
+	}
+	if len(clients) == 0 {
+		return nil, badger.ErrKeyNotFound
+	}
+	return clients[0], nil
+}
+
 // ListClients lists all clients in the database.
-func (db *BadgerDB) ListClients(ctx context.Context) ([]*model.ClientInfo, error) {
+func (db *BadgerDB) ListClients(ctx context.Context, opts ...model.ClientOption) ([]*model.ClientInfo, error) {
 	clients := make([]*model.ClientInfo, 0)
 	err := db.DB.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
 
 		prefix := []byte(prefixClient)
+		var userMeta byte
+		for _, opt := range opts {
+			userMeta |= byte(opt)
+		}
 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
 			item := it.Item()
 
-			var client model.ClientInfo
-			err := item.Value(func(v []byte) error {
-				return json.Unmarshal(v, &client)
-			})
-			if err != nil {
-				return err
+			meta := item.UserMeta()
+			if userMeta == 0 || userMeta&meta == meta {
+				var client model.ClientInfo
+				err := item.Value(func(v []byte) error {
+					return json.Unmarshal(v, &client)
+				})
+				if err != nil {
+					return err
+				}
+				clients = append(clients, &client)
 			}
-			clients = append(clients, &client)
 		}
 
 		return nil
@@ -227,6 +249,9 @@ func (db *BadgerDB) RegisterClient(ctx context.Context, clientInfo *model.Client
 		if err != nil {
 			return err
 		}
+		if opt == 0 {
+			opt = model.ClientOptionNone
+		}
 		return txn.SetEntry(&badger.Entry{
 			Key:      key,
 			Value:    b,
@@ -262,19 +287,21 @@ func (db *BadgerDB) CreateSession(ctx context.Context, request *model.Authorizat
 }
 
 // GetRequestInfo returns the session info associated with this ID.
-func (db *BadgerDB) GetRequestInfo(ctx context.Context, requestID string) (request *model.AuthorizationRequest, err error) {
+func (db *BadgerDB) GetRequestInfo(ctx context.Context, requestID string) (*model.AuthorizationRequest, error) {
 	key := makeSessionKey(requestID)
-	err = db.DB.View(func(txn *badger.Txn) error {
+
+	var request model.AuthorizationRequest
+	err := db.DB.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(key)
 		if err != nil {
 			return err
 		}
 
 		return item.Value(func(v []byte) error {
-			return json.Unmarshal(v, request)
+			return json.Unmarshal(v, &request)
 		})
 	})
-	return
+	return &request, err
 }
 
 // UpdateRequestInfo updates the information pertinent to this request.
@@ -305,7 +332,8 @@ func (db *BadgerDB) LookupSessionByCode(ctx context.Context, code string) (reque
 			if err != nil {
 				return err
 			}
-			if request.Code == code {
+
+			if req.Code == code {
 				request = &req
 				return nil
 			}
@@ -321,16 +349,18 @@ func (db *BadgerDB) LookupSessionByCode(ctx context.Context, code string) (reque
 func (db *BadgerDB) RegisterTokens(ctx context.Context, accessToken, refreshToken *jwt.Token) (commit func() error, rollback func() error, err error) {
 	accessKey := makeTokenKey(accessToken.Claims.JwtID)
 	refreshKey := makeTokenKey(refreshToken.Claims.JwtID)
+
 	txn := db.DB.NewTransaction(true)
 	commit, rollback = txn.Commit, func() error { txn.Discard(); return nil }
 
-	b, err := json.Marshal(accessToken)
+	var accessTokenJwt string
+	accessTokenJwt, err = accessToken.Raw()
 	if err != nil {
 		return
 	}
 	entry := &badger.Entry{
 		Key:       accessKey,
-		Value:     b,
+		Value:     []byte(accessTokenJwt),
 		ExpiresAt: uint64(accessToken.Claims.ExpirationTime),
 	}
 	err = txn.SetEntry(entry)
@@ -338,13 +368,14 @@ func (db *BadgerDB) RegisterTokens(ctx context.Context, accessToken, refreshToke
 		return
 	}
 
-	b, err = json.Marshal(refreshToken)
+	var refreshTokenJwt string
+	refreshTokenJwt, err = refreshToken.Raw()
 	if err != nil {
 		return
 	}
 	entry = &badger.Entry{
 		Key:       refreshKey,
-		Value:     b,
+		Value:     []byte(refreshTokenJwt),
 		ExpiresAt: uint64(refreshToken.Claims.ExpirationTime),
 	}
 	err = txn.SetEntry(entry)
@@ -411,19 +442,24 @@ func (db *BadgerDB) CreateUser(ctx context.Context, id, username, passwordHash s
 }
 
 // GetUserByID retrieves user's info based off an ID.
-func (db *BadgerDB) GetUserByID(ctx context.Context, id string) (user *model.User, err error) {
+func (db *BadgerDB) GetUserByID(ctx context.Context, id string) (*model.User, error) {
 	key := makeUserKey(id)
-	err = db.DB.View(func(txn *badger.Txn) error {
+
+	var user model.User
+	err := db.DB.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(key)
 		if err != nil {
 			return err
 		}
 
 		return item.Value(func(v []byte) error {
-			return json.Unmarshal(v, user)
+			return json.Unmarshal(v, &user)
 		})
 	})
-	return
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 // GetUserByUsername retrieves user's info based off a username.
@@ -465,20 +501,4 @@ func (db *BadgerDB) VerifyUsernameAndPassword(ctx context.Context, username, pas
 		return errors.New("invalid password")
 	}
 	return nil
-}
-
-// DescribeSelf returns metadata about this server.
-func (db *BadgerDB) DescribeSelf(ctx context.Context) (metadata *model.AuthorizationServerMetadata, err error) {
-	key := []byte(prefixMetadata)
-	err = db.DB.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(key)
-		if err != nil {
-			return err
-		}
-
-		return item.Value(func(v []byte) error {
-			return json.Unmarshal(v, metadata)
-		})
-	})
-	return
 }

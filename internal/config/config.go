@@ -100,7 +100,7 @@ func setConfigDefaults() {
 	viper.SetDefault("oauth.scopes.default", "default")
 	viper.SetDefault("oauth.authentication.ropc", false)
 	viper.SetDefault("oauth.template.options", &templateOptions{
-		Dir:          "template",
+		Dir:          "web/template",
 		PrimaryColor: "#4d87ca",
 	})
 }

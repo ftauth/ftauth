@@ -26,5 +26,5 @@ oauth:
     ropc: false
   template:
     options:
-      dir: template
+      dir: web/template
       primaryColor: "#4d87ca"

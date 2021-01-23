@@ -16,6 +16,7 @@ import (
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/ftauth/ftauth/pkg/util/base64url"
+	"github.com/ftauth/ftauth/pkg/util/passwordutil"
 	"github.com/gofrs/uuid"
 	"github.com/gorilla/mux"
 )
@@ -307,7 +308,7 @@ type registerHandler struct {
 
 func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		http.ServeFile(w, r, "template/register.html")
+		http.ServeFile(w, r, config.Current.OAuth.Template.Options.Dir+"/register.html")
 		return
 	}
 
@@ -343,7 +344,13 @@ func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "An unknown error occurred", http.StatusInternalServerError)
 		return
 	}
-	err = h.authenticationDB.CreateUser(ctx, id.String(), username, password)
+
+	hash, err := passwordutil.GeneratePasswordHash(password)
+	if err != nil {
+		log.Printf("Error generating password hash: %v\n", err)
+	}
+
+	err = h.authenticationDB.CreateUser(ctx, id.String(), username, hash)
 	if err != nil {
 		log.Printf("Error creating user: %v\n", err)
 		http.Error(w, "An unknown error occurred", http.StatusInternalServerError)
@@ -360,7 +367,7 @@ type loginEndpointHandler struct {
 
 func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		http.ServeFile(w, r, "template/index.html")
+		http.ServeFile(w, r, config.Current.OAuth.Template.Options.Dir+"/index.html")
 		return
 	}
 
@@ -373,21 +380,25 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	username := r.FormValue("username")
 	if username == "" {
+		log.Println("Username cannot be empty")
 		http.Error(w, "Username cannot be empty", http.StatusBadRequest)
 		return
 	}
 	password := r.FormValue("password")
 	if password == "" {
+		log.Println("Password cannot be empty")
 		http.Error(w, "Password cannot be empty", http.StatusBadRequest)
 		return
 	}
 	sessionCookie, err := r.Cookie("session")
 	if err != nil {
+		log.Println("No session found for user")
 		http.Error(w, "No session found for user", http.StatusBadRequest)
 		return
 	}
 	sessionID := sessionCookie.Value
 	if sessionID == "" {
+		log.Println("Could not retrieve session cookie")
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
@@ -397,6 +408,7 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	err = h.authenticationDB.VerifyUsernameAndPassword(ctx, username, password)
 	if err != nil {
+		log.Printf("Error validating user info: %v\n", err)
 		http.Error(w, "Invalid username and password", http.StatusBadRequest)
 		return
 	}
@@ -407,6 +419,7 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	requestInfo, err := h.authorizationDB.GetRequestInfo(ctx, sessionID)
 	if err != nil {
+		log.Printf("Error retrieving request info: %v\n", err)
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
 		return
 	}

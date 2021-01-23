@@ -23,7 +23,9 @@ func main() {
 	config.LoadConfig()
 
 	// Setup database
-	db, _, err := database.InitializeBadgerDB(false)
+	db, adminClient, err := database.InitializeBadgerDB(false)
+
+	fmt.Printf("Admin client: %#v\n", adminClient)
 
 	// Setup routing
 	r := mux.NewRouter()
