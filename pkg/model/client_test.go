@@ -88,6 +88,11 @@ func TestValidateScopes(t *testing.T) {
 	}{
 		{
 			client: mock.AdminClient,
+			scopes: "",
+			valid:  false,
+		},
+		{
+			client: mock.AdminClient,
 			scopes: "default",
 			valid:  true,
 		},
@@ -100,6 +105,11 @@ func TestValidateScopes(t *testing.T) {
 			client: mock.AdminClient,
 			scopes: "default admin",
 			valid:  true,
+		},
+		{
+			client: mock.PublicClient,
+			scopes: "",
+			valid:  false,
 		},
 		{
 			client: mock.PublicClient,

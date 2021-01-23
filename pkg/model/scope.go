@@ -18,6 +18,9 @@ var (
 	// ErrInvalidScopeTokenFormat means the provided scope token
 	// does not conform to the proper format.
 	ErrInvalidScopeTokenFormat = errors.New("invalid scope token format")
+
+	// ErrEmptyScope means no scope was provided.
+	ErrEmptyScope = errors.New("empty scope")
 )
 
 // ParseScope ensures the provided scope string contains
@@ -31,6 +34,9 @@ func ParseScope(scope string) ([]string, error) {
 
 	scopeTokens := make([]string, 0)
 	for _, scopeToken := range fields {
+		if scopeToken == "" {
+			return nil, ErrEmptyScope
+		}
 		if ValidScopeTokenRegex.MatchString(scopeToken) {
 			scopeTokens = append(scopeTokens, scopeToken)
 		} else {

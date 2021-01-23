@@ -204,6 +204,7 @@ func (t *Token) Encode(key *Key) (string, error) {
 
 	signature := base64url.Encode(signed)
 	t.raw = fmt.Sprintf("%s.%s", unsigned, signature)
+	t.Signature = signed
 	return t.raw, nil
 }
 

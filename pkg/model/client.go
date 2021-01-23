@@ -251,6 +251,9 @@ func (client *ClientInfo) ValidateScopes(scopes string) error {
 	if err != nil {
 		return err
 	}
+	if len(scopeTokens) == 0 {
+		return ErrEmptyScope
+	}
 	// Validate scope tokens
 	for _, scopeToken := range scopeTokens {
 		valid := false
