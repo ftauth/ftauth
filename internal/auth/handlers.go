@@ -134,21 +134,7 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	redirectURI := query.Get(paramRedirectURI)
 	{
 		// Verify redirect URI
-		valid := false
-		redirect, err := url.Parse(redirectURI)
-		if err == nil {
-			for _, uri := range clientInfo.RedirectURIs {
-				if uri == model.LocalhostRedirectURI && redirect.Hostname() == model.LocalhostRedirectURI {
-					valid = true
-					break
-				}
-				if uri == redirectURI {
-					valid = true
-					break
-				}
-			}
-		}
-		if !valid {
+		if !clientInfo.IsValidRedirectURI(redirectURI) {
 			errorString := "Invalid redirect URI"
 			if err != nil {
 				errorString += fmt.Sprintf(": %v", err)

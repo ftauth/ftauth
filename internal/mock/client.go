@@ -31,6 +31,23 @@ var (
 		RefreshTokenLife: 60 * 60 * 24,
 	}
 
+	AdminClient = model.ClientInfo{
+		ID:           uuidMust(),
+		Name:         "Test Admin Client",
+		Type:         model.ClientTypePublic,
+		RedirectURIs: []string{"localhost"},
+		Scopes: []*model.Scope{
+			{Name: "default"},
+			{Name: "admin"},
+		},
+		GrantTypes: []model.GrantType{
+			model.GrantTypeAuthorizationCode,
+			model.GrantTypeRefreshToken,
+		},
+		AccessTokenLife:  60 * 60,
+		RefreshTokenLife: 60 * 60 * 24,
+	}
+
 	ConfidentialClient = model.ClientInfo{
 		ID:           uuidMust(),
 		Name:         "Test Confidential Client",

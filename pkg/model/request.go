@@ -63,7 +63,7 @@ var (
 	// ValidRequestErrorFieldRegex represents the range of characters allowed in
 	// a field of a request error redirect query parameter per
 	// [RFC 6749 4.2.2.1](https://tools.ietf.org/html/rfc6749#section-4.2.2.1)
-	ValidRequestErrorFieldRegex = regexp.MustCompile("[\x21\x23-\x5B\x5D-\x7E]+")
+	ValidRequestErrorFieldRegex = regexp.MustCompile(`^[\x21\x23-\x5B\x5D-\x7E]+$`)
 )
 
 const (

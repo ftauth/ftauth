@@ -92,6 +92,16 @@ func (client *ClientInfo) Update(clientUpdate ClientInfoUpdate) *ClientInfo {
 	return client
 }
 
+// IsDevClient returns true if the client permits localhost redirect URIs.
+func (client *ClientInfo) IsDevClient() bool {
+	for _, uri := range client.RedirectURIs {
+		if uri == LocalhostRedirectURI {
+			return true
+		}
+	}
+	return false
+}
+
 // IsValid checks whether the client info has required and valid parameters,
 // returning an error if not.
 func (client *ClientInfo) IsValid() error {
@@ -295,3 +305,21 @@ const (
 	ClientOptionNone  ClientOption = 0
 	ClientOptionAdmin ClientOption = (1 << iota) // the admin client
 )
+
+// IsValidRedirectURI returns true if the given URI is a localhost URI or
+// matches one of the
+func (client *ClientInfo) IsValidRedirectURI(uri string) bool {
+	redirectURI, err := url.Parse(uri)
+	if err != nil {
+		return false
+	}
+	if client.IsDevClient() && redirectURI.Hostname() == LocalhostRedirectURI {
+		return true
+	}
+	for _, clientRedirect := range client.RedirectURIs {
+		if uri == clientRedirect {
+			return true
+		}
+	}
+	return false
+}
