@@ -133,8 +133,8 @@ func (client *ClientInfo) IsValid() error {
 		if redirectURI.Hostname() == "localhost" {
 			continue
 		}
-		if redirectURI.Scheme != "https" {
-			return fmt.Errorf("invalid redirect URI: %s: Only HTTPS is allowed", uri)
+		if redirectURI.Scheme == "http" {
+			return fmt.Errorf("invalid redirect URI: %s: HTTP is not allowed", uri)
 		}
 		if redirectURI.Hostname() == "" {
 			return fmt.Errorf("invalid redirect URI: %s: Missing host", uri)

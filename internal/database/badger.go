@@ -142,6 +142,10 @@ func (db *BadgerDB) createAdminClient() (*model.ClientInfo, error) {
 		Name:         "Admin",
 		Type:         model.ClientTypePublic,
 		RedirectURIs: []string{"localhost", "myapp://auth"},
+		Scopes: []*model.Scope{
+			{Name: "default"},
+			{Name: "admin"},
+		},
 		GrantTypes: []model.GrantType{
 			model.GrantTypeAuthorizationCode,
 			model.GrantTypeClientCredentials,
