@@ -3,22 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="css/style.css">
-    <link href="packages/codemirror/codemirror.css" rel="stylesheet">
+    <link rel="stylesheet" href="normalize.css">
+    <link rel="stylesheet" href="style.css">
+    <link href="packages/codemirror/css/codemirror.css" rel="stylesheet">
+    <link href="packages/codemirror/theme/material.css" rel="stylesheet">
+    <script defer src="packages/codemirror/codemirror.js"></script>
+    <script defer src="main.dart.js"></script>
     <title>FTAuth</title>
 </head>
 <body>
     <nav>
         <h1 class="nav-title"><a href="/">FTAuth</a></h1>
         <span class="flex-spacer"></span>
-        <label for="menu">&#9776;</label>
+        <!-- <label for="menu">&#9776;</label>
         <input type="checkbox" id="menu"/>
         <ul class="nav-links">
             <li class="nav-link active"><a href="/">Home</a></li>
             <li class="nav-link"><a href="/about">About</a></li>
             <li class="nav-link"><a href="/docs">Docs</a></li>
             <li class="nav-link"><a href="/blog">Blog</a></li>
-        </ul>
+        </ul> -->
     </nav>
     <header>
         <h1 class="header-title">FTAuth</h1>
@@ -33,7 +37,7 @@
                 </button>
             </div>
         </div>
-        <p id="emailResult"></p>
+        <div id="email_result"></div>
     </header>
     <section class="highlights-wrapper">
         <div class="highlights">
@@ -58,20 +62,27 @@
         </div>
     </section>
     <section class="getting-started">
-        <!-- <div class="img-wrapper"></div> -->
+        <div class="email cta">
+            <h3>Sign up to stay updated</h3>
+            <div class="email_submit">
+                <input id="email" type="email" name="email" placeholder="E-mail address">
+                <button id="submitEmail">
+                    <span>&#x2794;</span>
+                </button>
+            </div>
+            <div class="email_result"></div>
+        </div>
         <div id="codeContainer"></div>
-        <h3>Get Started</h3>
+        <!-- <h3>Get Started</h3>
         <h5>Get started authenticating users in under 5 minutes</h5>
         <a class="link" href="/docs">
             <h5>Read the Docs</h5>
-        </a>
+        </a> -->
     </section>
-    <script defer src="packages/codemirror/codemirror.js"></script>
-    <script defer src="js/main.js"></script>
-    <script>
+    <!-- <script>
         document.onscroll = function(e) {
             document.getElementById('menu').checked = false;
         }
-    </script>
+    </script> -->
 </body>
 </html>

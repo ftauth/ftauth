@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:glob/glob.dart';
@@ -16,7 +17,7 @@ build() {
 
   // Build main.dart
   Dart2js.compile(
-    File('main.dart'),
+    File('lib/main.dart'),
     outDir: joinDir(Directory.current, ['js']),
     minify: true,
   );
@@ -37,6 +38,21 @@ build() {
       copy(fileEnt, dir);
     }
   }
+}
+
+@Task()
+serve() async {
+  // Build main.dart
+  Dart2js.compile(
+    File('lib/main.dart'),
+    outFile: File('web/js/main.js'),
+    minify: false,
+  );
+
+  await Process.start(Platform.executable, ['bin/serve.dart'])
+      .then((Process process) {
+    process.stdout.transform(utf8.decoder).listen(stdout.write);
+  });
 }
 
 @Task()

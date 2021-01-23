@@ -5,6 +5,7 @@ import 'dart:html';
 import 'package:codemirror/codemirror.dart';
 import 'package:email_validator/email_validator.dart';
 import 'package:http/http.dart' as http;
+import 'package:meta/meta.dart';
 import 'package:pool/pool.dart';
 
 final _httpClient = _ThrottleClient(
@@ -12,17 +13,26 @@ final _httpClient = _ThrottleClient(
   _DebounceClient(const Duration(milliseconds: 500)),
 );
 
-void main() {
-  final options = {
-    'mode': 'dart',
-    'theme': 'material',
-  };
-  final editor = CodeMirror.fromElement(
-    querySelector('#codeContainer'),
-    options: options,
-  );
-  editor.getDoc().setValue('''
-import 'package:ftauth_flutter/ftauth_flutter.dart';
+class LangVals {
+  final String widthSm; // 60 char line width
+  final String widthLg; // 80 char line width
+
+  const LangVals({@required this.widthSm, @required this.widthLg});
+
+  String valueForWidth(int width) {
+    if (width <= xsBreakpoint) {
+      return widthSm;
+    } else {
+      return widthLg;
+    }
+  }
+}
+
+const xsBreakpoint = 500;
+
+const vals = <String, LangVals>{
+  'dart': LangVals(
+    widthLg: '''import 'package:ftauth_flutter/ftauth_flutter.dart';
 
 Future<void> main() async {
   final config = FTAuthConfig(
@@ -32,7 +42,58 @@ Future<void> main() async {
   );
 
   await FTAuth.initFlutter(config: config);
-}''');
+
+  runApp(FTAuth(
+    config: config,
+    child: MyApp(),
+  ));
+}''',
+    widthSm: '''import 'package:ftauth_flutter/ftauth_flutter.dart';
+
+Future<void> main() async {
+  final config = FTAuthConfig(
+    gatewayUrl: 'https://myapp.ftauth.dev',
+    clientId: '1deddb6d-7957-40a1-a323-77725cecfa18',
+    redirectUri: kIsWeb
+        ? 'http://localhost:8080/#/auth'
+        : 'myapp://auth',
+  );
+
+  await FTAuth.initFlutter(config: config);
+
+  runApp(FTAuth(
+    config: config,
+    child: MyApp(),
+  ));
+}''',
+  )
+};
+
+void main() {
+  final options = {
+    'mode': 'dart',
+    'theme': 'material',
+    'autofocus': false,
+    'tabSize': 2,
+    'indentUnit': 2,
+    'lineWrapping': true,
+    'scrollbarStyle': "null", // hides the scrollbars
+  };
+  final editor = CodeMirror.fromElement(
+    querySelector('#codeContainer'),
+    options: options,
+  );
+  const initialLang = 'dart';
+  final screenWidth = window.innerWidth;
+  editor.getDoc().setValue(vals[initialLang].valueForWidth(screenWidth));
+  editor.onChange.first.then((_) {
+    final codeMirrorScroll = document.querySelector('.CodeMirror-scroll');
+    codeMirrorScroll.styleMap.append('overflow', 'hidden !important');
+  });
+  document
+      .querySelector(
+          '#codeContainer > div > div.CodeMirror-scroll > div:nth-child(2)')
+      .remove();
 
   // Register emails on submission
   document.querySelector('#submitEmail').onClick.listen((event) async {
