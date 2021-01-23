@@ -1,19 +1,16 @@
 import 'dart:async';
 
 import 'package:admin/app_state.dart';
-import 'package:admin/bloc/auth/auth_cubit.dart';
 import 'package:admin/model/tabs.dart';
 import 'package:admin/model/template.dart';
-import 'package:admin/screens/auth/auth_screen.dart';
 import 'package:admin/screens/app/app_screen.dart';
+import 'package:admin/screens/auth/auth_screen.dart';
 import 'package:admin/screens/client/client_detail_screen.dart';
 import 'package:admin/util/regex.dart';
-import 'package:admin/util/future.dart';
-import 'package:ftauth/ftauth.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:ftauth_flutter/ftauth_flutter.dart';
 
 part 'auth.dart';
 part 'clients.dart';
@@ -69,10 +66,9 @@ class AdminRouteInformationParser extends RouteInformationParser<RouteInfo> {
 class AdminRouterDelegate extends RouterDelegate<RouteInfo>
     with ChangeNotifier, PopNavigatorRouterDelegateMixin {
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-  final AuthCubit _authCubit;
   final AppState _appState;
 
-  AdminRouterDelegate(this._authCubit, this._appState) {
+  AdminRouterDelegate(this._appState) {
     _appState.addListener(notifyListeners);
     // addListener(() {
     //   print('Rebuilding Router...');
@@ -83,43 +79,38 @@ class AdminRouterDelegate extends RouterDelegate<RouteInfo>
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<AuthCubit, AuthState>(
-      listener: (context, state) {
+    return StreamBuilder<AuthState>(
+      stream: FTAuth.of(context).authStates,
+      builder: (context, state) {
         showAuthScreen = state is! AuthSignedIn;
-        notifyListeners();
-      },
-      child: BlocBuilder<AuthCubit, AuthState>(
-        cubit: _authCubit,
-        builder: (context, state) {
-          return Navigator(
-            pages: [
+        return Navigator(
+          pages: [
+            MaterialPage(
+              key: ValueKey('AppScreen'),
+              child: AppScreen(),
+            ),
+            if (_appState.isClientDetail)
               MaterialPage(
-                key: ValueKey('AppScreen'),
-                child: AppScreen(),
+                key: ValueKey(_appState.clientRouteInfo.clientId),
+                child: ClientDetailScreen(_appState.clientRouteInfo),
               ),
-              if (_appState.isClientDetail)
-                MaterialPage(
-                  key: ValueKey(_appState.clientRouteInfo.clientId),
-                  child: ClientDetailScreen(_appState.clientRouteInfo),
-                ),
-              if (showAuthScreen)
-                MaterialPage(
-                  key: ValueKey('AuthScreen'),
-                  child: AuthScreen(_appState.authRouteInfo),
-                ),
-            ],
-            onPopPage: (route, result) {
-              if (!route.didPop(result)) {
-                return false;
-              }
+            if (showAuthScreen)
+              MaterialPage(
+                key: ValueKey('AuthScreen'),
+                child: AuthScreen(_appState.authRouteInfo),
+              ),
+          ],
+          onPopPage: (route, result) {
+            if (!route.didPop(result)) {
+              return false;
+            }
 
-              _appState.resetSelected();
+            _appState.resetSelected();
 
-              return true;
-            },
-          );
-        },
-      ),
+            return true;
+          },
+        );
+      },
     );
   }
 

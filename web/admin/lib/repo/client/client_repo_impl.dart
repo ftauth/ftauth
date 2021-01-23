@@ -1,28 +1,30 @@
+import 'dart:async';
+
 import 'package:admin/config/config.dart';
 import 'package:ftauth/ftauth.dart';
-import 'package:admin/repo/auth/auth_repo.dart';
 import 'package:admin/util/json.dart';
 import 'package:http/http.dart' as http;
 
 import 'client_repo.dart';
 
 class ClientRepoImpl extends ClientRepo {
-  final AuthRepository _authRepo;
+  http.Client _client;
+  final Completer<void> _loggedIn = Completer();
+
   final AppConfig _config;
 
-  ClientRepoImpl(this._authRepo, this._config);
-
-  http.Client get client {
-    if (_authRepo.client == null) {
-      throw AuthException.uninitialized();
-    }
-    return _authRepo.client;
+  ClientRepoImpl(Stream<AuthState> authStates, this._config) {
+    authStates.firstWhere((state) => state is AuthSignedIn).then((state) {
+      _client = (state as AuthSignedIn).client;
+      _loggedIn.complete();
+    });
   }
 
   @override
   Future<ClientInfo> getClientInfo(String id) async {
+    await _loggedIn.future;
     final path = '${_config.host}/api/admin/clients/$id';
-    final res = await client.get(path);
+    final res = await _client.get(Uri.tryParse(path));
     if (res.statusCode == 200) {
       final json = decodeJSON(res.body);
       return ClientInfo.fromJson(json);
@@ -33,8 +35,12 @@ class ClientRepoImpl extends ClientRepo {
 
   @override
   Future<ClientInfo> registerClient(ClientInfo clientInfo) async {
+    await _loggedIn.future;
     final path = '${_config.host}/api/admin/clients';
-    final res = await client.post(path, body: clientInfo.toJson());
+    final res = await _client.post(
+      Uri.tryParse(path),
+      body: clientInfo.toJson(),
+    );
     if (res.statusCode == 200) {
       final json = decodeJSON(res.body);
       return ClientInfo.fromJson(json);
@@ -45,8 +51,12 @@ class ClientRepoImpl extends ClientRepo {
 
   @override
   Future<ClientInfo> updateClient(ClientInfo clientInfo) async {
+    await _loggedIn.future;
     final path = '${_config.host}/api/admin/clients/${clientInfo.clientId}';
-    final res = await client.put(path, body: clientInfo.toJson());
+    final res = await _client.put(
+      Uri.tryParse(path),
+      body: clientInfo.toJson(),
+    );
     if (res.statusCode == 200) {
       final json = decodeJSON(res.body);
       return ClientInfo.fromJson(json);
@@ -57,8 +67,9 @@ class ClientRepoImpl extends ClientRepo {
 
   @override
   Future<void> deleteClient(ClientInfo clientInfo) async {
+    await _loggedIn.future;
     final path = '${_config.host}/api/admin/clients/${clientInfo.clientId}';
-    final res = await client.delete(path);
+    final res = await _client.delete(Uri.tryParse(path));
     if (res.statusCode != 200) {
       throw ApiException.delete(path, res.statusCode, res.body);
     }
@@ -66,8 +77,9 @@ class ClientRepoImpl extends ClientRepo {
 
   @override
   Future<List<ClientInfo>> listClients() async {
+    await _loggedIn.future;
     final path = '${_config.host}/api/admin/clients';
-    final res = await client.get(path);
+    final res = await _client.get(Uri.tryParse(path));
     if (res.statusCode == 200) {
       final json = decodeJSONArray(res.body);
       final clients = <ClientInfo>[];

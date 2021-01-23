@@ -1,9 +1,9 @@
-import 'package:admin/bloc/auth/auth_cubit.dart';
 import 'package:admin/bloc/client/client_cubit.dart';
 import 'package:admin/repo/client/client_repo_impl.dart';
 import 'package:admin/routes/routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:ftauth_flutter/ftauth_flutter.dart';
 import 'package:provider/provider.dart';
 
 import 'client_detail_view.dart';
@@ -24,15 +24,12 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   @override
   void initState() {
     super.initState();
-    final authCubit = Provider.of<AuthCubit>(context, listen: false);
     cubit = ClientCubit(
       Provider.of<ClientRepoImpl>(context, listen: false),
       widget.routeInfo.clientId,
       clientInfo: widget.routeInfo.clientInfo,
     );
-    authCubit.isAuthenticated.then((_) {
-      cubit.getClientInfo();
-    });
+    cubit.getClientInfo();
   }
 
   @override

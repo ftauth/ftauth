@@ -1,5 +1,4 @@
 import 'package:admin/app_state.dart';
-import 'package:admin/bloc/auth/auth_cubit.dart';
 import 'package:admin/bloc/client_list/client_list_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -14,13 +13,7 @@ class _ClientListViewState extends State<ClientListView> {
   @override
   void initState() {
     super.initState();
-
-    // Wait for authentication before trying to load clients.
-    final authCubit = Provider.of<AuthCubit>(context, listen: false);
-    final isAuthorized =
-        authCubit.states.firstWhere((state) => state is AuthSignedIn);
-
-    isAuthorized.then((_) => loadClients());
+    loadClients();
   }
 
   Future<void> loadClients() async {

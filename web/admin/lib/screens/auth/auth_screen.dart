@@ -1,8 +1,6 @@
-import 'package:admin/bloc/auth/auth_cubit.dart';
 import 'package:admin/routes/routes.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:ftauth_flutter/ftauth_flutter.dart';
 
 class AuthScreen extends StatefulWidget {
   final AuthRouteInfo routeInfo;
@@ -15,24 +13,16 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   @override
-  void initState() {
-    super.initState();
-    print('Init state');
-    final cubit = BlocProvider.of<AuthCubit>(context, listen: false);
-    final isInitialized = cubit.initialize();
-    if (!widget.routeInfo.isEmpty) {
-      isInitialized.then((_) {
-        cubit.exchangeToken({
-          'code': widget.routeInfo.code,
-          'state': widget.routeInfo.state,
-        });
-      });
-    }
-  }
+  void didChangeDependencies() async {
+    super.didChangeDependencies();
 
-  Future<void> _loadLogin(String url) async {
-    if (await canLaunch(url)) {
-      return launch(url, webOnlyWindowName: '_self');
+    final config = FTAuth.of(context);
+    final isLoggedIn = (await config.authStates.first) is AuthSignedIn;
+    if (!widget.routeInfo.isEmpty && !isLoggedIn) {
+      config.exchangeAuthorizationCode({
+        'code': widget.routeInfo.code,
+        'state': widget.routeInfo.state,
+      });
     }
   }
 
@@ -43,47 +33,29 @@ class _AuthScreenState extends State<AuthScreen> {
         automaticallyImplyLeading: false,
       ),
       body: Center(
-        child: BlocBuilder<AuthCubit, AuthState>(
-          builder: (context, state) {
+        child: StreamBuilder<AuthState>(
+          stream: FTAuth.of(context).authStates,
+          initialData: const AuthLoading(),
+          builder: (context, snapshot) {
+            final state = snapshot.data;
+
             bool showIndicator = true;
             String message;
             Widget button;
             if (state is AuthLoading) {
-              message = state.message;
-            } else if (state is AuthStarted) {
-              showIndicator = false;
-              button = RaisedButton(
-                child: Text('Login'),
-                onPressed: () async {
-                  final url =
-                      await BlocProvider.of<AuthCubit>(context).loadLoginUrl();
-                  if (url != null) {
-                    _loadLogin(url);
-                  }
-                },
-              );
+              message = 'Loading...';
             } else if (state is AuthSignedOut) {
               showIndicator = false;
               message = 'You are not logged in.';
               button = RaisedButton(
                 child: Text('Login'),
                 onPressed: () async {
-                  final url =
-                      await BlocProvider.of<AuthCubit>(context).loadLoginUrl();
-                  if (url != null) {
-                    _loadLogin(url);
-                  }
+                  await FTAuth.of(context).authorize();
                 },
               );
             } else if (state is AuthFailure) {
               showIndicator = false;
               message = state.message;
-              button = RaisedButton(
-                child: Text('Try Again'),
-                onPressed: () {
-                  BlocProvider.of<AuthCubit>(context).initialize();
-                },
-              );
             }
             return Column(
               mainAxisAlignment: MainAxisAlignment.center,
