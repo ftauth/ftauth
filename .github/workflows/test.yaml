@@ -18,17 +18,13 @@ jobs:
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     container:
-      image: ubuntu:latest
+      image: golang:${{ matrix.go-version }}
     services:
       dgraph:
         image: dgraph/standalone:${{ matrix.dgraph-version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Setup Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ matrix.go-version }}
       - run: apt-get update && apt-get install make
       - name: Test
         run: make test
@@ -52,6 +48,7 @@ jobs:
         # up for upcoming breaking changes.
         flutter-version: [beta, dev]
         os: [ubuntu-latest]
+      fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
