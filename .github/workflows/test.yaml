@@ -25,9 +25,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - run: apt-get update && apt-get install make
       - name: Test
-        run: make test
+        run: make server-test
         env:
           FTAUTH_DATABASE_HOST: dgraph
           FTAUTH_DATABASE_PORT: 9080
@@ -67,4 +66,4 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-build-${{ env.cache-name }}-
       - name: Test
-        run: make test
+        run: make admin-test

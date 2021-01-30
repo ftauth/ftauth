@@ -6,13 +6,14 @@ LDFLAGS := "-X 'main.Version=$(Version)' -X 'main.GitCommit=$(GitCommit)' -X 'ma
 COVERFILE := coverage.txt
 
 .PHONY: test
-test: clean
-	if [ -n `which go` ]; then go test -v -coverprofile=$(COVERFILE) ./...; fi
-	# if [ -n `which dart` ]; then $(MAKE) landing-test; fi
-	if [ -n `which flutter` ]; then $(MAKE) admin-test; fi
+test: clean server-test admin-test # landing-test
 
-.PHONY: build
-build: clean
+.PHONY: server-test
+server-test:
+	go test -v -coverprofile=$(COVERFILE) ./...
+
+.PHONY: server
+server: clean
 	mkdir -p bin
 	GOOS=linux go build -ldflags $(LDFLAGS) -o bin/ftauth ./cmd/server
 	GOOS=darwin go build -ldflags $(LDFLAGS) -o bin/ftauth-macos ./cmd/server
