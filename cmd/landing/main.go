@@ -10,54 +10,25 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ftauth/ftauth/internal/admin"
-	"github.com/ftauth/ftauth/internal/auth"
 	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/internal/database"
-	"github.com/ftauth/ftauth/internal/discovery"
-	"github.com/ftauth/ftauth/internal/user"
+	"github.com/ftauth/ftauth/internal/landing"
 	"github.com/gorilla/mux"
 )
-
-// Build-time injected constants via -ldflags -X
-var (
-	Version   string
-	GitCommit string
-	BuildDate string
-)
-
-func init() {
-	fmt.Println("Version:\t", Version)
-	fmt.Println("Git commit:\t", GitCommit)
-	fmt.Println("Build date:\t", BuildDate)
-}
 
 func main() {
 	config.LoadConfig()
 
 	// Setup database
-	opts := database.Options{
-		Path:   config.Current.Database.Dir,
-		SeedDB: true,
-	}
-	db, err := database.InitializeBadgerDB(opts)
+	db, err := database.InitializeDgraphDatabase()
 	if err != nil {
 		log.Fatalf("Error initializing DB: %v\n", err)
 	}
-	adminClient := db.AdminClient
-
-	fmt.Printf("Admin client: %#v\n", adminClient)
-
-	// Setup routing
 	r := mux.NewRouter()
-	auth.SetupRoutes(r, db, db, db)
-	discovery.SetupRoutes(r, db)
-	admin.SetupRoutes(r, db)
-	user.SetupRoutes(r)
 
 	// Static file handling
-	templateDir := config.Current.OAuth.Template.Options.Dir
-	r.PathPrefix("/").Handler(http.FileServer(http.Dir(templateDir)))
+	templateDir := "web/landing/build"
+	landing.SetupRoutes(r, templateDir)
 
 	addr := fmt.Sprintf("%s:%d", "localhost", config.Current.Server.Port)
 	srv := http.Server{
@@ -79,7 +50,7 @@ func main() {
 	<-c
 
 	log.Println("Shutting down server...")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	err = srv.Shutdown(ctx)

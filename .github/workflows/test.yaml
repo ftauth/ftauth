@@ -1,0 +1,72 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - '*'
+  pull_request:
+    branches:
+      - '*'
+
+jobs:
+  server:
+    name: Server
+    strategy:
+      matrix:
+        dgraph-version: [v20.11.0]
+        go-version: [1.15]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    container:
+      image: ubuntu:latest
+    services:
+      dgraph:
+        image: dgraph/standalone:${{ matrix.dgraph-version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Test
+        run: make test
+        env:
+          FTAUTH_DATABASE_HOST: dgraph
+          FTAUTH_DATABASE_PORT: 9080
+      - name: Upload Coverage
+        uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.txt
+          fail_ci_if_error: true
+          verbose: true
+
+  admin:
+    name: Admin
+    strategy:
+      matrix:
+        # Test on multiple Flutter versions to ensure
+        # regressions do not occur - and to give a heads
+        # up for upcoming breaking changes.
+        flutter-version: [beta, dev, master]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v1
+        with:
+          channel: ${{ matrix.flutter-version }}
+      - name: Cache Pubcache
+        uses: actions/cache@v2
+        env:
+          cache-name: pubcache
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('web/admin/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+      - name: Test
+        run: make test

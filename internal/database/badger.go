@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	badger "github.com/dgraph-io/badger/v3"
-	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/ftauth/ftauth/pkg/util/passwordutil"
@@ -16,8 +15,9 @@ import (
 
 // BadgerDB holds a connection to a Badger backend.
 type BadgerDB struct {
-	InMemory bool
-	DB       *badger.DB
+	Options     Options
+	DB          *badger.DB
+	AdminClient *model.ClientInfo
 }
 
 const (
@@ -62,33 +62,52 @@ func makeKey(prefix, id string) []byte {
 	return []byte(fmt.Sprintf("%s_%s", prefix, id))
 }
 
+// Options specifies the FTAuth-specific options
+// for initializing a DB instance
+type Options struct {
+	Path     string // Path to the DB storage
+	InMemory bool   // Whether or not the DB is in memory
+	SeedDB   bool   // Whether or not to seed the DB
+}
+
 // InitializeBadgerDB creates a new database with a Badger backend.
 // Pass `true` to create an in-memory database (useful in tests, for example).
-func InitializeBadgerDB(inMemory bool) (*BadgerDB, *model.ClientInfo, error) {
-	path := config.Current.Database.Dir
-	if inMemory {
-		path = ""
+func InitializeBadgerDB(opts Options) (*BadgerDB, error) {
+	if opts.Path == "" && !opts.InMemory {
+		return nil, errors.New("missing path")
 	}
-	db, err := badger.Open(badger.DefaultOptions(path).WithInMemory(inMemory))
+
+	var badgerOpts badger.Options
+	if opts.InMemory {
+		badgerOpts = badger.DefaultOptions("").WithInMemory(true)
+	} else {
+		badgerOpts = badger.DefaultOptions(opts.Path)
+	}
+	db, err := badger.Open(badgerOpts)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// TODO: If empty, seed with default client and server metadata.
-	badgerDB := &BadgerDB{DB: db, InMemory: inMemory}
-	if badgerDB.isEmpty() {
-		clientInfo, err := badgerDB.createAdminClient()
-		if err != nil {
-			return nil, nil, err
+	badgerDB := &BadgerDB{DB: db, Options: opts}
+
+	if opts.SeedDB {
+		if badgerDB.isEmpty() {
+			admin, err := badgerDB.createAdminClient()
+			if err != nil {
+				return nil, err
+			}
+			badgerDB.AdminClient = admin
+		} else {
+			admin, err := badgerDB.getAdminClient()
+			if err != nil {
+				return nil, err
+			}
+			badgerDB.AdminClient = admin
 		}
-		return badgerDB, clientInfo, nil
 	}
 
-	admin, err := badgerDB.getAdminClient()
-	if err != nil {
-		return badgerDB, nil, err
-	}
-	return badgerDB, admin, nil
+	return badgerDB, nil
 }
 
 // Close handles closing all connections to the database.

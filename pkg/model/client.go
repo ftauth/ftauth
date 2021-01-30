@@ -38,18 +38,58 @@ const (
 
 // ClientInfo holds all relevant information about a client.
 type ClientInfo struct {
-	ID               string      `json:"client_id"` // A UUID v4 string which uniquely idenitifes a particular client.
+	ID               string      `json:"uid"` // A UUID v4 string which uniquely idenitifes a particular client.
 	Name             string      `json:"client_name"`
 	Type             ClientType  `json:"client_type"`
-	Secret           string      `json:"client_secret"`
-	SecretExpiry     time.Time   `json:"client_secret_expires_at"` // Required if client_secret is issued. Time at which secret expires or 0 for no expiry.
+	Secret           string      `json:"client_secret,omitempty"`
+	SecretExpiry     time.Time   `json:"client_secret_expires_at,omitempty"` // Required if client_secret is issued. Time at which secret expires or 0 for no expiry.
 	RedirectURIs     []string    `json:"redirect_uris"`
 	Scopes           []*Scope    `json:"scopes"`
-	JWKsURI          string      `json:"jwks_uri"`
-	LogoURI          string      `json:"logo_uri"`
+	JWKsURI          string      `json:"jwks_uri,omitempty"`
+	LogoURI          string      `json:"logo_uri,omitempty"`
 	GrantTypes       []GrantType `json:"grant_types"`
-	AccessTokenLife  int         `json:"access_token_life"`  // Lifetime of access token, in seconds
-	RefreshTokenLife int         `json:"refresh_token_life"` // Lifetime of refresh token, in seconds
+	AccessTokenLife  int         `json:"access_token_life"`     // Lifetime of access token, in seconds
+	RefreshTokenLife int         `json:"refresh_token_life"`    // Lifetime of refresh token, in seconds
+	DType            []string    `json:"dgraph.type,omitempty"` // The Dgraph type
+}
+
+// NewClient creates a new client with the provided values. This
+// is the preferred method for creating a client, since it will
+// populate some required values for you.
+func NewClient(
+	name string,
+	typ ClientType,
+	redirectUris []string,
+	scopes []*Scope,
+	jwksURI,
+	logoURI string,
+	accessTokenLife,
+	refreshTokenLife int,
+) *ClientInfo {
+	var secret string
+	if typ == ClientTypeConfidential {
+		secret = GenerateAuthorizationCode()
+	}
+	var grantTypes []GrantType
+	if typ == ClientTypeConfidential {
+		grantTypes = []GrantType{GrantTypeClientCredentials}
+	} else if typ == ClientTypePublic {
+		grantTypes = []GrantType{GrantTypeAuthorizationCode, GrantTypeRefreshToken}
+	}
+	return &ClientInfo{
+		ID:               "_:client",
+		Name:             name,
+		Type:             typ,
+		Secret:           secret,
+		RedirectURIs:     redirectUris,
+		Scopes:           scopes,
+		JWKsURI:          jwksURI,
+		LogoURI:          logoURI,
+		GrantTypes:       grantTypes,
+		AccessTokenLife:  accessTokenLife,
+		RefreshTokenLife: refreshTokenLife,
+		DType:            []string{"Client"},
+	}
 }
 
 // Update creates a new copy of client and updates fields from clientUpdate.
@@ -158,13 +198,14 @@ func (client *ClientInfo) IsValid() error {
 
 // ClientInfoUpdate holds updateable parameters for ClientInfo.
 type ClientInfoUpdate struct {
-	Name             *string   `json:"client_name"`
-	RedirectURIs     *[]string `json:"redirect_uris"`
-	Scopes           *[]*Scope `json:"scopes"`
-	JWKsURI          *string   `json:"jwks_uri"`
-	LogoURI          *string   `json:"logo_uri"`
-	AccessTokenLife  *int      `json:"access_token_life"`
-	RefreshTokenLife *int      `json:"refresh_token_life"`
+	ID               string    `json:"uid"`
+	Name             *string   `json:"client_name,omitempty"`
+	RedirectURIs     *[]string `json:"redirect_uris,omitempty"`
+	Scopes           *[]*Scope `json:"scopes,omitempty"`
+	JWKsURI          *string   `json:"jwks_uri,omitempty"`
+	LogoURI          *string   `json:"logo_uri,omitempty"`
+	AccessTokenLife  *int      `json:"access_token_life,omitempty"`
+	RefreshTokenLife *int      `json:"refresh_token_life,omitempty"`
 }
 
 // ClientInfoEntity holds client info for transfer on the wire,
@@ -240,8 +281,9 @@ func parseGrantTypes(grants string) []GrantType {
 
 // Scope identifies an access scope for a client
 type Scope struct {
-	Name    string `db:"name" json:"name"`       // Primary key
-	Ruleset string `db:"ruleset" json:"ruleset"` // Set of rules - in JSON format
+	Name    string   `db:"name" json:"name"`                 // Primary key
+	Ruleset string   `db:"ruleset" json:"ruleset,omitempty"` // Set of rules - in JSON format
+	DType   []string `json:"dgraph.type,omitempty"`
 }
 
 // ValidateScopes affirms whether the client supports the given scopes.

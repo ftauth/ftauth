@@ -20,10 +20,11 @@ import (
 func TestCreateAdmin(t *testing.T) {
 	config.LoadConfig()
 
-	db, admin, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
 	defer db.Close()
-
 	require.NoError(t, err)
+
+	admin := db.AdminClient
 
 	client, err := db.GetClient(context.Background(), admin.ID)
 	require.NoError(t, err)
@@ -34,7 +35,7 @@ func TestCreateAdmin(t *testing.T) {
 func TestRegisterClient(t *testing.T) {
 	config.LoadConfig()
 
-	db, _, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true})
 	defer db.Close()
 
 	require.NoError(t, err)
@@ -56,9 +57,11 @@ func TestGetClient(t *testing.T) {
 
 	config.LoadConfig()
 
-	db, admin, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
+
+	admin := db.AdminClient
 
 	client, err := db.GetClient(ctx, admin.ID)
 	require.NoError(t, err)
@@ -69,7 +72,7 @@ func TestUpdateClient(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, _, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -126,9 +129,11 @@ func TestUpdateClient(t *testing.T) {
 func TestGetAdminClient(t *testing.T) {
 	config.LoadConfig()
 
-	db, admin, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
+
+	admin := db.AdminClient
 
 	loadedClient, err := db.getAdminClient()
 	require.NoError(t, err)
@@ -140,9 +145,11 @@ func TestListClients(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, admin, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
+
+	admin := db.AdminClient
 
 	_, err = db.RegisterClient(ctx, &mock.PublicClient, model.ClientOptionNone)
 	require.NoError(t, err)
@@ -165,7 +172,7 @@ func TestDeleteClient(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, _, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -187,9 +194,11 @@ func TestCreateSession(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, admin, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
+
+	admin := db.AdminClient
 
 	id, err := uuid.NewV4()
 	require.NoError(t, err)
@@ -214,9 +223,11 @@ func TestGetRequestInfo(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, admin, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
+
+	admin := db.AdminClient
 
 	id, err := uuid.NewV4()
 	require.NoError(t, err)
@@ -246,9 +257,11 @@ func TestUpdateRequestInfo(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, admin, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
+
+	admin := db.AdminClient
 
 	id, err := uuid.NewV4()
 	require.NoError(t, err)
@@ -287,9 +300,11 @@ func TestLookupSessionByCode(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, admin, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
+
+	admin := db.AdminClient
 
 	id, err := uuid.NewV4()
 	require.NoError(t, err)
@@ -341,9 +356,11 @@ func TestRegisterTokens(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, admin, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
+
+	admin := db.AdminClient
 
 	accessToken, err := token.IssueAccessToken(admin, &model.User{ID: "test"}, "default")
 	require.NoError(t, err)
@@ -406,9 +423,11 @@ func TestGetTokenByID(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, admin, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
+
+	admin := db.AdminClient
 
 	accessToken, err := token.IssueAccessToken(admin, &model.User{ID: "test"}, "default")
 	require.NoError(t, err)
@@ -454,9 +473,11 @@ func TestIsTokenSeen(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, admin, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
+
+	admin := db.AdminClient
 
 	token, err := token.IssueAccessToken(admin, &model.User{ID: "test"}, "default")
 	require.NoError(t, err)
@@ -472,7 +493,7 @@ func TestCreateUser(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, _, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -488,7 +509,7 @@ func TestGetUserByID(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, _, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -512,7 +533,7 @@ func TestGetUserByUsername(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, _, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -536,7 +557,7 @@ func TestVerifyUsernameAndPassword(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, _, err := InitializeBadgerDB(true)
+	db, err := InitializeBadgerDB(Options{InMemory: true})
 	defer db.Close()
 	require.NoError(t, err)
 

@@ -71,5 +71,4 @@ type AuthenticationDB interface {
 
 // DiscoveryDB handles interactions with the discovery database, which contains
 // metadata about this program. It should be the same as AuthorizationDB.
-type DiscoveryDB interface {
-}
+type DiscoveryDB interface{}

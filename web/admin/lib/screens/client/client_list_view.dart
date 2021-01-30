@@ -18,7 +18,7 @@ class _ClientListViewState extends State<ClientListView> {
 
   Future<void> loadClients() async {
     final clientListCubit =
-        Provider.of<ClientListCubit>(context, listen: false);
+        BlocProvider.of<ClientListCubit>(context);
     return clientListCubit.loadClients();
   }
 

@@ -81,7 +81,8 @@ class AdminRouterDelegate extends RouterDelegate<RouteInfo>
   Widget build(BuildContext context) {
     return StreamBuilder<AuthState>(
       stream: FTAuth.of(context).authStates,
-      builder: (context, state) {
+      builder: (context, snapshot) {
+        final state = snapshot.data;
         showAuthScreen = state is! AuthSignedIn;
         return Navigator(
           pages: [

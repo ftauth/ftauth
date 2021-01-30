@@ -59,8 +59,11 @@ func Test_handleTokenRequestError(t *testing.T) {
 func TestAuthorizationEndpoint(t *testing.T) {
 	config.LoadConfig()
 
-	db, admin, err := database.InitializeBadgerDB(true)
+	db, err := database.InitializeBadgerDB(database.Options{InMemory: true, SeedDB: true})
+	defer db.Close()
 	require.NoError(t, err)
+
+	admin := db.AdminClient
 
 	handler := authorizationEndpointHandler{
 		db:       db,

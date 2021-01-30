@@ -34,8 +34,10 @@ type clientTestSuite struct {
 func (suite *clientTestSuite) SetupSuite() {
 	config.LoadConfig()
 
-	db, admin, err := database.InitializeBadgerDB(true)
-	assert.NoError(suite.T(), err)
+	db, err := database.InitializeBadgerDB(database.Options{InMemory: true, SeedDB: true})
+	require.NoError(suite.T(), err)
+
+	admin := db.AdminClient
 
 	suite.db = db
 	suite.admin = admin

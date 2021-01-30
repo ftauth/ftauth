@@ -11,19 +11,23 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ftauth_flutter/ftauth_flutter.dart';
 import 'package:provider/provider.dart';
 
+const _isDemo = bool.fromEnvironment('demo', defaultValue: false);
+
 Future<void> main() async {
   Bloc.observer = MyBlocObserver();
   EquatableConfig.stringify = true;
 
-  final config = FTAuthConfig(
-    gatewayUrl: 'http://localhost:8000',
-    clientId: '12cb5a11-9e2c-4f46-a0e0-1c35db45d146',
-    redirectUri: kReleaseMode
-        ? 'http://localhost:8080/auth'
-        : 'http://localhost:8080/#/auth',
-    scopes: ['default', 'admin'],
-    grantTypes: ['authorization_code', 'refresh_token'],
-  );
+  final config = _isDemo
+      ? DemoConfig()
+      : FTAuthConfig(
+          gatewayUrl: 'http://localhost:8000',
+          clientId: '12cb5a11-9e2c-4f46-a0e0-1c35db45d146',
+          redirectUri: kReleaseMode
+              ? 'http://localhost:8080/auth'
+              : 'http://localhost:8080/#/auth',
+          scopes: ['default', 'admin'],
+          grantTypes: ['authorization_code', 'refresh_token'],
+        );
 
   await FTAuth.initFlutter(config: config);
 
@@ -40,12 +44,13 @@ AppConfig config = AppConfig.dev();
 class AdminApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final authStates = FTAuth.of(context).authStates;
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: AppState()),
         Provider(
-          create: (context) => ClientRepoImpl(
-            FTAuth.of(context).authStates,
+          create: (_) => ClientRepoImpl(
+            authStates,
             config,
           ),
         ),

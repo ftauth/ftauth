@@ -12,6 +12,7 @@ class AppScreen extends StatelessWidget {
     (_) => ClientListView(),
     (_) => TemplateScreen(),
   ];
+
   @override
   Widget build(BuildContext context) {
     final AppState appState = Provider.of<AppState>(context);

@@ -1,4 +1,4 @@
-name: ftauth_static
+name: ftauth_landing
 publish_to: none
 
 environment:
@@ -12,6 +12,7 @@ dependencies:
   firebase: any
 
 dev_dependencies:
+  test: any
   build_runner: any
   build_web_compilers: any
   sass_builder: ^2.0.0

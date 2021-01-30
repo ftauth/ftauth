@@ -15,6 +15,8 @@ class _ClientDetailViewState extends State<ClientDetailView> {
   bool _isEditing = false;
   bool _showSecret = false;
 
+  final _formKey = GlobalKey<FormState>();
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<ClientCubit, ClientState>(
@@ -33,114 +35,118 @@ class _ClientDetailViewState extends State<ClientDetailView> {
           title = client.clientName == '' ? 'Client Detail' : client.clientName;
           body = Padding(
             padding: const EdgeInsets.all(10.0),
-            child: ListView(
-              children: <Widget>[
-                FormGroup(
-                  title: 'Client Name',
-                  value: client.clientName,
-                  isEditing: _isEditing,
-                  onChanged: (String name) {
-                    cubit.updateFormState(clientName: name);
-                  },
-                ),
-                FormGroup(
-                  title: 'Client ID',
-                  value: client.clientId,
-                  isEditing: false,
-                  onChanged: print,
-                ),
-                FormGroup(
-                  title: 'Client Type',
-                  value: client.clientType.stringify,
-                  isEditing: _isEditing,
-                ),
-                if (client.clientType == ClientType.confidential)
-                  FormGroup(
-                    title: 'Client Secret',
-                    value: client.clientSecret,
-                    isEditing: false,
-                    child: StatefulBuilder(
-                      builder: (context, setState) {
-                        if (_showSecret) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SelectableText(client.clientSecret),
-                              const SizedBox(height: 5),
-                              SelectableText(
-                                client.clientSecretExpiresAt.toIso8601String(),
-                              ),
-                            ],
-                          );
-                        }
-                        return Align(
-                          alignment: Alignment.centerLeft,
-                          child: LimitedBox(
-                            maxWidth: 50,
-                            child: RaisedButton(
-                              onPressed: () {
-                                setState(() => _showSecret = true);
-                              },
-                              child: Text('Show'),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+            child: Form(
+              key: _formKey,
+              child: ListView(
+                children: <Widget>[
+                  FormGroup<String>(
+                    title: 'Client Name',
+                    value: client.clientName,
+                    isEditing: _isEditing,
+                    onChanged: (String name) {
+                      cubit.updateFormState(clientName: name);
+                    },
                   ),
-                MultiFormGroup(
-                  title: 'Redirect URIs',
-                  value: client.redirectUris,
-                  isEditing: _isEditing,
-                  onChanged: (List<String> redirectUris) {
-                    cubit.updateFormState(redirectUris: redirectUris);
-                  },
-                  headerButton: IconButton(
-                    icon: Icon(Icons.add_circle_outline),
-                    onPressed: () {
+                  FormGroup<String>(
+                    title: 'Client ID',
+                    value: client.clientId,
+                    isEditing: false,
+                    onChanged: print,
+                  ),
+                  FormGroup<String>(
+                    title: 'Client Type',
+                    value: client.clientType.stringify,
+                    isEditing: false,
+                  ),
+                  if (client.clientType == ClientType.confidential)
+                    FormGroup<String>(
+                      title: 'Client Secret',
+                      value: client.clientSecret,
+                      isEditing: false,
+                      child: StatefulBuilder(
+                        builder: (context, setState) {
+                          if (_showSecret) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SelectableText(client.clientSecret),
+                                if (client.clientSecretExpiresAt != null) ...[
+                                  const SizedBox(height: 5),
+                                  SelectableText(
+                                    client.clientSecretExpiresAt.toIso8601String(),
+                                  ),
+                                ],
+                              ],
+                            );
+                          }
+                          return Align(
+                            alignment: Alignment.centerLeft,
+                            child: LimitedBox(
+                              maxWidth: 50,
+                              child: RaisedButton(
+                                onPressed: () {
+                                  setState(() => _showSecret = true);
+                                },
+                                child: Text('Show'),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  MultiTextFormGroup(
+                    title: 'Redirect URIs',
+                    value: client.redirectUris,
+                    isEditing: _isEditing,
+                    onChanged: (List<String> redirectUris) {
+                      cubit.updateFormState(redirectUris: redirectUris);
+                    },
+                    onAdd: () {
                       cubit.updateFormState(
                         redirectUris: [...client.redirectUris, ''],
                       );
                     },
                   ),
-                ),
-                MultiFormGroup(
-                  title: 'Scopes',
-                  value: client.scopes,
-                  isEditing: _isEditing,
-                  onChanged: (List<String> scopes) {
-                    cubit.updateFormState(scopes: scopes);
-                  },
-                ),
-                MultiFormGroup(
-                  title: 'Grant Types',
-                  value: client.grantTypes,
-                  isEditing: _isEditing,
-                  onChanged: (List<String> grantTypes) {
-                    cubit.updateFormState(grantTypes: grantTypes);
-                  },
-                ),
-                FormGroup(
-                  title: 'Json Web Key Set (JWKS) URI',
-                  value: client.jwksUri,
-                  isEditing: _isEditing,
-                  onChanged: (String jwksUri) {
-                    cubit.updateFormState(jwksUri: jwksUri);
-                  },
-                ),
-                FormGroup(
-                  title: 'Logo URI',
-                  value: client.logoUri,
-                  isEditing: _isEditing,
-                  onChanged: (String logoUri) {
-                    cubit.updateFormState(logoUri: logoUri);
-                  },
-                ),
-              ].spacedByAll(const [
-                SizedBox(height: 5),
-                Divider(),
-                SizedBox(height: 5),
-              ]),
+                  MultiTextFormGroup(
+                    title: 'Scopes',
+                    value: client.scopes,
+                    isEditing: _isEditing,
+                    onChanged: (List<String> scopes) {
+                      cubit.updateFormState(scopes: scopes);
+                    },
+                    onAdd: () {
+                      cubit.updateFormState(
+                        scopes: [...client.scopes, ''],
+                      );
+                    },
+                  ),
+                  MultiTextFormGroup(
+                    title: 'Grant Types',
+                    value: client.grantTypes,
+                    isEditing: false,
+                  ),
+                  FormGroup<String>(
+                    title: 'Json Web Key Set (JWKS) URI',
+                    value: client.jwksUri,
+                    isEditing: _isEditing,
+                    onChanged: (String jwksUri) {
+                      cubit.updateFormState(jwksUri: jwksUri);
+                    },
+                  ),
+                  FormGroup<String>(
+                    title: 'Logo URI',
+                    value: client.logoUri,
+                    isEditing: _isEditing,
+                    onChanged: (String logoUri) {
+                      cubit.updateFormState(logoUri: logoUri);
+                    },
+                  ),
+                ].spacedByAll(const [
+                  SizedBox(height: 5),
+                  Divider(),
+                  SizedBox(height: 5),
+                ]),
+              ),
             ),
           );
         }
@@ -152,7 +158,7 @@ class _ClientDetailViewState extends State<ClientDetailView> {
                 ? [
                     IconButton(
                       icon: Icon(Icons.check),
-                      onPressed: () => setState(() => _isEditing = false),
+                      onPressed: _validateAndSave,
                     ),
                   ]
                 : [
@@ -167,47 +173,77 @@ class _ClientDetailViewState extends State<ClientDetailView> {
       },
     );
   }
+
+  void _validateAndSave() {
+    if (!_formKey.currentState.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Please fix errors in the form'),
+        backgroundColor: Colors.red[300],
+      ));
+    }
+    setState(() => _isEditing = false);
+  }
 }
 
-class MultiFormGroup<T> extends FormGroup<List<T>> {
-  MultiFormGroup({
+class MultiTextFormGroup extends FormGroup<List<String>> {
+  final VoidCallback onAdd;
+  final ValueChanged<String> onRemove;
+
+  MultiTextFormGroup({
     String title,
-    List<T> value,
-    ValueChanged<List<T>> onChanged,
+    List<String> value,
+    ValueChanged<List<String>> onChanged,
+    String Function(String) validator,
+    this.onAdd,
+    this.onRemove,
     bool isEditing,
     Widget child,
-    Widget headerButton,
   }) : super(
           title: title,
           value: value,
           onChanged: onChanged,
           isEditing: isEditing,
           child: child,
-          headerButton: headerButton,
+          validator: validator,
         );
 
   @override
+  Widget get headerButton => IconButton(
+        icon: Icon(Icons.add_circle_outline),
+        onPressed: onAdd,
+      );
+
+  @override
   Widget get formField {
-    switch (T) {
-      case String:
-        return Column(
-          children: [
-            for (var i = 0; i < value.length; i++)
-              TextFormField(
-                initialValue: value[i].toString(),
-                onChanged: (String val) {
-                  (onChanged as ValueChanged<List>)(
-                    [
-                      ...value.sublist(0, i),
-                      val,
-                      ...value.sublist(i + 1),
-                    ],
-                  );
-                },
-              )
-          ],
-        );
-    }
+    return Column(
+      children: [
+        for (var i = 0; i < value.length; i++)
+          TextFormField(
+            initialValue: value[i].toString(),
+            onChanged: (String val) {
+              onChanged(
+                [
+                  ...value.sublist(0, i),
+                  val,
+                  ...value.sublist(i + 1),
+                ],
+              );
+            },
+            validator: validator,
+          )
+      ],
+    );
+  }
+
+  @override
+  Widget staticView(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        for (var el in value) Text('\u00B7 $el'),
+      ].spacedBy(const SizedBox(height: 5)),
+    );
   }
 }
 
@@ -216,17 +252,21 @@ class FormGroup<T> extends StatelessWidget {
   final T value;
   final ValueChanged<T> onChanged;
   final bool isEditing;
-  final Widget headerButton;
   final Widget child;
+  final String Function(String) validator;
 
   FormGroup({
     this.title,
     this.value,
     this.onChanged,
     this.isEditing,
-    this.headerButton,
+    Widget headerButton,
     this.child,
-  });
+    this.validator,
+  }) : _headerButton = headerButton;
+
+  final Widget _headerButton;
+  Widget get headerButton => _headerButton;
 
   Widget get formField {
     switch (T) {
@@ -234,6 +274,7 @@ class FormGroup<T> extends StatelessWidget {
         return TextFormField(
           initialValue: value as String,
           onChanged: onChanged as ValueChanged<String>,
+          validator: validator,
         );
       case num:
         return TextFormField(
@@ -241,16 +282,21 @@ class FormGroup<T> extends StatelessWidget {
           onChanged: (String val) {
             (onChanged as ValueChanged<num>)(num.tryParse(val));
           },
+          validator: validator,
         );
     }
 
     return null;
   }
 
+  Widget staticView(BuildContext context) {
+    final bodyStyle = Theme.of(context).textTheme.bodyText2;
+    return Text(value.toString(), style: bodyStyle);
+  }
+
   @override
   Widget build(BuildContext context) {
     final headerStyle = Theme.of(context).textTheme.headline6;
-    final bodyStyle = Theme.of(context).textTheme.bodyText2;
 
     final header = Container(
       width: 200,
@@ -265,7 +311,7 @@ class FormGroup<T> extends StatelessWidget {
     if (isEditing) {
       _child = formField;
     } else {
-      _child = Text(value.toString(), style: bodyStyle);
+      _child = staticView(context);
     }
     return Row(
       children: [

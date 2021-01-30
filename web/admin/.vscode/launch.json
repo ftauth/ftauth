@@ -5,11 +5,20 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "web",
+            "name": "Localhost",
             "request": "launch",
             "type": "dart",
             "args": [
                 "--web-port=8080"
+            ]
+        },
+        {
+            "name": "Demo",
+            "request": "launch",
+            "type": "dart",
+            "args": [
+                "--web-port=8080",
+                "--dart-define=demo=true"
             ]
         }
     ]

@@ -6,6 +6,7 @@ require (
 	github.com/chromedp/cdproto v0.0.0-20201204063249-be40c824ad18 // indirect
 	github.com/chromedp/chromedp v0.5.4
 	github.com/dgraph-io/badger/v3 v3.2011.0
+	github.com/dgraph-io/dgo/v200 v200.0.0-20210125093441-2ab429259580
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gofrs/uuid v3.2.0+incompatible
@@ -27,6 +28,7 @@ require (
 	golang.org/x/oauth2 v0.0.0-20201208152858-08078c50e5b5
 	golang.org/x/sys v0.0.0-20201214210602-f9fddec55a1e // indirect
 	golang.org/x/text v0.3.4 // indirect
+	google.golang.org/grpc v1.31.0
 	gopkg.in/ini.v1 v1.62.0 // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect
 )

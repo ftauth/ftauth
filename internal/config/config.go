@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ftauth/ftauth/pkg/jwt"
 	homedir "github.com/mitchellh/go-homedir"
@@ -85,23 +86,23 @@ var (
 )
 
 func setConfigDefaults() {
-	viper.SetDefault("server", &ServerConfig{
-		Scheme: "http",
-		Host:   "localhost",
-		Port:   8000,
+	viper.SetDefault("server", map[string]interface{}{
+		"scheme": "http",
+		"host":   "localhost",
+		"port":   8000,
 	})
 
-	viper.SetDefault("database", &DatabaseConfig{
-		Host:   "localhost",
-		Port:   5432,
-		DBName: "oauth",
+	viper.SetDefault("database", map[string]interface{}{
+		"host":   "localhost",
+		"port":   9080,
+		"dbname": "oauth",
 	})
 
 	viper.SetDefault("oauth.scopes.default", "default")
 	viper.SetDefault("oauth.authentication.ropc", false)
-	viper.SetDefault("oauth.template.options", &templateOptions{
-		Dir:          "web/template",
-		PrimaryColor: "#4d87ca",
+	viper.SetDefault("oauth.template.options", map[string]interface{}{
+		"dir":          "web/template",
+		"primaryColor": "#4d87ca",
 	})
 }
 
@@ -115,6 +116,10 @@ func LoadConfig() {
 	viper.SetConfigType("yaml")
 
 	setConfigDefaults()
+
+	viper.SetEnvPrefix("ftauth")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.AutomaticEnv()
 
 	err := viper.ReadInConfig()
 	if err != nil {
