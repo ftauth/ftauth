@@ -29,6 +29,7 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go-version }}
+      - run: apt-get update && apt-get install make
       - name: Test
         run: make test
         env:
@@ -49,7 +50,7 @@ jobs:
         # Test on multiple Flutter versions to ensure
         # regressions do not occur - and to give a heads
         # up for upcoming breaking changes.
-        flutter-version: [beta, dev, master]
+        flutter-version: [beta, dev]
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
