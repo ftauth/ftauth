@@ -26,33 +26,33 @@ jobs:
       - name: Build
         run: make server
 
-  landing:
-    name: Landing
-    strategy:
-      matrix:
-        go-version: [1.15]
-        dart-sdk: [stable]
-        os: [ubuntu-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Setup Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ matrix.go-version }}
-      - name: Setup Dart
-        uses: dart-lang/setup-dart@main
-        with:
-          sdk: ${{ matrix.dart-sdk }}
-      - name: Cache Pubcache
-        uses: actions/cache@v2
-        env:
-          cache-name: pubcache
-        with:
-          path: ~/.pub-cache
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('web/landing/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-      - name: Build
-        run: make landing
+  # landing:
+  #   name: Landing
+  #   strategy:
+  #     matrix:
+  #       go-version: [1.15]
+  #       dart-sdk: [stable]
+  #       os: [ubuntu-latest]
+  #   runs-on: ${{ matrix.os }}
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v2
+  #     - name: Setup Go
+  #       uses: actions/setup-go@v2
+  #       with:
+  #         go-version: ${{ matrix.go-version }}
+  #     - name: Setup Dart
+  #       uses: dart-lang/setup-dart@main
+  #       with:
+  #         sdk: ${{ matrix.dart-sdk }}
+  #     - name: Cache Pubcache
+  #       uses: actions/cache@v2
+  #       env:
+  #         cache-name: pubcache
+  #       with:
+  #         path: ~/.pub-cache
+  #         key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('web/landing/pubspec.lock') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-build-${{ env.cache-name }}-
+  #     - name: Build
+  #       run: make landing
