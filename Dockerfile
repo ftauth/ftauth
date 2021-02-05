@@ -11,4 +11,6 @@ RUN make server
 FROM alpine:latest
 COPY --from=build-server /app/bin/ftauth /usr/local/bin/
 # COPY --from=build-admin /app/build /etc/ftauth/admin
+
+EXPOSE 8000
 CMD ["ftauth", "--embedded"]
