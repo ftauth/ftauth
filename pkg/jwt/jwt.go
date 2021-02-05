@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ftauth/ftauth/pkg/util/base64url"
 	"github.com/mitchellh/mapstructure"
@@ -288,4 +289,9 @@ func (t *Token) Verify(key *Key) error {
 	}
 
 	return nil
+}
+
+// IsExpired returns true if the expiration time has passed.
+func (t *Token) IsExpired() bool {
+	return t.Claims.ExpirationTime == 0 || time.Unix(t.Claims.ExpirationTime, 0).Before(time.Now())
 }

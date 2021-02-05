@@ -3,6 +3,7 @@ package token
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"reflect"
 	"testing"
 
 	"github.com/ftauth/ftauth/internal/config"
@@ -66,16 +67,36 @@ func TestIssueAccessToken(t *testing.T) {
 			scope:   "default",
 			wantErr: false,
 		},
+		{
+			name:   "Parse user",
+			client: &mock.PublicClient,
+			user: &model.User{
+				ID:        "test",
+				FirstName: "Dillon",
+				LastName:  "Nys",
+				Provider:  "ftauth",
+			},
+			scope:   "default",
+			wantErr: false,
+		},
 	}
 
 	for _, test := range tt {
 		t.Run(test.name, func(t *testing.T) {
-			_, err := IssueAccessToken(test.client, test.user, test.scope)
+			token, err := IssueAccessToken(test.client, test.user, test.scope)
 			if test.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
+				require.Error(t, err)
+				return
 			}
+			require.NoError(t, err)
+
+			userInfo, ok := token.Claims.CustomClaims["userInfo"]
+			require.Truef(t, ok, "Missing userInfo key in custom claims")
+
+			user, ok := userInfo.(*model.UserData)
+			require.Truef(t, ok, "userInfo is not a model.UserData")
+
+			require.True(t, reflect.DeepEqual(test.user.ToUserData(), user))
 		})
 	}
 }

@@ -62,7 +62,7 @@ func IssueAccessToken(clientInfo *model.ClientInfo, user *model.User, scope stri
 			JwtID:          id.String(),
 			Scope:          scope,
 			CustomClaims: jwt.CustomClaims{
-				"userInfo": user,
+				"userInfo": user.ToUserData(),
 			},
 		},
 	}
@@ -115,7 +115,7 @@ func IssueRefreshToken(clientInfo *model.ClientInfo, accessToken *jwt.Token) (*j
 			JwtID:          id.String(),
 			Scope:          accessToken.Claims.Scope,
 			CustomClaims: jwt.CustomClaims{
-				"userInfo": model.User{ID: accessToken.Claims.Audience},
+				"userInfo": model.UserData{ID: accessToken.Claims.Audience},
 			},
 		},
 	}

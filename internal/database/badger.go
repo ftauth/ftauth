@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	badger "github.com/dgraph-io/badger/v3"
 	"github.com/ftauth/ftauth/pkg/jwt"
@@ -177,7 +178,25 @@ func (db *BadgerDB) createAdminClient() (*model.ClientInfo, error) {
 		RefreshTokenLife: 60 * 60 * 24, // 1 day
 	}
 	opt := model.ClientOptionAdmin | model.ClientOption(model.MasterSystemFlag)
-	return db.RegisterClient(context.Background(), adminClient, opt)
+	client, err := db.RegisterClient(context.Background(), adminClient, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	userUUID, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
+	}
+	passwordHash, err := passwordutil.GeneratePasswordHash("password")
+	if err != nil {
+		return nil, err
+	}
+	err = db.CreateUser(context.Background(), userUUID.String(), "admin", passwordHash)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
 }
 
 func (db *BadgerDB) getAdminClient() (*model.ClientInfo, error) {
@@ -447,10 +466,9 @@ func (db *BadgerDB) IsTokenSeen(ctx context.Context, token *jwt.Token) error {
 func (db *BadgerDB) CreateUser(ctx context.Context, id, username, passwordHash string) error {
 	key := makeUserKey(id)
 	return db.DB.Update(func(txn *badger.Txn) error {
-		// TODO: json marshaller will ignore certain tags meant for export
 		b, err := json.Marshal(&model.User{
 			ID:           id,
-			Username:     username,
+			Username:     strings.ToLower(username),
 			PasswordHash: passwordHash,
 		})
 		if err != nil {
@@ -499,7 +517,7 @@ func (db *BadgerDB) GetUserByUsername(ctx context.Context, username string) (use
 				return err
 			}
 
-			if _user.Username == username {
+			if _user.Username == strings.ToLower(username) {
 				user = &_user
 				return nil
 			}
