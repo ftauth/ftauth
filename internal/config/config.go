@@ -23,14 +23,14 @@ import (
 type ServerConfig struct {
 	Scheme string
 	Host   string
-	Port   int
+	Port   string
 }
 
 // URL returns the main gateway URL for the server.
 func (s *ServerConfig) URL() string {
 	host := s.Host
-	if s.Port > 0 {
-		host = fmt.Sprintf("%s:%d", host, s.Port)
+	if s.Port != "" {
+		host = fmt.Sprintf("%s:%s", host, s.Port)
 	}
 	uri := url.URL{
 		Scheme: s.Scheme,
@@ -42,7 +42,7 @@ func (s *ServerConfig) URL() string {
 // DatabaseConfig holds configuration variables for the database.
 type DatabaseConfig struct {
 	Host   string
-	Port   int
+	Port   string
 	DBName string
 	Dir    string // Path to store data in
 }
@@ -68,6 +68,7 @@ type OAuthConfig struct {
 type templateOptions struct {
 	Dir          string // Local path to template files
 	PrimaryColor string // Hex value of primary color
+	Name         string
 }
 
 // Config holds configuration information for the program.
@@ -89,12 +90,12 @@ func setConfigDefaults() {
 	viper.SetDefault("server", map[string]interface{}{
 		"scheme": "http",
 		"host":   "localhost",
-		"port":   8000,
+		"port":   "8000",
 	})
 
 	viper.SetDefault("database", map[string]interface{}{
 		"host":   "localhost",
-		"port":   9080,
+		"port":   "9080",
 		"dbname": "oauth",
 	})
 
@@ -103,6 +104,7 @@ func setConfigDefaults() {
 	viper.SetDefault("oauth.template.options", map[string]interface{}{
 		"dir":          "web/template",
 		"primaryColor": "#4d87ca",
+		"name":         "Demo",
 	})
 }
 

@@ -5,7 +5,19 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Server",
+            "name": "Server (Embedded)",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceRoot}/cmd/server/main.go",
+            "cwd": "${workspaceRoot}",
+            "env": {},
+            "args": [
+                "--embedded"
+            ]
+        },
+        {
+            "name": "Server (Dgraph)",
             "type": "go",
             "request": "launch",
             "mode": "auto",

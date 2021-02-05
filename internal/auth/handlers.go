@@ -12,6 +12,7 @@ import (
 
 	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/internal/database"
+	"github.com/ftauth/ftauth/internal/templates"
 	"github.com/ftauth/ftauth/internal/token"
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/model"
@@ -308,7 +309,7 @@ type registerHandler struct {
 
 func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		http.ServeFile(w, r, config.Current.OAuth.Template.Options.Dir+"/register.html")
+		templates.All.ExecuteTemplate(w, "register", config.Current.OAuth.Template.Options)
 		return
 	}
 
@@ -367,7 +368,7 @@ type loginEndpointHandler struct {
 
 func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		http.ServeFile(w, r, config.Current.OAuth.Template.Options.Dir+"/index.html")
+		templates.All.ExecuteTemplate(w, "login", config.Current.OAuth.Template.Options)
 		return
 	}
 

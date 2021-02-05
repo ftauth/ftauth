@@ -24,7 +24,7 @@ type DgraphDatabase struct {
 // InitializeDgraphDatabase creates a new Dgraph database connection
 // uses settings from the loaded configuration.
 func InitializeDgraphDatabase() (*DgraphDatabase, error) {
-	addr := fmt.Sprintf("%s:%d", config.Current.Database.Host, config.Current.Database.Port)
+	addr := fmt.Sprintf("%s:%s", config.Current.Database.Host, config.Current.Database.Port)
 	conn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
 		return nil, err

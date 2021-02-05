@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"embed"
 	"flag"
 	"fmt"
 	"log"
@@ -17,6 +18,7 @@ import (
 	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/internal/database"
 	"github.com/ftauth/ftauth/internal/discovery"
+	"github.com/ftauth/ftauth/internal/templates"
 	"github.com/ftauth/ftauth/internal/user"
 	"github.com/gorilla/mux"
 )
@@ -29,6 +31,11 @@ var (
 )
 
 var runEmbedded bool
+
+// staticFS holds static files for the web server like
+// templates and global CSS styles
+//go:embed static
+var staticFS embed.FS
 
 func init() {
 	var version string
@@ -80,11 +87,15 @@ func main() {
 	admin.SetupRoutes(r, db)
 	user.SetupRoutes(r)
 
-	// Static file handling
-	templateDir := config.Current.OAuth.Template.Options.Dir
-	r.PathPrefix("/").Handler(http.FileServer(http.Dir(templateDir)))
+	err := templates.SetupTemplates(staticFS)
+	if err != nil {
+		log.Fatalln("Error parsing templates: ", err)
+	}
 
-	addr := fmt.Sprintf("%s:%d", "localhost", config.Current.Server.Port)
+	// Static file handling
+	r.PathPrefix("/").Handler(http.FileServer(http.FS(staticFS)))
+
+	addr := ":" + config.Current.Server.Port
 	srv := http.Server{
 		Addr:    addr,
 		Handler: r,
@@ -94,7 +105,7 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Listening on %s\n", addr)
+		log.Printf("Listening on localhost%s\n", addr)
 		log.Fatal(srv.ListenAndServe())
 	}()
 
@@ -107,7 +118,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err := srv.Shutdown(ctx)
+	err = srv.Shutdown(ctx)
 	if err != nil {
 		log.Printf("Error shutting down server: %v\n", err)
 	}

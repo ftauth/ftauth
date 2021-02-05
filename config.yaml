@@ -26,5 +26,6 @@ oauth:
     ropc: false
   template:
     options:
+      name: FTAuth
       dir: web/template
       primaryColor: "#4d87ca"
