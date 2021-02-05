@@ -1,4 +1,4 @@
-FROM golang:1.15 AS build-server
+FROM golang:1.16rc1 AS build-server
 WORKDIR /app
 COPY . .
 RUN make server
