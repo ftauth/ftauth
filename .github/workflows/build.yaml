@@ -27,7 +27,7 @@ jobs:
         run: make server
 
   landing:
-    name: landing
+    name: Landing
     strategy:
       matrix:
         go-version: [1.15]
