@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	badger "github.com/dgraph-io/badger/v3"
+	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/ftauth/ftauth/pkg/util/passwordutil"
@@ -156,12 +157,16 @@ func (db *BadgerDB) isEmpty() (empty bool) {
 }
 
 func (db *BadgerDB) createAdminClient() (*model.ClientInfo, error) {
-	id, err := uuid.NewV4()
-	if err != nil {
-		return nil, err
+	clientID := config.Current.OAuth.Admin.ClientID
+	if clientID == "" {
+		id, err := uuid.NewV4()
+		if err != nil {
+			return nil, err
+		}
+		clientID = id.String()
 	}
 	adminClient := &model.ClientInfo{
-		ID:           id.String(),
+		ID:           clientID,
 		Name:         "Admin",
 		Type:         model.ClientTypePublic,
 		RedirectURIs: []string{"localhost", "myapp://auth"},
@@ -187,11 +192,11 @@ func (db *BadgerDB) createAdminClient() (*model.ClientInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	passwordHash, err := passwordutil.GeneratePasswordHash("password")
+	passwordHash, err := passwordutil.GeneratePasswordHash(config.Current.OAuth.Admin.Password)
 	if err != nil {
 		return nil, err
 	}
-	err = db.CreateUser(context.Background(), userUUID.String(), "admin", passwordHash)
+	err = db.CreateUser(context.Background(), userUUID.String(), config.Current.OAuth.Admin.Username, passwordHash)
 	if err != nil {
 		return nil, err
 	}

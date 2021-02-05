@@ -48,6 +48,10 @@ admin-test:
 	flutter pub get; \
 	flutter test
 
+.PHONY: docker
+docker:
+	docker build -t ftauth/ftauth:dev .
+
 .PHONY: clean
 clean:
 	rm -rf bin/ $(COVERFILE) web/admin/build/ web/landing/build/

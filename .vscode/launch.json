@@ -11,7 +11,10 @@
             "mode": "auto",
             "program": "${workspaceRoot}/cmd/server/main.go",
             "cwd": "${workspaceRoot}",
-            "env": {},
+            "env": {
+                "FTAUTH_OAUTH_ADMIN_CLIENTID": "3cf9a7ac-9198-469e-92a7-cc2f15d8b87d",
+                "FTAUTH_OAUTH_ADMIN_USERNAME": "dillon"
+            },
             "args": [
                 "--embedded"
             ]

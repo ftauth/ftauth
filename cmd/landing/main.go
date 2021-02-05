@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -30,7 +29,7 @@ func main() {
 	templateDir := "web/landing/build"
 	landing.SetupRoutes(r, templateDir)
 
-	addr := fmt.Sprintf("%s:%d", "localhost", config.Current.Server.Port)
+	addr := ":" + config.Current.Server.Port
 	srv := http.Server{
 		Addr:    addr,
 		Handler: r,

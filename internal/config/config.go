@@ -49,6 +49,11 @@ type DatabaseConfig struct {
 
 // OAuthConfig holds configuration variables for FTAuth
 type OAuthConfig struct {
+	Admin struct {
+		ClientID string // can be assigned or randomly generated
+		Username string
+		Password string
+	}
 	Tokens struct {
 		PrivateKeyFile string
 		PublicKey      *jwt.Key
@@ -97,6 +102,12 @@ func setConfigDefaults() {
 		"host":   "localhost",
 		"port":   "9080",
 		"dbname": "oauth",
+	})
+
+	viper.SetDefault("oauth.admin", map[string]interface{}{
+		"clientID": "",
+		"username": "admin",
+		"password": "password",
 	})
 
 	viper.SetDefault("oauth.scopes.default", "default")
