@@ -29,9 +29,7 @@ func (alg Algorithm) IsValid() error {
 	case AlgorithmHMACSHA256,
 		AlgorithmHMACSHA384,
 		AlgorithmHMACSHA512,
-		AlgorithmRSASHA256,
-		AlgorithmRSASHA384,
-		AlgorithmRSASHA512,
+
 		AlgorithmECDSASHA256,
 		AlgorithmECDSASHA384,
 		AlgorithmECDSASHA512,
@@ -39,6 +37,11 @@ func (alg Algorithm) IsValid() error {
 		AlgorithmPSSSHA384,
 		AlgorithmPSSSHA512:
 		return nil
+	case AlgorithmRSASHA256,
+		AlgorithmRSASHA384,
+		AlgorithmRSASHA512,
+		AlgorithmNone:
+		fallthrough
 	default:
 		return errUnsupportedValue("alg", string(alg))
 	}

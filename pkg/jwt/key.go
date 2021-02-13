@@ -51,7 +51,7 @@ type Key struct {
 	// These keys are created during parsing if creating
 	// a key from a JSON Web Key (JWK)
 
-	SymmetricKey []byte            `json:"-"` // required, the symmetric key bytes
+	SymmetricKey []byte            `json:"-"` // required for HMAC, the symmetric key bytes
 	PublicKey    crypto.PublicKey  `json:"-"` // required for RSA/EC, the public key
 	PrivateKey   crypto.PrivateKey `json:"-"` // optional for RSA/EC, the private key
 
@@ -377,7 +377,7 @@ func NewJWKFromRSAPrivateKey(key *rsa.PrivateKey) (*Key, error) {
 		PublicKey:   &key.PublicKey,
 		PrivateKey:  key,
 		KeyType:     KeyTypeRSA,
-		Algorithm:   AlgorithmRSASHA256,
+		Algorithm:   AlgorithmPSSSHA256,
 		N:           (*bigInt)(key.N),
 		E:           (*bigInt)(e),
 		D:           (*bigInt)(key.D),
@@ -402,7 +402,7 @@ func NewJWKFromRSAPublicKey(key *rsa.PublicKey) (*Key, error) {
 	newKey := &Key{
 		PublicKey: key,
 		KeyType:   KeyTypeRSA,
-		Algorithm: AlgorithmRSASHA256,
+		Algorithm: AlgorithmPSSSHA256,
 		N:         (*bigInt)(key.N),
 		E:         (*bigInt)(e),
 	}

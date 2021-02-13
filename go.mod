@@ -25,6 +25,7 @@ require (
 	github.com/spf13/viper v1.7.1
 	github.com/stretchr/testify v1.5.1
 	golang.org/x/crypto v0.0.0-20201208171446-5f87f3452ae9
+	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sys v0.0.0-20201214210602-f9fddec55a1e // indirect
 	golang.org/x/text v0.3.4 // indirect
 	google.golang.org/appengine v1.6.6 // indirect

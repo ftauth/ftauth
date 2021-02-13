@@ -54,13 +54,20 @@ const (
 	paramCodeChallengeMethod = "code_challenge_method"
 	paramCodeVerifier        = "code_verifier"
 	paramRefreshToken        = "refresh_token"
+	paramProvider            = "provider"
 	paramError               = "error"
 	paramErrorDescription    = "error_description"
 	paramErrorURI            = "error_uri"
 
+	// Apple parameters
+	paramIDToken = "id_token"
+	paramUser    = "user"
+
 	// JwtContextKey allows attachment/retrieval of JWT tokens from contexts.
 	JwtContextKey  jwtKey  = "jwt"
 	dpopContextKey dpopKey = "dpop"
+
+	sessionExp = 10 * time.Minute
 )
 
 // SetupRoutes configures routing for the given mux.
@@ -98,182 +105,41 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 
 	query := r.URL.Query()
 
-	// REQUIRED
-	clientID := query.Get(paramClientID)
+	provider := model.Provider(query.Get(paramProvider))
 
-	invalidClientID := func() {
-		// Even if the redirect URI is present, we should not redirect to it if
-		// we cannot identify the client and confirm its registration.
-		http.Error(
-			w,
-			model.AuthorizationRequestErrInvalidRequest.Description(
-				model.RequestErrorDetails{ParamName: paramClientID, Details: "Invalid client ID"},
-			),
-			http.StatusBadRequest,
-		)
-	}
-
-	if clientID == "" {
-		invalidClientID()
-		return
-	}
-
-	// Get client info
-	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
-	defer cancel()
-	clientInfo, err := h.clientDB.GetClient(ctx, clientID)
-
-	if err != nil {
-		log.Printf("Error retrieving client ID %s: %v\n", clientID, err)
-		invalidClientID()
-		return
-	}
-
-	// OPTIONAL, but must be registered otherwise
-	// Check if client has single endpoint registered
-	// If they do, use that
-	// If not, consider this a required parameter
-	redirectURI := query.Get(paramRedirectURI)
-	{
-		// Verify redirect URI
-		if !clientInfo.IsValidRedirectURI(redirectURI) {
-			errorString := "Invalid redirect URI"
-			if err != nil {
-				errorString += fmt.Sprintf(": %v", err)
-			}
-			// Do not redirect to an unverified redirect URI
-			http.Error(
-				w,
-				model.AuthorizationRequestErrInvalidRequest.Description(
-					model.RequestErrorDetails{ParamName: paramRedirectURI, Details: errorString},
-				),
-				http.StatusBadRequest,
-			)
-			return
-		}
-	}
-
-	// RECOMMENDED per RFC 6749
-	// REQUIRED per FTAuth
-	state := query.Get(paramState)
-	if state == "" {
-		handleAuthorizationRequestError(
-			w, r, redirectURI, state,
-			model.AuthorizationRequestErrInvalidRequest,
-			model.RequestErrorDetails{
-				ParamName: paramState,
-				Details:   "State required",
+	var validator Validator
+	switch provider {
+	case model.ProviderFTAuth:
+		validator = &ftauthValidator{h.clientDB}
+	default:
+		handleAuthorizationRequestError(w, r, &authorizationRequestError{
+			err: model.AuthorizationRequestErrInvalidRequest,
+			details: model.RequestErrorDetails{
+				ParamName: paramProvider,
+				Details:   fmt.Sprintf("Unsupported provider: %s", provider),
 			},
-		)
+		})
 		return
 	}
 
-	// REQUIRED
-	responseTypeStr := query.Get(paramResponseType)
-	if responseTypeStr == "" {
-		handleAuthorizationRequestError(
-			w, r, redirectURI, state,
-			model.AuthorizationRequestErrInvalidRequest,
-			model.RequestErrorDetails{
-				ParamName: paramResponseType,
-				Details:   "Response type required",
-			},
-		)
+	authRequest, requestErr := validator.ValidateAuthorizationCodeRequest(r)
+	if requestErr != nil {
+		handleAuthorizationRequestError(w, r, requestErr)
 		return
-	}
-	responseType := model.AuthorizationResponseType(responseTypeStr)
-	if !responseType.IsValid() {
-		handleAuthorizationRequestError(
-			w, r, redirectURI, state,
-			model.AuthorizationRequestErrUnsupportedResponseType,
-			model.RequestErrorDetails{},
-		)
-		return
-	}
-
-	// OPTIONAL
-	scope := query.Get(paramScope)
-	if scope == "" {
-		// Use default scope
-		scope = config.Current.OAuth.Scopes.Default
-	} else {
-		err = clientInfo.ValidateScopes(scope)
-		if err != nil {
-			handleAuthorizationRequestError(
-				w, r, redirectURI, state,
-				model.AuthorizationRequestErrInvalidScope,
-				model.RequestErrorDetails{},
-			)
-			return
-		}
-	}
-
-	// REQUIRED
-	codeChallenge := query.Get(paramCodeChallenge)
-	if codeChallenge == "" {
-		handleAuthorizationRequestError(
-			w, r, redirectURI, state,
-			model.AuthorizationRequestErrInvalidRequest,
-			model.RequestErrorDetails{
-				ParamName: paramCodeChallenge,
-				Details:   "Code challenge required",
-			},
-		)
-		return
-	}
-
-	// REQUIRED
-	codeChallengeMethodStr := query.Get(paramCodeChallengeMethod)
-	if codeChallengeMethodStr == "" {
-		handleAuthorizationRequestError(
-			w, r, redirectURI, state,
-			model.AuthorizationRequestErrInvalidRequest,
-			model.RequestErrorDetails{
-				ParamName: paramCodeChallengeMethod,
-				Details:   "Code challenge method required",
-			},
-		)
-		return
-	}
-	codeChallengeMethod := model.CodeChallengeMethod(codeChallengeMethodStr)
-	if !codeChallengeMethod.IsValid() {
-		handleAuthorizationRequestError(
-			w, r, redirectURI, state,
-			model.AuthorizationRequestErrInvalidRequest,
-			model.RequestErrorDetails{
-				ParamName: paramCodeChallengeMethod,
-				Details:   "Transform algorithm is not supported",
-			},
-		)
-		return
-	}
-
-	// Generate authorization request
-	code := model.GenerateAuthorizationCode()
-	exp := time.Now().Add(10 * time.Minute) // TODO: document
-
-	authRequest := &model.AuthorizationRequest{
-		ClientID:            clientID,
-		Scope:               scope,
-		State:               state,
-		RedirectURI:         redirectURI,
-		Code:                code,
-		Expiry:              exp.Unix(),
-		CodeChallenge:       codeChallenge,
-		CodeChallengeMethod: codeChallengeMethod,
 	}
 
 	// Create session from request, storing all required information
-	ctx, cancel = context.WithTimeout(r.Context(), database.DefaultTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
 	sessionUUID, err := uuid.NewV4()
 	if err != nil {
-		handleAuthorizationRequestError(
-			w, r, redirectURI, state,
+		requestErr = &authorizationRequestError{
+			authRequest.RedirectURI, authRequest.State,
 			model.AuthorizationRequestErrServerError,
 			model.RequestErrorDetails{},
-		)
+		}
+		handleAuthorizationRequestError(w, r, requestErr)
 		return
 	}
 	sessionID := sessionUUID.String()
@@ -281,11 +147,12 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 
 	err = h.db.CreateSession(ctx, authRequest)
 	if err != nil {
-		handleAuthorizationRequestError(
-			w, r, redirectURI, state,
+		requestErr = &authorizationRequestError{
+			authRequest.RedirectURI, authRequest.State,
 			model.AuthorizationRequestErrServerError,
 			model.RequestErrorDetails{},
-		)
+		}
+		handleAuthorizationRequestError(w, r, requestErr)
 		return
 	}
 
@@ -294,7 +161,7 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		Name:     "session",
 		Value:    sessionID,
 		Path:     "/",
-		Expires:  exp,
+		Expires:  time.Now().Add(sessionExp),
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
 	})
@@ -811,24 +678,25 @@ func (h tokenEndpointHandler) validateRefreshTokenRequest(w http.ResponseWriter,
 func handleAuthorizationRequestError(
 	w http.ResponseWriter,
 	r *http.Request,
-	redirectURI,
-	state string,
-	err model.RequestError,
-	details model.RequestErrorDetails,
+	requestErr *authorizationRequestError,
 ) {
-	errorURI, _ := url.Parse(redirectURI)
-	query := errorURI.Query()
-	query.Add(paramError, string(err.(model.AuthorizationRequestError)))
-	query.Add(paramErrorDescription, err.Description(details))
-	query.Add(paramErrorURI, err.URI())
-	query.Add(paramState, state)
+	if requestErr.redirectURI != "" {
+		errorURI, _ := url.Parse(requestErr.redirectURI)
+		query := errorURI.Query()
+		query.Add(paramError, string(requestErr.err))
+		query.Add(paramErrorDescription, requestErr.err.Description(requestErr.details))
+		query.Add(paramErrorURI, requestErr.err.URI())
+		query.Add(paramState, requestErr.state)
 
-	// url.URL cannot handle '#' values in path
-	// e.g. localhost:8080/#/token results in
-	// 	Path = "/"
-	//	Fragment = "/token"
-	uri := fmt.Sprintf("%s?%s", redirectURI, query.Encode())
-	http.Redirect(w, r, uri, http.StatusFound)
+		// url.URL cannot handle '#' values in path
+		// e.g. localhost:8080/#/token results in
+		// 	Path = "/"
+		//	Fragment = "/token"
+		uri := fmt.Sprintf("%s?%s", requestErr.redirectURI, query.Encode())
+		http.Redirect(w, r, uri, http.StatusFound)
+	} else {
+		http.Error(w, requestErr.err.Description(requestErr.details), http.StatusBadRequest)
+	}
 }
 
 func handleTokenRequestError(w http.ResponseWriter, reqErr model.TokenRequestError, details model.RequestErrorDetails) {

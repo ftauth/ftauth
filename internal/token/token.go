@@ -49,7 +49,7 @@ func IssueAccessToken(clientInfo *model.ClientInfo, user *model.User, scope stri
 	token := &jwt.Token{
 		Header: &jwt.Header{
 			Type:      jwt.TypeAccess,
-			Algorithm: jwt.AlgorithmRSASHA256,
+			Algorithm: jwt.AlgorithmPSSSHA256,
 			KeyID:     config.Current.OAuth.Tokens.PublicKey.KeyID,
 		},
 		Claims: &jwt.Claims{
@@ -102,7 +102,7 @@ func IssueRefreshToken(clientInfo *model.ClientInfo, accessToken *jwt.Token) (*j
 	token := &jwt.Token{
 		Header: &jwt.Header{
 			Type:      jwt.TypeAccess,
-			Algorithm: jwt.AlgorithmRSASHA256,
+			Algorithm: jwt.AlgorithmPSSSHA256,
 			KeyID:     config.Current.OAuth.Tokens.PublicKey.KeyID,
 		},
 		Claims: &jwt.Claims{

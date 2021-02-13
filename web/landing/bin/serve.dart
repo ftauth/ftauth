@@ -6,8 +6,7 @@ Future<void> main() async {
   final handler = const Pipeline()
       .addMiddleware(_corsHeadersMiddleware)
       .addMiddleware(logRequests())
-      .addHandler(
-          createStaticHandler('build/web', defaultDocument: 'index.html'));
+      .addHandler(createStaticHandler('build', defaultDocument: 'index.html'));
 
   final server = await io.serve(handler, 'localhost', 8000);
 

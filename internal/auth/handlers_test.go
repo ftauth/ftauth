@@ -23,10 +23,10 @@ func Test_handleAuthorizationRequestError(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/authorize", nil)
 
 	state := "state"
-	handleAuthorizationRequestError(w, r, redirectURI, state, requestErr, model.RequestErrorDetails{
+	handleAuthorizationRequestError(w, r, &authorizationRequestError{redirectURI, state, requestErr, model.RequestErrorDetails{
 		ParamName: paramCodeChallenge,
 		Details:   "Code challenge not provided",
-	})
+	}})
 
 	loc := w.Header().Get("Location")
 
