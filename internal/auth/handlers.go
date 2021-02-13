@@ -106,6 +106,9 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	query := r.URL.Query()
 
 	provider := model.Provider(query.Get(paramProvider))
+	if provider == "" {
+		provider = model.ProviderFTAuth
+	}
 
 	var validator Validator
 	switch provider {
