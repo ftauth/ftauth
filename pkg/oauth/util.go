@@ -4,6 +4,8 @@ import (
 	"bytes"
 	crand "crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
+	"fmt"
 	"io"
 	"math/rand"
 	"strings"
@@ -36,4 +38,9 @@ func GenerateState() (string, error) {
 		return "", err
 	}
 	return base64url.Encode(b.Bytes()), nil
+}
+
+// CreateBasicAuthorization returns an Authorization header value for basic client authentication.
+func CreateBasicAuthorization(clientID, clientSecret string) string {
+	return "Basic " + base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", clientID, clientSecret)))
 }

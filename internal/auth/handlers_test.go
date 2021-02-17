@@ -2,9 +2,7 @@ package auth
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -17,6 +15,7 @@ import (
 	"github.com/ftauth/ftauth/internal/database"
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/model"
+	"github.com/ftauth/ftauth/pkg/oauth"
 	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -417,7 +416,7 @@ func TestClientCredentialsGrant(t *testing.T) {
 
 			r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			r.Header.Add("Content-Length", strconv.Itoa(len(body)))
-			r.Header.Add("Authorization", createBasicAuthHeader(test.clientID, test.clientSecret))
+			r.Header.Add("Authorization", oauth.CreateBasicAuthorization(test.clientID, test.clientSecret))
 
 			handler.ServeHTTP(w, r)
 
@@ -589,7 +588,7 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 
 			r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			r.Header.Add("Content-Length", strconv.Itoa(len(body)))
-			r.Header.Add("Authorization", createBasicAuthHeader(test.clientID, ""))
+			r.Header.Add("Authorization", oauth.CreateBasicAuthorization(test.clientID, ""))
 
 			handler.ServeHTTP(w, r)
 
@@ -656,7 +655,7 @@ func TestRefreshTokenGrant(t *testing.T) {
 		enc := body.Encode()
 
 		request := httptest.NewRequest(http.MethodPost, TokenEndpoint, strings.NewReader(enc))
-		request.Header.Add("Authorization", createBasicAuthHeader(client.ID, client.Secret))
+		request.Header.Add("Authorization", oauth.CreateBasicAuthorization(client.ID, client.Secret))
 		request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		request.Header.Add("Content-Length", strconv.Itoa(len(enc)))
 
@@ -726,7 +725,7 @@ func TestRefreshTokenGrant(t *testing.T) {
 			enc := body.Encode()
 
 			request := httptest.NewRequest(http.MethodPost, TokenEndpoint, strings.NewReader(enc))
-			request.Header.Add("Authorization", createBasicAuthHeader(client.ID, client.Secret))
+			request.Header.Add("Authorization", oauth.CreateBasicAuthorization(client.ID, client.Secret))
 			request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			request.Header.Add("Content-Length", strconv.Itoa(len(enc)))
 
@@ -761,8 +760,4 @@ func TestRefreshTokenGrant(t *testing.T) {
 			}
 		})
 	}
-}
-
-func createBasicAuthHeader(clientID, clientSecret string) string {
-	return "Basic " + base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", clientID, clientSecret)))
 }
