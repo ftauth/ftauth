@@ -1,21 +1,28 @@
 package auth
 
 import (
+	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/internal/database"
+	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/model"
+	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func Test_handleAuthorizationRequestError(t *testing.T) {
+func TestHandleAuthorizationRequestError(t *testing.T) {
 	redirectURI := "http://localhost:8080"
 	requestErr := model.AuthorizationRequestErrInvalidRequest
 
@@ -40,7 +47,7 @@ func Test_handleAuthorizationRequestError(t *testing.T) {
 	assert.NotEmpty(t, query.Get("error_uri"))
 }
 
-func Test_handleTokenRequestError(t *testing.T) {
+func TestHandleTokenRequestError(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	handleTokenRequestError(
@@ -264,7 +271,7 @@ func TestAuthorizationEndpoint(t *testing.T) {
 	for _, test := range tt {
 		t.Run(test.name, func(t *testing.T) {
 			uri := url.URL{
-				Path: "/authorize",
+				Path: AuthorizationEndpoint,
 			}
 			query := uri.Query()
 			for key, val := range test.query {
@@ -304,4 +311,458 @@ func TestAuthorizationEndpoint(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClientCredentialsGrant(t *testing.T) {
+	config.LoadConfig()
+
+	db, err := database.InitializeBadgerDB(database.Options{InMemory: true, SeedDB: true})
+	defer db.Close()
+	require.NoError(t, err)
+
+	handler := tokenEndpointHandler{
+		db:       db,
+		clientDB: db,
+	}
+
+	id, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	secret, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	client := &model.ClientInfo{
+		ID:               id.String(),
+		Name:             "Confidential Client",
+		Type:             model.ClientTypeConfidential,
+		Secret:           secret.String(),
+		Scopes:           []*model.Scope{{Name: "default"}},
+		GrantTypes:       []model.GrantType{model.GrantTypeClientCredentials},
+		AccessTokenLife:  60 * 60,
+		RefreshTokenLife: 24 * 60 * 60,
+	}
+	require.NoError(t, client.IsValid())
+
+	_, err = db.RegisterClient(context.Background(), client, model.ClientOptionNone)
+	require.NoError(t, err)
+
+	tt := []struct {
+		name         string
+		clientID     string
+		clientSecret string
+		grantType    string
+		scope        string
+		wantStatus   int
+	}{
+		{
+			name:         "Empty client ID",
+			clientID:     "",
+			clientSecret: "secret",
+			grantType:    "client_credentials",
+			scope:        "default",
+			wantStatus:   http.StatusUnauthorized,
+		},
+		{
+			name:         "Invalid client ID",
+			clientID:     "d3790444-275c-48e5-9836-519cc1b78138",
+			clientSecret: "secret",
+			grantType:    "client_credentials",
+			scope:        "default",
+			wantStatus:   http.StatusUnauthorized,
+		},
+		{
+			name:         "Invalid grant type",
+			clientID:     id.String(),
+			clientSecret: secret.String(),
+			grantType:    string(model.GrantTypeAuthorizationCode),
+			scope:        "",
+			wantStatus:   http.StatusBadRequest,
+		},
+		{
+			name:         "Empty scope",
+			clientID:     id.String(),
+			clientSecret: secret.String(),
+			grantType:    "client_credentials",
+			scope:        "",
+			wantStatus:   http.StatusOK,
+		},
+		{
+			name:         "Invalid scope",
+			clientID:     id.String(),
+			clientSecret: secret.String(),
+			grantType:    "client_credentials",
+			scope:        "admin",
+			wantStatus:   http.StatusBadRequest,
+		},
+		{
+			name:         "All valid values",
+			clientID:     id.String(),
+			clientSecret: secret.String(),
+			grantType:    "client_credentials",
+			scope:        "default",
+			wantStatus:   http.StatusOK,
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			vals := url.Values{
+				paramGrantType: []string{test.grantType},
+				paramScope:     []string{test.scope},
+			}
+			body := vals.Encode()
+
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodPost, TokenEndpoint, strings.NewReader(body))
+
+			r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			r.Header.Add("Content-Length", strconv.Itoa(len(body)))
+			r.Header.Add("Authorization", createBasicAuthHeader(test.clientID, test.clientSecret))
+
+			handler.ServeHTTP(w, r)
+
+			require.Equal(t, test.wantStatus, w.Result().StatusCode)
+			if test.wantStatus != http.StatusOK {
+				var response struct {
+					Error            string `json:"error"`
+					ErrorDescription string `json:"error_description"`
+					ErrorURI         string `json:"error_uri"`
+				}
+				err := json.NewDecoder(w.Body).Decode(&response)
+				require.NoError(t, err)
+
+				require.NotEmpty(t, response.Error)
+				require.NotEmpty(t, response.ErrorDescription)
+				require.NotEmpty(t, response.ErrorURI)
+			}
+		})
+	}
+}
+
+func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
+	config.LoadConfig()
+
+	db, err := database.InitializeBadgerDB(database.Options{InMemory: true, SeedDB: true})
+	defer db.Close()
+	require.NoError(t, err)
+
+	handler := tokenEndpointHandler{
+		db:       db,
+		clientDB: db,
+		authDB:   db,
+	}
+
+	id, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	client := &model.ClientInfo{
+		ID:               id.String(),
+		Name:             "ROPC Client",
+		Type:             model.ClientTypePublic,
+		Scopes:           []*model.Scope{{Name: "default"}},
+		GrantTypes:       []model.GrantType{model.GrantTypeResourceOwnerPasswordCredentials},
+		RedirectURIs:     []string{"localhost"},
+		AccessTokenLife:  60 * 60,
+		RefreshTokenLife: 24 * 60 * 60,
+	}
+	require.NoError(t, client.IsValid())
+
+	_, err = db.RegisterClient(context.Background(), client, model.ClientOptionNone)
+	require.NoError(t, err)
+
+	adminUsername := config.Current.OAuth.Admin.Username
+	adminPassword := config.Current.OAuth.Admin.Password
+
+	tt := []struct {
+		name       string
+		clientID   string
+		grantType  string
+		scope      string
+		username   string
+		password   string
+		wantStatus int
+	}{
+		{
+			name:       "Empty client ID",
+			clientID:   "",
+			grantType:  string(model.GrantTypeResourceOwnerPasswordCredentials),
+			scope:      "default",
+			username:   adminUsername,
+			password:   adminPassword,
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:       "Invalid client ID",
+			clientID:   "5abbc545-6940-40b0-8aba-f448524739ef",
+			grantType:  string(model.GrantTypeResourceOwnerPasswordCredentials),
+			scope:      "default",
+			username:   adminUsername,
+			password:   adminPassword,
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:       "Invalid grant type (authorization_code)",
+			clientID:   client.ID,
+			grantType:  string(model.GrantTypeAuthorizationCode),
+			scope:      "default",
+			username:   adminUsername,
+			password:   adminPassword,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "Invalid grant type (client_credentials)",
+			clientID:   client.ID,
+			grantType:  string(model.GrantTypeClientCredentials),
+			scope:      "default",
+			username:   adminUsername,
+			password:   adminPassword,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "Invalid grant type (refresh_token)",
+			clientID:   client.ID,
+			grantType:  string(model.GrantTypeRefreshToken),
+			scope:      "default",
+			username:   adminUsername,
+			password:   adminPassword,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "Empty scope",
+			clientID:   client.ID,
+			grantType:  string(model.GrantTypeResourceOwnerPasswordCredentials),
+			scope:      "",
+			username:   adminUsername,
+			password:   adminPassword,
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "Invalid scope",
+			clientID:   client.ID,
+			grantType:  string(model.GrantTypeResourceOwnerPasswordCredentials),
+			scope:      "random_scope",
+			username:   adminUsername,
+			password:   adminPassword,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "Invalid username",
+			clientID:   client.ID,
+			grantType:  string(model.GrantTypeResourceOwnerPasswordCredentials),
+			scope:      "default",
+			username:   "random_username",
+			password:   adminPassword,
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:       "Invalid password",
+			clientID:   client.ID,
+			grantType:  string(model.GrantTypeResourceOwnerPasswordCredentials),
+			scope:      "default",
+			username:   adminUsername,
+			password:   "random_password_123",
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:       "Valid login",
+			clientID:   client.ID,
+			grantType:  string(model.GrantTypeResourceOwnerPasswordCredentials),
+			scope:      "default",
+			username:   adminUsername,
+			password:   adminPassword,
+			wantStatus: http.StatusOK,
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			vals := url.Values{
+				paramGrantType: []string{test.grantType},
+				paramScope:     []string{test.scope},
+				paramUsername:  []string{test.username},
+				paramPassword:  []string{test.password},
+			}
+			body := vals.Encode()
+
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodPost, TokenEndpoint, strings.NewReader(body))
+
+			r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			r.Header.Add("Content-Length", strconv.Itoa(len(body)))
+			r.Header.Add("Authorization", createBasicAuthHeader(test.clientID, ""))
+
+			handler.ServeHTTP(w, r)
+
+			require.Equal(t, test.wantStatus, w.Result().StatusCode)
+			if test.wantStatus != http.StatusOK {
+				var response struct {
+					Error            string `json:"error"`
+					ErrorDescription string `json:"error_description"`
+					ErrorURI         string `json:"error_uri"`
+				}
+				err := json.NewDecoder(w.Body).Decode(&response)
+				require.NoError(t, err)
+
+				require.NotEmpty(t, response.Error)
+				require.NotEmpty(t, response.ErrorDescription)
+				require.NotEmpty(t, response.ErrorURI)
+			}
+		})
+	}
+}
+
+func TestRefreshTokenGrant(t *testing.T) {
+	config.LoadConfig()
+
+	db, err := database.InitializeBadgerDB(database.Options{InMemory: true, SeedDB: true})
+	defer db.Close()
+	require.NoError(t, err)
+
+	handler := tokenEndpointHandler{
+		db:       db,
+		clientDB: db,
+		authDB:   db,
+	}
+
+	id, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	secret, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	client := &model.ClientInfo{
+		ID:     id.String(),
+		Name:   "Confidential Client",
+		Type:   model.ClientTypeConfidential,
+		Secret: secret.String(),
+		Scopes: []*model.Scope{{Name: "default"}},
+		GrantTypes: []model.GrantType{
+			model.GrantTypeClientCredentials,
+			model.GrantTypeRefreshToken,
+		},
+		RedirectURIs:     []string{"localhost"},
+		AccessTokenLife:  60 * 60,
+		RefreshTokenLife: 1,
+	}
+	require.NoError(t, client.IsValid())
+
+	_, err = db.RegisterClient(context.Background(), client, model.ClientOptionNone)
+	require.NoError(t, err)
+
+	retrieveTokens := func(t *testing.T) (*jwt.Token, *jwt.Token) {
+		body := url.Values{}
+		body.Set(paramGrantType, string(model.GrantTypeClientCredentials))
+		body.Set(paramScope, "default")
+		enc := body.Encode()
+
+		request := httptest.NewRequest(http.MethodPost, TokenEndpoint, strings.NewReader(enc))
+		request.Header.Add("Authorization", createBasicAuthHeader(client.ID, client.Secret))
+		request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		request.Header.Add("Content-Length", strconv.Itoa(len(enc)))
+
+		response := httptest.NewRecorder()
+
+		handler.ServeHTTP(response, request)
+
+		require.Equal(t, http.StatusOK, response.Result().StatusCode)
+
+		var resp model.TokenResponse
+		err := json.NewDecoder(response.Body).Decode(&resp)
+		require.NoError(t, err)
+
+		accessToken, err := jwt.Decode(resp.AccessToken)
+		require.NoError(t, err)
+
+		refreshToken, err := jwt.Decode(resp.RefreshToken)
+		require.NoError(t, err)
+
+		return accessToken, refreshToken
+	}
+
+	tt := []struct {
+		name         string
+		refreshToken func(t *testing.T) string
+		wantStatus   int
+	}{
+		{
+			name: "Valid refresh token",
+			refreshToken: func(t *testing.T) string {
+				_, refreshToken := retrieveTokens(t)
+				refreshTokenEnc, err := refreshToken.Raw()
+				require.NoError(t, err)
+
+				return refreshTokenEnc
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name: "Expired refresh token",
+			refreshToken: func(t *testing.T) string {
+				_, refreshToken := retrieveTokens(t)
+				refreshTokenEnc, err := refreshToken.Raw()
+				require.NoError(t, err)
+
+				<-time.After(1 * time.Second)
+				return refreshTokenEnc
+			},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name: "Invalid refresh token",
+			refreshToken: func(t *testing.T) string {
+				return ""
+			},
+			wantStatus: http.StatusUnauthorized,
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			refreshToken := test.refreshToken(t)
+
+			body := url.Values{}
+			body.Set(paramGrantType, string(model.GrantTypeRefreshToken))
+			body.Set(paramRefreshToken, refreshToken)
+			enc := body.Encode()
+
+			request := httptest.NewRequest(http.MethodPost, TokenEndpoint, strings.NewReader(enc))
+			request.Header.Add("Authorization", createBasicAuthHeader(client.ID, client.Secret))
+			request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			request.Header.Add("Content-Length", strconv.Itoa(len(enc)))
+
+			response := httptest.NewRecorder()
+
+			handler.ServeHTTP(response, request)
+
+			require.Equal(t, test.wantStatus, response.Result().StatusCode)
+			if test.wantStatus == http.StatusOK {
+				var resp model.TokenResponse
+				err := json.NewDecoder(response.Body).Decode(&resp)
+				require.NoError(t, err)
+
+				_, err = jwt.Decode(resp.AccessToken)
+				require.NoError(t, err)
+
+				_, err = jwt.Decode(resp.RefreshToken)
+				require.NoError(t, err)
+			} else {
+				var resp struct {
+					Error       string `json:"error"`
+					Description string `json:"error_description"`
+					URI         string `json:"error_uri"`
+				}
+
+				err := json.NewDecoder(response.Body).Decode(&resp)
+				require.NoError(t, err)
+
+				require.NotEmpty(t, resp.Error)
+				require.NotEmpty(t, resp.Description)
+				require.NotEmpty(t, resp.URI)
+			}
+		})
+	}
+}
+
+func createBasicAuthHeader(clientID, clientSecret string) string {
+	return "Basic " + base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", clientID, clientSecret)))
 }

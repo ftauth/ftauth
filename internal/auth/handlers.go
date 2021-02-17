@@ -53,6 +53,8 @@ const (
 	paramCodeChallenge       = "code_challenge"
 	paramCodeChallengeMethod = "code_challenge_method"
 	paramCodeVerifier        = "code_verifier"
+	paramUsername            = "username"
+	paramPassword            = "password"
 	paramRefreshToken        = "refresh_token"
 	paramProvider            = "provider"
 	paramError               = "error"
@@ -67,6 +69,7 @@ const (
 	JwtContextKey  jwtKey  = "jwt"
 	dpopContextKey dpopKey = "dpop"
 
+	// Recommended authorization code lifetime
 	sessionExp = 10 * time.Minute
 )
 
@@ -86,7 +89,7 @@ func SetupRoutes(
 	)
 	r.Handle(
 		TokenEndpoint,
-		dpopMiddleware(tokenEndpointHandler{db: authorizationDB, clientDB: clientDB}),
+		dpopMiddleware(tokenEndpointHandler{db: authorizationDB, clientDB: clientDB, authDB: authenticationDB}),
 	)
 	r.Handle(LoginEndpoint, loginEndpointHandler{authenticationDB, authorizationDB})
 	r.Handle(RegisterEndpoint, registerHandler{authenticationDB: authenticationDB})
@@ -328,6 +331,7 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 type tokenEndpointHandler struct {
 	db       database.AuthorizationDB
+	authDB   database.AuthenticationDB
 	clientDB database.ClientDB
 }
 
@@ -407,6 +411,10 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	switch grantType {
 	case model.GrantTypeAuthorizationCode:
 		validateRequestAndRetrieveScopes = h.validateAuthorizationCodeRequest
+	case model.GrantTypeClientCredentials:
+		validateRequestAndRetrieveScopes = h.validateClientCredentialsRequest
+	case model.GrantTypeResourceOwnerPasswordCredentials:
+		validateRequestAndRetrieveScopes = h.validateResourceOwnerPasswordCredentialsRequest
 	case model.GrantTypeRefreshToken:
 		validateRequestAndRetrieveScopes = h.validateRefreshTokenRequest
 	default:
@@ -418,7 +426,7 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// validator handles error redirect
+	// validator handles error redirect, signaled by a nil return here
 	reqInfo := validateRequestAndRetrieveScopes(w, r, clientInfo)
 	if reqInfo == nil {
 		return
@@ -521,6 +529,108 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+func (h tokenEndpointHandler) validateClientCredentialsRequest(w http.ResponseWriter, r *http.Request, clientInfo *model.ClientInfo) *tokenRequestInfo {
+	// Other grant types could end up here. Let's validate the grant type.
+	foundClientCredentialsGrantType := false
+	for _, grantType := range clientInfo.GrantTypes {
+		if grantType == model.GrantTypeClientCredentials {
+			foundClientCredentialsGrantType = true
+			break
+		}
+	}
+
+	if clientInfo.Type != model.ClientTypeConfidential || !foundClientCredentialsGrantType {
+		handleTokenRequestError(w, model.TokenRequestErrUnauthorizedClient, model.RequestErrorDetails{
+			Details: "This client does not support the client credentials grant",
+		})
+		return nil
+	}
+
+	body := r.Form
+
+	scope := body.Get(paramScope)
+	if scope == "" {
+		// Use default scope
+		scope = config.Current.OAuth.Scopes.Default
+	} else {
+		err := clientInfo.ValidateScopes(scope)
+		if err != nil {
+			handleTokenRequestError(w, model.TokenRequestErrInvalidScope, model.RequestErrorDetails{
+				ParamName: paramScope,
+			})
+			return nil
+		}
+	}
+
+	return &tokenRequestInfo{
+		scope:  scope,
+		userID: clientInfo.ID,
+	}
+}
+
+func (h tokenEndpointHandler) validateResourceOwnerPasswordCredentialsRequest(w http.ResponseWriter, r *http.Request, clientInfo *model.ClientInfo) *tokenRequestInfo {
+	// Other grant types could end up here. Let's validate the grant type.
+	foundClientCredentialsGrantType := false
+	for _, grantType := range clientInfo.GrantTypes {
+		if grantType == model.GrantTypeResourceOwnerPasswordCredentials {
+			foundClientCredentialsGrantType = true
+			break
+		}
+	}
+
+	if !foundClientCredentialsGrantType {
+		handleTokenRequestError(w, model.TokenRequestErrUnauthorizedClient, model.RequestErrorDetails{
+			Details: "This client does not support the resource owner password credentials grant",
+		})
+		return nil
+	}
+
+	scope := r.Form.Get(paramScope)
+	if scope == "" {
+		// Use default scope
+		scope = config.Current.OAuth.Scopes.Default
+	} else {
+		err := clientInfo.ValidateScopes(scope)
+		if err != nil {
+			handleTokenRequestError(w, model.TokenRequestErrInvalidScope, model.RequestErrorDetails{
+				ParamName: paramScope,
+			})
+			return nil
+		}
+	}
+
+	username := r.Form.Get(paramUsername)
+	if username == "" {
+		handleTokenRequestError(w, model.TokenRequestErrInvalidGrant, model.RequestErrorDetails{})
+		return nil
+	}
+	password := r.Form.Get(paramPassword)
+	if password == "" {
+		handleTokenRequestError(w, model.TokenRequestErrInvalidGrant, model.RequestErrorDetails{})
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
+	defer cancel()
+
+	err := h.authDB.VerifyUsernameAndPassword(ctx, username, password)
+	if err != nil {
+		handleTokenRequestError(w, model.TokenRequestErrInvalidGrant, model.RequestErrorDetails{})
+		return nil
+	}
+
+	user, err := h.authDB.GetUserByUsername(ctx, username)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return nil
+	}
+
+	return &tokenRequestInfo{
+		userID: user.ID,
+		scope:  scope,
+	}
+}
+
 func (h tokenEndpointHandler) validateAuthorizationCodeRequest(w http.ResponseWriter, r *http.Request, clientInfo *model.ClientInfo) *tokenRequestInfo {
 	// REQUIRED, must match value from request
 	redirectURI := r.FormValue(paramRedirectURI)
@@ -613,6 +723,22 @@ func (h tokenEndpointHandler) validateAuthorizationCodeRequest(w http.ResponseWr
 }
 
 func (h tokenEndpointHandler) validateRefreshTokenRequest(w http.ResponseWriter, r *http.Request, clientInfo *model.ClientInfo) *tokenRequestInfo {
+	// Other grant types could end up here. Let's validate the grant type.
+	foundClientCredentialsGrantType := false
+	for _, grantType := range clientInfo.GrantTypes {
+		if grantType == model.GrantTypeRefreshToken {
+			foundClientCredentialsGrantType = true
+			break
+		}
+	}
+
+	if !foundClientCredentialsGrantType {
+		handleTokenRequestError(w, model.TokenRequestErrUnauthorizedClient, model.RequestErrorDetails{
+			Details: "This client does not support refreshing credentials",
+		})
+		return nil
+	}
+
 	// REQUIRED
 	refreshTokenEnc := r.FormValue(paramRefreshToken)
 	if refreshTokenEnc == "" {

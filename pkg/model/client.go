@@ -158,26 +158,27 @@ func (client *ClientInfo) IsValid() error {
 		if client.Secret == "" {
 			return util.ErrMissingParameter("client_secret")
 		}
-	}
-	if len(client.RedirectURIs) == 0 {
-		return util.ErrMissingParameter("redirect_uris")
-	}
-	for _, uri := range client.RedirectURIs {
-		if uri == "localhost" {
-			continue
+	} else {
+		if len(client.RedirectURIs) == 0 {
+			return util.ErrMissingParameter("redirect_uris")
 		}
-		redirectURI, err := url.Parse(uri)
-		if err != nil {
-			return fmt.Errorf("Invalid redirect URI: %s: %v", uri, err)
-		}
-		if redirectURI.Hostname() == "localhost" {
-			continue
-		}
-		if redirectURI.Scheme == "http" {
-			return fmt.Errorf("invalid redirect URI: %s: HTTP is not allowed", uri)
-		}
-		if redirectURI.Hostname() == "" {
-			return fmt.Errorf("invalid redirect URI: %s: Missing host", uri)
+		for _, uri := range client.RedirectURIs {
+			if uri == "localhost" {
+				continue
+			}
+			redirectURI, err := url.Parse(uri)
+			if err != nil {
+				return fmt.Errorf("Invalid redirect URI: %s: %v", uri, err)
+			}
+			if redirectURI.Hostname() == "localhost" {
+				continue
+			}
+			if redirectURI.Scheme == "http" {
+				return fmt.Errorf("invalid redirect URI: %s: HTTP is not allowed", uri)
+			}
+			if redirectURI.Hostname() == "" {
+				return fmt.Errorf("invalid redirect URI: %s: Missing host", uri)
+			}
 		}
 	}
 	if len(client.Scopes) == 0 {

@@ -6,7 +6,7 @@ require (
 	github.com/dgraph-io/badger/v3 v3.2011.0
 	github.com/dgraph-io/dgo/v200 v200.0.0-20210125093441-2ab429259580
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
-	github.com/gofrs/uuid v3.2.0+incompatible
+	github.com/gofrs/uuid v4.0.0+incompatible
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.4.2 // indirect
 	github.com/google/go-cmp v0.5.1 // indirect
