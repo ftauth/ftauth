@@ -389,6 +389,36 @@ func TestDPoPAuthenticated(t *testing.T) {
 			wantStatus: http.StatusBadRequest,
 		},
 		{
+			name: "Invalid HTTP method",
+			proof: func(t *testing.T) string {
+				dpop, err := oauth.CreateProofToken(privateJWK, http.MethodPost, path)
+				require.NoError(t, err)
+
+				return dpop
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "Invalid HTTP URI",
+			proof: func(t *testing.T) string {
+				dpop, err := oauth.CreateProofToken(privateJWK, http.MethodGet, path+"/some-url")
+				require.NoError(t, err)
+
+				return dpop
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "Local (not absolute) HTTP URI",
+			proof: func(t *testing.T) string {
+				dpop, err := oauth.CreateProofToken(privateJWK, http.MethodGet, "/")
+				require.NoError(t, err)
+
+				return dpop
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
 			name: "Valid token",
 			proof: func(t *testing.T) string {
 				dpop, err := oauth.CreateProofToken(privateJWK, http.MethodGet, path)
@@ -421,8 +451,6 @@ func TestDPoPAuthenticated(t *testing.T) {
 			require.Equal(t, test.wantStatus, response.Result().StatusCode)
 		})
 	}
-
-	// TODO: Mismatched HTTP method/URI
 
 	// Prevent token replay
 	t.Run("Token replay", func(t *testing.T) {

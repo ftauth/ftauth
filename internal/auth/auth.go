@@ -74,6 +74,9 @@ func ParseBasicAuthorizationHeader(authHeader string) (string, string, error) {
 
 	// Retrieve client ID and secret
 	decoded, err := base64.StdEncoding.DecodeString(token)
+	if err != nil {
+		return "", "", err
+	}
 	fields := strings.Split(string(decoded), ":")
 	if len(fields) != 2 {
 		return "", "", ErrInvalidToken
