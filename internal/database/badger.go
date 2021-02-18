@@ -449,8 +449,8 @@ func (db *BadgerDB) GetTokenByID(ctx context.Context, tokenID string) (token str
 	return
 }
 
-// IsTokenSeen returns true if the token has been before. If false, it firse
-// records the token information so that subsequent calls return true.
+// IsTokenSeen returns an error if the token has been seen before. If not, it first
+// records the token information so that subsequent calls return an error.
 func (db *BadgerDB) IsTokenSeen(ctx context.Context, token *jwt.Token) error {
 	key := makeDPoPKey(token.Claims.JwtID)
 	return db.DB.Update(func(txn *badger.Txn) error {

@@ -55,8 +55,15 @@ func (h *Header) IsValid() error {
 	if h.Algorithm == "" {
 		return errMissingParameter("alg")
 	}
+	if err := h.Algorithm.IsValid(); err != nil {
+		return err
+	}
 	switch h.Type {
 	case TypeDPoP:
+		// Further constrain the DPoP algorithm to asymmetric keys
+		if h.Algorithm.IsSymmetric() {
+			return errInvalidParameter("alg")
+		}
 		if h.JWK == nil {
 			return errMissingParameter("jwk")
 		}
@@ -111,20 +118,20 @@ type ConfirmationClaim struct {
 // and is properly formatted. Returns an error if not.
 func (c *Claims) IsValid(typ Type) error {
 	if typ == TypeAccess || typ == TypeDPoP {
-		if c.Issuer == "" {
-			return errMissingParameter("iss")
-		}
-		if c.Subject == "" {
-			return errMissingParameter("sub")
-		}
-		if c.Audience == "" {
-			return errMissingParameter("aud")
-		}
 		if c.IssuedAt == 0 {
 			return errMissingParameter("iat")
 		}
 		switch typ {
 		case TypeAccess:
+			if c.Issuer == "" {
+				return errMissingParameter("iss")
+			}
+			if c.Subject == "" {
+				return errMissingParameter("sub")
+			}
+			if c.Audience == "" {
+				return errMissingParameter("aud")
+			}
 			if c.ExpirationTime == 0 {
 				return errMissingParameter("exp")
 			}
@@ -291,7 +298,37 @@ func (t *Token) Verify(key *Key) error {
 	return nil
 }
 
+// Valid returns nil if the token is valid.
+func (t *Token) Valid() error {
+	if err := t.Header.IsValid(); err != nil {
+		return err
+	}
+	if err := t.Claims.IsValid(t.Header.Type); err != nil {
+		return err
+	}
+	return nil
+}
+
+// IssuedBefore returns true if the token was issued before the given time.
+func (t *Token) IssuedBefore(u time.Time) bool {
+	return time.Unix(t.Claims.IssuedAt, 0).Before(u)
+}
+
+// IssuedBeforeAgo returns true if the token was issued before the given duration before now.
+func (t *Token) IssuedBeforeAgo(d time.Duration) bool {
+	issuedAt := time.Unix(t.Claims.IssuedAt, 0)
+	diff := time.Now().Sub(issuedAt).Seconds()
+	return diff > d.Seconds()
+}
+
 // IsExpired returns true if the expiration time has passed.
 func (t *Token) IsExpired() bool {
-	return t.Claims.ExpirationTime == 0 || time.Unix(t.Claims.ExpirationTime, 0).Before(time.Now())
+	if t.Claims.ExpirationTime == 0 {
+		return true
+	}
+
+	const buffer = 5 * time.Second // to protect against clock differences
+	exp := time.Unix(t.Claims.ExpirationTime, 0)
+	diff := time.Now().UTC().Sub(exp).Seconds()
+	return diff > buffer.Seconds()
 }

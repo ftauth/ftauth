@@ -648,34 +648,10 @@ func TestRefreshTokenGrant(t *testing.T) {
 	_, err = db.RegisterClient(context.Background(), client, model.ClientOptionNone)
 	require.NoError(t, err)
 
-	retrieveTokens := func(t *testing.T) (*jwt.Token, *jwt.Token) {
-		body := url.Values{}
-		body.Set(paramGrantType, string(model.GrantTypeClientCredentials))
-		body.Set(paramScope, "default")
-		enc := body.Encode()
-
-		request := httptest.NewRequest(http.MethodPost, TokenEndpoint, strings.NewReader(enc))
-		request.Header.Add("Authorization", oauth.CreateBasicAuthorization(client.ID, client.Secret))
-		request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-		request.Header.Add("Content-Length", strconv.Itoa(len(enc)))
-
-		response := httptest.NewRecorder()
-
-		handler.ServeHTTP(response, request)
-
-		require.Equal(t, http.StatusOK, response.Result().StatusCode)
-
-		var resp model.TokenResponse
-		err := json.NewDecoder(response.Body).Decode(&resp)
-		require.NoError(t, err)
-
-		accessToken, err := jwt.Decode(resp.AccessToken)
-		require.NoError(t, err)
-
-		refreshToken, err := jwt.Decode(resp.RefreshToken)
-		require.NoError(t, err)
-
-		return accessToken, refreshToken
+	mockClient := mockConfidentialClient{
+		t:       t,
+		client:  client,
+		handler: handler,
 	}
 
 	tt := []struct {
@@ -686,7 +662,7 @@ func TestRefreshTokenGrant(t *testing.T) {
 		{
 			name: "Valid refresh token",
 			refreshToken: func(t *testing.T) string {
-				_, refreshToken := retrieveTokens(t)
+				_, refreshToken := mockClient.retrieveTokens()
 				refreshTokenEnc, err := refreshToken.Raw()
 				require.NoError(t, err)
 
@@ -697,7 +673,7 @@ func TestRefreshTokenGrant(t *testing.T) {
 		{
 			name: "Expired refresh token",
 			refreshToken: func(t *testing.T) string {
-				_, refreshToken := retrieveTokens(t)
+				_, refreshToken := mockClient.retrieveTokens()
 				refreshTokenEnc, err := refreshToken.Raw()
 				require.NoError(t, err)
 
@@ -760,4 +736,40 @@ func TestRefreshTokenGrant(t *testing.T) {
 			}
 		})
 	}
+}
+
+type mockConfidentialClient struct {
+	client  *model.ClientInfo
+	handler http.Handler
+	t       *testing.T
+}
+
+func (mock mockConfidentialClient) retrieveTokens() (*jwt.Token, *jwt.Token) {
+	body := url.Values{}
+	body.Set(paramGrantType, string(model.GrantTypeClientCredentials))
+	body.Set(paramScope, "default")
+	enc := body.Encode()
+
+	request := httptest.NewRequest(http.MethodPost, TokenEndpoint, strings.NewReader(enc))
+	request.Header.Add("Authorization", oauth.CreateBasicAuthorization(mock.client.ID, mock.client.Secret))
+	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Add("Content-Length", strconv.Itoa(len(enc)))
+
+	response := httptest.NewRecorder()
+
+	mock.handler.ServeHTTP(response, request)
+
+	require.Equal(mock.t, http.StatusOK, response.Result().StatusCode)
+
+	var resp model.TokenResponse
+	err := json.NewDecoder(response.Body).Decode(&resp)
+	require.NoError(mock.t, err)
+
+	accessToken, err := jwt.Decode(resp.AccessToken)
+	require.NoError(mock.t, err)
+
+	refreshToken, err := jwt.Decode(resp.RefreshToken)
+	require.NoError(mock.t, err)
+
+	return accessToken, refreshToken
 }

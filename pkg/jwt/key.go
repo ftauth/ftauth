@@ -869,3 +869,50 @@ func (key *Key) Thumbprint() (string, error) {
 
 	return base64url.Encode(digest[:]), nil
 }
+
+// IsPrivateKey returns true if the key has private key info.
+// Returns false for public and symmetric keys.
+func (key *Key) IsPrivateKey() bool {
+	return key.PrivateKey != nil && key.HasPrivateKeyInfo() == nil
+}
+
+// PublicJWK returns the public key given a private key.
+// For public keys, it returns itself.
+func (key *Key) PublicJWK() *Key {
+	if !key.IsPrivateKey() {
+		return key
+	}
+
+	publicJWK := &Key{
+		KeyType:               key.KeyType,
+		PublicKeyUse:          key.PublicKeyUse,
+		KeyOperations:         key.KeyOperations,
+		Algorithm:             key.Algorithm,
+		KeyID:                 key.KeyID,
+		X509Url:               key.X509Url,
+		X509CertificateChain:  key.X509CertificateChain,
+		X509CertificateSHA1:   key.X509CertificateSHA1,
+		X509CertificateSHA256: key.X509CertificateSHA256,
+	}
+
+	publicKey := key.PublicKey
+
+	switch key.KeyType {
+	case KeyTypeEllipticCurve:
+		publicJWK.X = key.X
+		publicJWK.Y = key.Y
+		if publicKey == nil {
+			publicKey = key.PrivateKey.(*ecdsa.PrivateKey).PublicKey
+		}
+	case KeyTypeRSA:
+		publicJWK.N = key.N
+		publicJWK.E = key.E
+		if publicKey == nil {
+			publicKey = key.PrivateKey.(*rsa.PrivateKey).PublicKey
+		}
+	}
+
+	publicJWK.PublicKey = publicKey
+
+	return publicJWK
+}

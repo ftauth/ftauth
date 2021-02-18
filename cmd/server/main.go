@@ -95,6 +95,9 @@ func main() {
 	// Static file handling
 	r.PathPrefix("/").Handler(http.FileServer(http.FS(staticFS)))
 
+	// Apply middleware
+	r.Use(auth.SuppressReferrer)
+
 	addr := ":" + config.Current.Server.Port
 	srv := http.Server{
 		Addr:    addr,

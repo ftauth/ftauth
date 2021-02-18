@@ -121,10 +121,9 @@ func (in *middlewareInjector) DPoPAuthenticated() mux.MiddlewareFunc {
 			}
 
 			// Verify DPoP information, if present
-			header := r.Header.Get("DPoP")
-			dpopEnc, err := ParseDPoPAuthorizationHeader(header)
-			if dpopEnc != "" && err == nil {
-				dpop, err := in.decodeAndVerifyDPoP(dpopEnc, r)
+			proof := r.Header.Get("DPoP")
+			if proof != "" {
+				dpop, err := in.decodeAndVerifyDPoP(proof, r)
 				if err != nil {
 					log.Printf("Error decoding/verifying DPoP token: %v\n", err)
 					handleErr(err)
@@ -163,6 +162,10 @@ func decodeAndVerifyAuthHeader(authHeader string) (*jwt.Token, error) {
 		return nil, err
 	}
 
+	if token.IsExpired() {
+		return nil, ErrExpiredToken
+	}
+
 	return token, nil
 }
 
@@ -187,11 +190,7 @@ func (in *middlewareInjector) decodeAndVerifyDPoP(dpopEnc string, r *http.Reques
 	}
 
 	// Verify the token was created recently
-	issuedAt := time.Unix(dpop.Claims.IssuedAt, 0)
-	const tokenValidFor = 10 * time.Minute
-	const buffer = 5 * time.Second // to protect against clock differences
-	diff := time.Now().UTC().Sub(issuedAt)
-	if diff > tokenValidFor || diff < -buffer {
+	if dpop.IssuedBeforeAgo(10 * time.Minute) {
 		return nil, ErrExpiredToken
 	}
 
@@ -200,7 +199,7 @@ func (in *middlewareInjector) decodeAndVerifyDPoP(dpopEnc string, r *http.Reques
 	defer cancel()
 
 	err = in.db.IsTokenSeen(ctx, dpop)
-	if err == nil {
+	if err != nil {
 		return nil, ErrExpiredToken
 	}
 

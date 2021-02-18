@@ -45,3 +45,15 @@ func (alg Algorithm) IsValid() error {
 		return errUnsupportedValue("alg", string(alg))
 	}
 }
+
+// IsSymmetric returns true for symmetric key-based algorithms.
+func (alg Algorithm) IsSymmetric() bool {
+	switch alg {
+	case AlgorithmHMACSHA256,
+		AlgorithmHMACSHA384,
+		AlgorithmHMACSHA512:
+		return true
+	default:
+		return false
+	}
+}

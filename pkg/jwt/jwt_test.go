@@ -3,6 +3,7 @@ package jwt
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -110,5 +111,54 @@ func TestDecode(t *testing.T) {
 
 		assert.True(t, reflect.DeepEqual(token.Header, test.want.Header))
 		assert.True(t, reflect.DeepEqual(token.Claims, test.want.Claims))
+	}
+}
+
+func TestIsExpired(t *testing.T) {
+	tt := []struct {
+		name    string
+		token   *Token
+		expired bool
+	}{
+		{
+			name: "Empty expiration",
+			token: &Token{
+				Claims: &Claims{},
+			},
+			expired: true,
+		},
+		{
+			name: "Expired",
+			token: &Token{
+				Claims: &Claims{
+					ExpirationTime: time.Now().Add(-1 * time.Minute).Unix(),
+				},
+			},
+			expired: true,
+		},
+		{
+			name: "Valid",
+			token: &Token{
+				Claims: &Claims{
+					ExpirationTime: time.Now().Add(1 * time.Minute).Unix(),
+				},
+			},
+			expired: false,
+		},
+		{
+			name: "Within Buffer",
+			token: &Token{
+				Claims: &Claims{
+					ExpirationTime: time.Now().Add(-1 * time.Second).Unix(),
+				},
+			},
+			expired: false,
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.expired, test.token.IsExpired())
+		})
 	}
 }
