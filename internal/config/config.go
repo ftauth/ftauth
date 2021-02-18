@@ -29,7 +29,17 @@ type ServerConfig struct {
 // URL returns the main gateway URL for the server.
 func (s *ServerConfig) URL() string {
 	host := s.Host
-	if s.Port != "" {
+	includePort := func() bool {
+		if s.Port == "" {
+			return false
+		}
+		if s.Scheme == "http" {
+			return s.Port != "80"
+		}
+		// s.Scheme == "https"
+		return s.Port != "443"
+	}()
+	if includePort {
 		host = fmt.Sprintf("%s:%s", host, s.Port)
 	}
 	uri := url.URL{

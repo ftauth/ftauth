@@ -182,7 +182,7 @@ func (in *middlewareInjector) decodeAndVerifyDPoP(dpopEnc string, r *http.Reques
 	}
 
 	// Verify the HTTP method and URI match what's encoded in the token
-	uri := r.URL.String()
+	uri := config.Current.Server.URL() + r.URL.Path
 	method := r.Method
 
 	if uri != dpop.Claims.HTTPURI || method != dpop.Claims.HTTPMethod {

@@ -901,6 +901,7 @@ func (key *Key) PublicJWK() *Key {
 	case KeyTypeEllipticCurve:
 		publicJWK.X = key.X
 		publicJWK.Y = key.Y
+		publicJWK.Curve = key.Curve
 		if publicKey == nil {
 			publicKey = key.PrivateKey.(*ecdsa.PrivateKey).PublicKey
 		}

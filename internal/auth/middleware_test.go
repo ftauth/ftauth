@@ -75,7 +75,7 @@ func TestBearerAuthentated(t *testing.T) {
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
-			name: "Invalid token",
+			name: "Invalid token (Wrong JWK)",
 			authHeader: func(*testing.T) string {
 				accessToken, _ := mockClient.retrieveTokens()
 
@@ -283,11 +283,15 @@ func TestDPoPAuthenticated(t *testing.T) {
 
 	publicJWK := privateJWK.PublicJWK()
 
-	tt := []struct {
+	type testCase struct {
 		name       string
 		proof      func(t *testing.T) string
 		wantStatus int
-	}{
+	}
+
+	path := config.Current.Server.URL()
+
+	tt := []testCase{
 		{
 			name: "Empty proof",
 			proof: func(*testing.T) string {
@@ -310,10 +314,44 @@ func TestDPoPAuthenticated(t *testing.T) {
 						JwtID:      id.String(),
 						IssuedAt:   time.Now().Unix(),
 						HTTPMethod: http.MethodGet,
-						HTTPURI:    "/",
+						HTTPURI:    path,
 					},
 				}
 				require.Error(t, dpop.Valid())
+
+				enc, err := dpop.Encode(privateJWK)
+				require.NoError(t, err)
+
+				return enc
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "Invalid token (Mismatched JWK)",
+			proof: func(*testing.T) string {
+				id, err := uuid.NewV4()
+				require.NoError(t, err)
+
+				otherKey, err := rsa.GenerateKey(rand.Reader, 2048)
+				require.NoError(t, err)
+
+				otherJWK, err := jwt.NewJWKFromRSAPublicKey(&otherKey.PublicKey)
+				require.NoError(t, err)
+
+				dpop := &jwt.Token{
+					Header: &jwt.Header{
+						Type:      jwt.TypeDPoP,
+						Algorithm: jwt.AlgorithmPSSSHA256,
+						JWK:       otherJWK,
+					},
+					Claims: &jwt.Claims{
+						JwtID:      id.String(),
+						IssuedAt:   time.Now().Unix(),
+						HTTPMethod: http.MethodGet,
+						HTTPURI:    path,
+					},
+				}
+				require.NoError(t, dpop.Valid())
 
 				enc, err := dpop.Encode(privateJWK)
 				require.NoError(t, err)
@@ -338,7 +376,7 @@ func TestDPoPAuthenticated(t *testing.T) {
 						JwtID:      id.String(),
 						IssuedAt:   time.Now().Add(-11 * time.Minute).Unix(),
 						HTTPMethod: http.MethodGet,
-						HTTPURI:    "/",
+						HTTPURI:    path,
 					},
 				}
 				require.NoError(t, dpop.Valid())
@@ -353,7 +391,7 @@ func TestDPoPAuthenticated(t *testing.T) {
 		{
 			name: "Valid token",
 			proof: func(t *testing.T) string {
-				dpop, err := oauth.CreateProofToken(privateJWK, http.MethodGet, "/")
+				dpop, err := oauth.CreateProofToken(privateJWK, http.MethodGet, path)
 				require.NoError(t, err)
 
 				return dpop
@@ -362,18 +400,18 @@ func TestDPoPAuthenticated(t *testing.T) {
 		},
 	}
 
+	middlewareInjector := middlewareInjector{db}
+	middleware := middlewareInjector.DPoPAuthenticated()
+	server := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		dpop := r.Context().Value(dpopContextKey)
+		if dpop == nil {
+			w.WriteHeader(http.StatusBadRequest)
+		}
+	}))
+
 	for _, test := range tt {
 		t.Run(test.name, func(t *testing.T) {
-			middlewareInjector := middlewareInjector{db}
-			middleware := middlewareInjector.DPoPAuthenticated()
-			server := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				dpop := r.Context().Value(dpopContextKey)
-				if dpop == nil {
-					w.WriteHeader(http.StatusBadRequest)
-				}
-			}))
-
-			request := httptest.NewRequest(http.MethodGet, "/", nil)
+			request := httptest.NewRequest(http.MethodGet, path, nil)
 			request.Header.Add("DPoP", test.proof(t))
 
 			response := httptest.NewRecorder()
@@ -383,4 +421,23 @@ func TestDPoPAuthenticated(t *testing.T) {
 			require.Equal(t, test.wantStatus, response.Result().StatusCode)
 		})
 	}
+
+	// TODO: Mismatched HTTP method/URI
+
+	// Prevent token replay
+	t.Run("Token replay", func(t *testing.T) {
+		dpop, err := oauth.CreateProofToken(privateJWK, http.MethodGet, path)
+		require.NoError(t, err)
+
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		request.Header.Add("DPoP", dpop)
+
+		response1 := httptest.NewRecorder()
+		server.ServeHTTP(response1, request)
+		require.Equal(t, http.StatusOK, response1.Result().StatusCode)
+
+		response2 := httptest.NewRecorder()
+		server.ServeHTTP(response2, request)
+		require.Equal(t, http.StatusBadRequest, response2.Result().StatusCode)
+	})
 }
