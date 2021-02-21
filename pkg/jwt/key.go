@@ -35,8 +35,11 @@ func (bi *bigInt) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	_bi, err := base64urluint.Decode(s)
-	if _bi == nil || err != nil {
+	if err != nil {
 		return err
+	}
+	if _bi == nil {
+		return errors.New("empty value")
 	}
 	*bi = bigInt(*_bi)
 	return nil

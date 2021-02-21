@@ -166,20 +166,18 @@ func (t *Token) encodeUnsigned() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if t.Claims.CustomClaims != nil {
-		var payloadMap map[string]interface{}
-		if err := json.Unmarshal(payload, &payloadMap); err != nil {
-			return "", err
+	var payloadMap map[string]interface{}
+	if err := json.Unmarshal(payload, &payloadMap); err != nil {
+		return "", err
+	}
+	for key, value := range t.Claims.CustomClaims {
+		if !isRegisteredClaim(key) {
+			payloadMap[key] = value
 		}
-		for key, value := range t.Claims.CustomClaims {
-			if !isRegisteredClaim(key) {
-				payloadMap[key] = value
-			}
-		}
-		payload, err = json.Marshal(payloadMap)
-		if err != nil {
-			return "", err
-		}
+	}
+	payload, err = json.Marshal(payloadMap)
+	if err != nil {
+		return "", err
 	}
 
 	encHeader := base64url.Encode(header)

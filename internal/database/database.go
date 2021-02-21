@@ -6,30 +6,29 @@ import (
 
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/model"
-	"github.com/jmoiron/sqlx"
 )
 
 // DefaultTimeout is the default length of time to wait
 // for a database operation to complete.
 const DefaultTimeout = time.Second * 3
 
-// SQLDatabase is a database for communicating with an SQL server.
-type SQLDatabase struct {
-	Type model.DatabaseType
-	DB   *sqlx.DB
-}
+// // SQLDatabase is a database for communicating with an SQL server.
+// type SQLDatabase struct {
+// 	Type model.DatabaseType
+// 	DB   *sqlx.DB
+// }
 
-// Bindvar returns the query parameter type for this database for use with sqlx.
-func (db *SQLDatabase) Bindvar() int {
-	switch db.Type {
-	case model.DatabaseTypeOracle:
-		return sqlx.NAMED
-	case model.DatabaseTypePostgres:
-		return sqlx.DOLLAR
-	default:
-		return sqlx.UNKNOWN
-	}
-}
+// // Bindvar returns the query parameter type for this database for use with sqlx.
+// func (db *SQLDatabase) Bindvar() int {
+// 	switch db.Type {
+// 	case model.DatabaseTypeOracle:
+// 		return sqlx.NAMED
+// 	case model.DatabaseTypePostgres:
+// 		return sqlx.DOLLAR
+// 	default:
+// 		return sqlx.UNKNOWN
+// 	}
+// }
 
 // Database handles all interactions with the data backend.
 type Database interface {

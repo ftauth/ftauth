@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -63,14 +62,13 @@ func (v ftauthValidator) ValidateAuthorizationCodeRequest(r *http.Request) (*mod
 	{
 		// Verify redirect URI
 		if !clientInfo.IsValidRedirectURI(redirectURI) {
-			errorString := "Invalid redirect URI"
-			if err != nil {
-				errorString += fmt.Sprintf(": %v", err)
-			}
 			// Do not redirect to an unverified redirect URI
 			return nil, &authorizationRequestError{
-				err:     model.AuthorizationRequestErrInvalidRequest,
-				details: model.RequestErrorDetails{ParamName: paramRedirectURI, Details: errorString},
+				err: model.AuthorizationRequestErrInvalidRequest,
+				details: model.RequestErrorDetails{
+					ParamName: paramRedirectURI,
+					Details:   "Invalid redirect URI",
+				},
 			}
 		}
 	}

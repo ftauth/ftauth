@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -72,7 +73,11 @@ func main() {
 		db = badgerDB
 		adminClient := badgerDB.AdminClient
 
-		fmt.Printf("Admin client: %#v\n", adminClient)
+		adminJSON, err := json.Marshal(adminClient)
+		if err != nil {
+			log.Fatalln("Error marshalling admin client: ", err)
+		}
+		fmt.Printf("Admin client: %s\n", adminJSON)
 	} else {
 		_, err := database.InitializeDgraphDatabase()
 		if err != nil {

@@ -15,7 +15,7 @@ import (
 
 const characterSet = `abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~`
 
-// GenerateCodeChallenge produces a new code challenge.
+// GenerateCodeChallenge produces a new code verifier and SHA-256 challenge.
 func GenerateCodeChallenge() (string, string) {
 	const N = 128
 	numChars := len(characterSet)

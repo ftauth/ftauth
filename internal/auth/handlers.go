@@ -473,7 +473,6 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		refreshToken.Claims.Confirmation = &jwt.ConfirmationClaim{
 			SHA256Thumbprint: thumbprint,
 		}
-		tokenType = token.TypeDPoP
 	}
 
 	accessJWT, err := accessToken.Encode(config.Current.OAuth.Tokens.PrivateKey)
