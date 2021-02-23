@@ -11,6 +11,16 @@ docker run --rm -it \
     -p 8000:8000 ftauth/ftauth:latest
 ```
 
+The process will print client info in JSON to the terminal which can be used with a client SDK to connect to the running server.
+
+```sh
+Admin client: {"uid":"5b8b954c-7a43-42f8-bc76-a5df26abd2f6","client_name":"Admin","client_type":"public","client_secret_expires_at":"0001-01-01T00:00:00Z","redirect_uris":["localhost","myapp://auth"],"scopes":[{"name":"default"},{"name":"admin"}],"grant_types":["authorization_code","client_credentials","refresh_token"],"access_token_life":3600,"refresh_token_life":86400}
+```
+
+## Client SDKs
+
+- Dart/Flutter: https://github.com/ftauth/sdk-dart
+
 ## Features
 FTAuth supports the OAuth 2.1 protocol, currently in [draft](https://tools.ietf.org/html/draft-ietf-oauth-v2-1-00), which slims the original OAuth 2.0 spec to incorporate best practices for security.
 
