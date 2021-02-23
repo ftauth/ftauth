@@ -14,7 +14,29 @@ docker run --rm -it \
 The process will print client info in JSON to the terminal which can be used with a client SDK to connect to the running server.
 
 ```sh
-Admin client: {"uid":"5b8b954c-7a43-42f8-bc76-a5df26abd2f6","client_name":"Admin","client_type":"public","client_secret_expires_at":"0001-01-01T00:00:00Z","redirect_uris":["localhost","myapp://auth"],"scopes":[{"name":"default"},{"name":"admin"}],"grant_types":["authorization_code","client_credentials","refresh_token"],"access_token_life":3600,"refresh_token_life":86400}
+Admin client: {
+  "uid": "3cf9a7ac-9198-469e-92a7-cc2f15d8b87d",
+  "client_name": "Admin",
+  "client_type": "public",
+  "redirect_uris": [
+    "localhost",
+    "myapp://auth"
+  ],
+  "scopes": [
+    {
+      "name": "default"
+    },
+    {
+      "name": "admin"
+    }
+  ],
+  "grant_types": [
+    "authorization_code",
+    "refresh_token"
+  ],
+  "access_token_life": 3600,
+  "refresh_token_life": 86400
+}
 ```
 
 ## Client SDKs
