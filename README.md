@@ -5,7 +5,10 @@ FTAuth (Fault-Tolerant Auth) is a secure, lightweight OAuth 2.1 server, written 
 Run the following command to create a local instance of FTAuth:
 
 ```sh
-docker-compose up
+docker run --rm -it \
+    -e FTAUTH_OAUTH_ADMIN_USERNAME=admin \
+    -e FTAUTH_OAUTH_ADMIN_PASSWORD=password \
+    -p 8000:8000 ftauth/ftauth:latest
 ```
 
 ## Features
