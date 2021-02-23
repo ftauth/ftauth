@@ -1,8 +1,6 @@
 package mock
 
 import (
-	"time"
-
 	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/gofrs/uuid"
 )
@@ -18,7 +16,6 @@ var DefaultClient = model.ClientInfo{
 	Name:         "Public Client",
 	Type:         model.ClientTypePublic,
 	Secret:       "",
-	SecretExpiry: time.Unix(0, 0),
 	RedirectURIs: []string{"localhost"},
 	Scopes: []*model.Scope{
 		{

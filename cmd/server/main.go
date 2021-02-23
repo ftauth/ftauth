@@ -73,7 +73,7 @@ func main() {
 		db = badgerDB
 		adminClient := badgerDB.AdminClient
 
-		adminJSON, err := json.Marshal(adminClient)
+		adminJSON, err := json.MarshalIndent(adminClient, "", "  ")
 		if err != nil {
 			log.Fatalln("Error marshalling admin client: ", err)
 		}

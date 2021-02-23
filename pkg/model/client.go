@@ -42,7 +42,7 @@ type ClientInfo struct {
 	Name             string      `json:"client_name"`
 	Type             ClientType  `json:"client_type"`
 	Secret           string      `json:"client_secret,omitempty"`
-	SecretExpiry     time.Time   `json:"client_secret_expires_at,omitempty"` // Required if client_secret is issued. Time at which secret expires or 0 for no expiry.
+	SecretExpiry     *time.Time  `json:"client_secret_expires_at,omitempty"` // Required if client_secret is issued. Time at which secret expires or 0 for no expiry.
 	RedirectURIs     []string    `json:"redirect_uris"`
 	Scopes           []*Scope    `json:"scopes"`
 	JWKsURI          string      `json:"jwks_uri,omitempty"`
@@ -216,7 +216,7 @@ type ClientInfoEntity struct {
 	Name             string     `db:"name"`
 	Type             ClientType `db:"type"`
 	Secret           string     `db:"secret"`
-	SecretExpiry     time.Time  `db:"secret_expiry"`
+	SecretExpiry     *time.Time `db:"secret_expiry"`
 	RedirectURIs     string     `db:"redirect_uris"`
 	Scopes           string     `db:"scopes"`
 	JWKsURI          string     `db:"jwks_uri"`

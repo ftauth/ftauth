@@ -176,7 +176,6 @@ func (db *BadgerDB) createAdminClient() (*model.ClientInfo, error) {
 		},
 		GrantTypes: []model.GrantType{
 			model.GrantTypeAuthorizationCode,
-			model.GrantTypeClientCredentials,
 			model.GrantTypeRefreshToken,
 		},
 		AccessTokenLife:  60 * 60,      // 1 hour
