@@ -20,7 +20,7 @@ import (
 func TestCreateAdmin(t *testing.T) {
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -35,7 +35,7 @@ func TestCreateAdmin(t *testing.T) {
 func TestRegisterClient(t *testing.T) {
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true})
 	defer db.Close()
 
 	require.NoError(t, err)
@@ -57,7 +57,7 @@ func TestGetClient(t *testing.T) {
 
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -72,13 +72,14 @@ func TestUpdateClient(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true})
 	defer db.Close()
 	require.NoError(t, err)
 
 	_, err = db.RegisterClient(ctx, &mock.PublicClient, model.ClientOptionNone)
 	require.NoError(t, err)
 
+	id := mock.PublicClient.ID
 	name := "Updated Client"
 	redirectUrls := []string{"localhost", "myapp://auth"}
 	scopes := []*model.Scope{
@@ -90,6 +91,7 @@ func TestUpdateClient(t *testing.T) {
 	accessTokenLife := 60 * 60 * 3
 	refreshTokenLife := 60 * 60 * 24 * 2
 	clientUpdate := model.ClientInfoUpdate{
+		ID:               id,
 		Name:             &name,
 		RedirectURIs:     &redirectUrls,
 		Scopes:           &scopes,
@@ -99,7 +101,7 @@ func TestUpdateClient(t *testing.T) {
 		RefreshTokenLife: &refreshTokenLife,
 	}
 
-	updatedClient, err := db.UpdateClient(ctx, mock.PublicClient.Update(clientUpdate))
+	updatedClient, err := db.UpdateClient(ctx, clientUpdate)
 	require.NoError(t, err)
 
 	// Assert the correct values were changed
@@ -129,7 +131,7 @@ func TestUpdateClient(t *testing.T) {
 func TestGetAdminClient(t *testing.T) {
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -145,7 +147,7 @@ func TestListClients(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -172,7 +174,7 @@ func TestDeleteClient(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -194,7 +196,7 @@ func TestCreateSession(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -223,7 +225,7 @@ func TestGetRequestInfo(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -257,7 +259,7 @@ func TestUpdateRequestInfo(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -300,7 +302,7 @@ func TestLookupSessionByCode(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -356,7 +358,7 @@ func TestRegisterTokens(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -423,7 +425,7 @@ func TestGetTokenByID(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -473,7 +475,7 @@ func TestIsTokenSeen(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true, SeedDB: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -493,7 +495,7 @@ func TestCreateUser(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -509,7 +511,7 @@ func TestGetUserByID(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -533,7 +535,7 @@ func TestGetUserByUsername(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -557,7 +559,7 @@ func TestVerifyUsernameAndPassword(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, err := InitializeBadgerDB(Options{InMemory: true})
+	db, err := InitializeBadgerDB(BadgerOptions{InMemory: true})
 	defer db.Close()
 	require.NoError(t, err)
 

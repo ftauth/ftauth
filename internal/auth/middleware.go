@@ -157,7 +157,11 @@ func decodeAndVerifyAuthHeader(authHeader string) (*jwt.Token, error) {
 		return nil, err
 	}
 
-	err = token.Verify(config.Current.OAuth.Tokens.PublicKey)
+	publicKey := config.Current.DefaultVerificationKey()
+	if err != nil {
+		return nil, err
+	}
+	err = token.Verify(publicKey)
 	if err != nil {
 		return nil, err
 	}

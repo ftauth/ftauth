@@ -10,3 +10,8 @@ const (
 	ProviderGoogle    Provider = "google"
 	ProviderMicrosoft Provider = "microsoft"
 )
+
+// GQL returns the GraphQL representation.
+func (provider Provider) GQL() string {
+	return string(provider)
+}

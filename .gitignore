@@ -1,3 +1,4 @@
 .DS_Store
 template/scss
 *.http
+.vscode

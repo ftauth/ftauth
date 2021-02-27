@@ -21,6 +21,7 @@ import (
 	"github.com/ftauth/ftauth/internal/discovery"
 	"github.com/ftauth/ftauth/internal/templates"
 	"github.com/ftauth/ftauth/internal/user"
+	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/gorilla/mux"
 )
 
@@ -60,9 +61,11 @@ func main() {
 	config.LoadConfig()
 
 	// Setup database
+	var clientDB database.ClientDB
 	var db database.Database
+	var adminClient *model.ClientInfo
 	if runEmbedded {
-		opts := database.Options{
+		opts := database.BadgerOptions{
 			Path:   config.Current.Database.Dir,
 			SeedDB: true,
 		}
@@ -71,28 +74,43 @@ func main() {
 			log.Fatalf("Error initializing DB: %v\n", err)
 		}
 		db = badgerDB
-		adminClient := badgerDB.AdminClient
-
-		adminJSON, err := json.MarshalIndent(adminClient, "", "  ")
-		if err != nil {
-			log.Fatalln("Error marshalling admin client: ", err)
-		}
-		fmt.Printf("Admin client: %s\n", adminJSON)
+		clientDB = badgerDB
+		adminClient = badgerDB.AdminClient
 	} else {
-		_, err := database.InitializeDgraphDatabase()
+		opts := database.DgraphOptions{
+			URL:      config.Current.Database.URL,
+			APIKey:   config.Current.Database.APIKey,
+			Username: config.Current.Database.Username,
+			Password: config.Current.Database.Password,
+			SeedDB:   true,
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		db, err := database.InitializeDgraphDatabase(ctx, opts)
 		if err != nil {
 			log.Fatalln("Error initializing DB: ", err)
 		}
-		// TODO: db = dgraphDB
+		clientDB = db
+		adminClient, _ = db.GetAdminClient()
 	}
+
+	// Print out the admin client
+	adminJSON, err := json.MarshalIndent(adminClient, "", "  ")
+	if err != nil {
+		log.Fatalln("Error marshalling admin client: ", err)
+	}
+	fmt.Printf("Admin client: %s\n", adminJSON)
+
 	// Setup routing
 	r := mux.NewRouter()
-	auth.SetupRoutes(r, db, db, db)
+	auth.SetupRoutes(r, db, db, clientDB)
 	discovery.SetupRoutes(r, db)
-	admin.SetupRoutes(r, db)
+	admin.SetupRoutes(r, clientDB)
 	user.SetupRoutes(r)
 
-	err := templates.SetupTemplates(staticFS)
+	err = templates.SetupTemplates(staticFS)
 	if err != nil {
 		log.Fatalln("Error parsing templates: ", err)
 	}

@@ -1,0 +1,16 @@
+fragment AllClientInfo on ClientInfo {
+    id
+    name            
+    type            
+    secret          
+    secret_expiry    
+    redirect_uris    
+    scopes {
+        name
+    }         
+    jwks_uri         
+    logo_uri         
+    grant_types      
+    access_token_life 
+    refresh_token_life
+}

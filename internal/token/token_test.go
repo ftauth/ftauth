@@ -1,8 +1,9 @@
 package token
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
 	"reflect"
 	"testing"
 
@@ -135,7 +136,7 @@ func TestIssueRefreshToken(t *testing.T) {
 			name:   "Invalid token",
 			client: &mock.PublicClient,
 			accessToken: func() *jwt.Token {
-				key, err := rsa.GenerateKey(rand.Reader, 2048)
+				key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 				require.NoError(t, err)
 
 				id, err := uuid.NewV4()
@@ -153,7 +154,7 @@ func TestIssueRefreshToken(t *testing.T) {
 					},
 				}
 
-				jwk, err := jwt.NewJWKFromRSAPrivateKey(key)
+				jwk, err := jwt.NewJWKFromECDSAPrivateKey(key)
 				require.NoError(t, err)
 
 				_, err = token.Encode(jwk)

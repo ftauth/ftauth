@@ -65,7 +65,7 @@ func TestHandleTokenRequestError(t *testing.T) {
 func TestAuthorizationEndpoint(t *testing.T) {
 	config.LoadConfig()
 
-	db, err := database.InitializeBadgerDB(database.Options{InMemory: true, SeedDB: true})
+	db, err := database.InitializeBadgerDB(database.BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -315,7 +315,7 @@ func TestAuthorizationEndpoint(t *testing.T) {
 func TestClientCredentialsGrant(t *testing.T) {
 	config.LoadConfig()
 
-	db, err := database.InitializeBadgerDB(database.Options{InMemory: true, SeedDB: true})
+	db, err := database.InitializeBadgerDB(database.BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -339,6 +339,9 @@ func TestClientCredentialsGrant(t *testing.T) {
 		GrantTypes:       []model.GrantType{model.GrantTypeClientCredentials},
 		AccessTokenLife:  60 * 60,
 		RefreshTokenLife: 24 * 60 * 60,
+		Providers: []model.Provider{
+			model.ProviderFTAuth,
+		},
 	}
 	require.NoError(t, client.IsValid())
 
@@ -441,7 +444,7 @@ func TestClientCredentialsGrant(t *testing.T) {
 func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 	config.LoadConfig()
 
-	db, err := database.InitializeBadgerDB(database.Options{InMemory: true, SeedDB: true})
+	db, err := database.InitializeBadgerDB(database.BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -463,6 +466,9 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 		RedirectURIs:     []string{"localhost"},
 		AccessTokenLife:  60 * 60,
 		RefreshTokenLife: 24 * 60 * 60,
+		Providers: []model.Provider{
+			model.ProviderFTAuth,
+		},
 	}
 	require.NoError(t, client.IsValid())
 
@@ -613,7 +619,7 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 func TestRefreshTokenGrant(t *testing.T) {
 	config.LoadConfig()
 
-	db, err := database.InitializeBadgerDB(database.Options{InMemory: true, SeedDB: true})
+	db, err := database.InitializeBadgerDB(database.BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -642,6 +648,9 @@ func TestRefreshTokenGrant(t *testing.T) {
 		RedirectURIs:     []string{"localhost"},
 		AccessTokenLife:  60 * 60,
 		RefreshTokenLife: 1,
+		Providers: []model.Provider{
+			model.ProviderFTAuth,
+		},
 	}
 	require.NoError(t, client.IsValid())
 

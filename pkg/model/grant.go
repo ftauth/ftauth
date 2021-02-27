@@ -21,6 +21,11 @@ const (
 	GrantTypeResourceOwnerPasswordCredentials GrantType = "password"
 )
 
+// GQL returns the GraphQL representation.
+func (typ GrantType) GQL() string {
+	return string(typ)
+}
+
 // IsValid returns whether or not this grant type is supported.
 func (typ GrantType) IsValid() bool {
 	switch typ {

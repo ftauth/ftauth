@@ -19,6 +19,7 @@ import (
 
 	"github.com/ftauth/ftauth/pkg/util/base64url"
 	"github.com/ftauth/ftauth/pkg/util/base64urluint"
+	"github.com/gofrs/uuid"
 )
 
 type bigInt big.Int
@@ -359,9 +360,17 @@ func (key *Key) tryParseAlgorithm() error {
 }
 
 // NewJWKFromRSAPrivateKey creates a JWK from an RSA private key.
-func NewJWKFromRSAPrivateKey(key *rsa.PrivateKey) (*Key, error) {
+func NewJWKFromRSAPrivateKey(key *rsa.PrivateKey, alg Algorithm) (*Key, error) {
 	if key == nil {
 		return nil, errors.New("nil key")
+	}
+	if !alg.ValidForKeyType(KeyTypeRSA) {
+		return nil, errInvalidParameter("alg")
+	}
+
+	id, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
 	}
 
 	oth := make([]OtherPrime, 0)
@@ -377,37 +386,125 @@ func NewJWKFromRSAPrivateKey(key *rsa.PrivateKey) (*Key, error) {
 	e := &big.Int{}
 	e.SetInt64(int64(key.E))
 	newKey := &Key{
-		PublicKey:   &key.PublicKey,
-		PrivateKey:  key,
-		KeyType:     KeyTypeRSA,
-		Algorithm:   AlgorithmPSSSHA256,
-		N:           (*bigInt)(key.N),
-		E:           (*bigInt)(e),
-		D:           (*bigInt)(key.D),
-		P:           (*bigInt)(key.Primes[0]),
-		Q:           (*bigInt)(key.Primes[1]),
-		DP:          (*bigInt)(key.Precomputed.Dp),
-		DQ:          (*bigInt)(key.Precomputed.Dq),
-		QI:          (*bigInt)(key.Precomputed.Qinv),
-		OtherPrimes: oth,
+		PublicKey:     &key.PublicKey,
+		PrivateKey:    key,
+		KeyType:       KeyTypeRSA,
+		KeyID:         id.String(),
+		Algorithm:     alg,
+		KeyOperations: []KeyOperation{KeyOperationSign},
+		PublicKeyUse:  PublicKeyUseSignature,
+		N:             (*bigInt)(key.N),
+		E:             (*bigInt)(e),
+		D:             (*bigInt)(key.D),
+		P:             (*bigInt)(key.Primes[0]),
+		Q:             (*bigInt)(key.Primes[1]),
+		DP:            (*bigInt)(key.Precomputed.Dp),
+		DQ:            (*bigInt)(key.Precomputed.Dq),
+		QI:            (*bigInt)(key.Precomputed.Qinv),
+		OtherPrimes:   oth,
 	}
 	return newKey, newKey.IsValid()
 }
 
 // NewJWKFromRSAPublicKey creates a JWK from an RSA public key.
-func NewJWKFromRSAPublicKey(key *rsa.PublicKey) (*Key, error) {
+func NewJWKFromRSAPublicKey(key *rsa.PublicKey, alg Algorithm) (*Key, error) {
 	if key == nil {
 		return nil, errors.New("nil key")
+	}
+	if !alg.ValidForKeyType(KeyTypeRSA) {
+		return nil, errInvalidParameter("alg")
+	}
+
+	id, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
 	}
 
 	e := &big.Int{}
 	e.SetInt64(int64(key.E))
 	newKey := &Key{
-		PublicKey: key,
-		KeyType:   KeyTypeRSA,
-		Algorithm: AlgorithmPSSSHA256,
-		N:         (*bigInt)(key.N),
-		E:         (*bigInt)(e),
+		PublicKey:     key,
+		KeyType:       KeyTypeRSA,
+		Algorithm:     alg,
+		KeyID:         id.String(),
+		PublicKeyUse:  PublicKeyUseSignature,
+		KeyOperations: []KeyOperation{KeyOperationVerify},
+		N:             (*bigInt)(key.N),
+		E:             (*bigInt)(e),
+	}
+
+	return newKey, newKey.IsValid()
+}
+
+// NewJWKFromECDSAPrivateKey creates a JWK from an ECDSA private key.
+func NewJWKFromECDSAPrivateKey(key *ecdsa.PrivateKey) (*Key, error) {
+	if key == nil {
+		return nil, errors.New("nil key")
+	}
+
+	id, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
+	}
+
+	var crv EllipticCurve
+	switch key.Curve {
+	case elliptic.P256():
+		crv = EllipticCurveP256
+	case elliptic.P384():
+		crv = EllipticCurveP384
+	case elliptic.P521():
+		crv = EllipticCurveP521
+	}
+
+	newKey := &Key{
+		PrivateKey:    key,
+		PublicKey:     &key.PublicKey,
+		KeyType:       KeyTypeEllipticCurve,
+		Algorithm:     AlgorithmECDSASHA256,
+		PublicKeyUse:  PublicKeyUseSignature,
+		KeyOperations: []KeyOperation{KeyOperationSign},
+		KeyID:         id.String(),
+		Curve:         crv,
+		X:             (*bigInt)(key.X),
+		Y:             (*bigInt)(key.Y),
+		D:             (*bigInt)(key.D),
+	}
+
+	return newKey, newKey.IsValid()
+}
+
+// NewJWKFromECDSAPublicKey creates a JWK from an ECDSA public key.
+func NewJWKFromECDSAPublicKey(key *ecdsa.PublicKey) (*Key, error) {
+	if key == nil {
+		return nil, errors.New("nil key")
+	}
+
+	id, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
+	}
+
+	var crv EllipticCurve
+	switch key.Curve {
+	case elliptic.P256():
+		crv = EllipticCurveP256
+	case elliptic.P384():
+		crv = EllipticCurveP384
+	case elliptic.P521():
+		crv = EllipticCurveP521
+	}
+
+	newKey := &Key{
+		PublicKey:     key,
+		KeyType:       KeyTypeEllipticCurve,
+		Algorithm:     AlgorithmECDSASHA256,
+		PublicKeyUse:  PublicKeyUseSignature,
+		KeyOperations: []KeyOperation{KeyOperationVerify},
+		KeyID:         id.String(),
+		Curve:         crv,
+		X:             (*bigInt)(key.X),
+		Y:             (*bigInt)(key.Y),
 	}
 
 	return newKey, newKey.IsValid()

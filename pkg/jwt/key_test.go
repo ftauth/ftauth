@@ -362,10 +362,10 @@ VZKLzKRcMWP8LGww7aEgcyyF2UNtatrC+zm4xXPwynI9lqwcddD7
 	rsaKey, err := x509.ParsePKCS1PrivateKey(p.Bytes)
 	require.NoError(t, err)
 
-	privKey, err := NewJWKFromRSAPrivateKey(rsaKey)
+	privKey, err := NewJWKFromRSAPrivateKey(rsaKey, AlgorithmPSSSHA256)
 	require.NoError(t, err)
 
-	pubKey, err := NewJWKFromRSAPublicKey(&rsaKey.PublicKey)
+	pubKey, err := NewJWKFromRSAPublicKey(&rsaKey.PublicKey, AlgorithmPSSSHA256)
 	require.NoError(t, err)
 
 	signer := privKey.Signer()

@@ -119,20 +119,12 @@ func (h clientHandler) UpdateClient(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	req.ID = clientID
 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	client, err := h.db.GetClient(ctx, clientID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	ctx, cancel = context.WithTimeout(r.Context(), database.DefaultTimeout)
-	defer cancel()
-
-	clientInfo, err := h.db.UpdateClient(ctx, client.Update(req))
+	clientInfo, err := h.db.UpdateClient(ctx, req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

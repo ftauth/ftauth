@@ -12,7 +12,6 @@ import (
 
 	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/internal/database"
-	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/ftauth/ftauth/pkg/util/cors"
 	"github.com/gorilla/mux"
@@ -114,8 +113,7 @@ func createMetadata() (*model.AuthorizationServerMetadata, error) {
 }
 
 func handleJWKS(w http.ResponseWriter, r *http.Request) {
-	jwk := config.Current.OAuth.Tokens.PublicKey
-	jwks := jwt.KeySet{Keys: []*jwt.Key{jwk}}
+	jwks := config.Current.JWKS(false)
 	b, err := json.Marshal(jwks)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

@@ -8,16 +8,14 @@ import (
 	"strings"
 
 	badger "github.com/dgraph-io/badger/v3"
-	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/ftauth/ftauth/pkg/util/passwordutil"
-	"github.com/gofrs/uuid"
 )
 
 // BadgerDB holds a connection to a Badger backend.
 type BadgerDB struct {
-	Options     Options
+	Options     BadgerOptions
 	DB          *badger.DB
 	AdminClient *model.ClientInfo
 }
@@ -64,9 +62,9 @@ func makeKey(prefix, id string) []byte {
 	return []byte(fmt.Sprintf("%s_%s", prefix, id))
 }
 
-// Options specifies the FTAuth-specific options
+// BadgerOptions specifies the FTAuth-specific options
 // for initializing a DB instance
-type Options struct {
+type BadgerOptions struct {
 	Path     string // Path to the DB storage
 	InMemory bool   // Whether or not the DB is in memory
 	SeedDB   bool   // Whether or not to seed the DB
@@ -74,7 +72,7 @@ type Options struct {
 
 // InitializeBadgerDB creates a new database with a Badger backend.
 // Pass `true` to create an in-memory database (useful in tests, for example).
-func InitializeBadgerDB(opts Options) (*BadgerDB, error) {
+func InitializeBadgerDB(opts BadgerOptions) (*BadgerDB, error) {
 	if opts.Path == "" && !opts.InMemory {
 		return nil, errors.New("missing path")
 	}
@@ -95,7 +93,7 @@ func InitializeBadgerDB(opts Options) (*BadgerDB, error) {
 
 	if opts.SeedDB {
 		if badgerDB.isEmpty() {
-			admin, err := badgerDB.createAdminClient()
+			admin, err := createAdminClient(badgerDB)
 			if err != nil {
 				return nil, err
 			}
@@ -154,53 +152,6 @@ func (db *BadgerDB) isEmpty() (empty bool) {
 		return nil
 	})
 	return
-}
-
-func (db *BadgerDB) createAdminClient() (*model.ClientInfo, error) {
-	clientID := config.Current.OAuth.Admin.ClientID
-	if clientID == "" {
-		id, err := uuid.NewV4()
-		if err != nil {
-			return nil, err
-		}
-		clientID = id.String()
-	}
-	adminClient := &model.ClientInfo{
-		ID:           clientID,
-		Name:         "Admin",
-		Type:         model.ClientTypePublic,
-		RedirectURIs: []string{"localhost", "myapp://auth"},
-		Scopes: []*model.Scope{
-			{Name: "default"},
-			{Name: "admin"},
-		},
-		GrantTypes: []model.GrantType{
-			model.GrantTypeAuthorizationCode,
-			model.GrantTypeRefreshToken,
-		},
-		AccessTokenLife:  60 * 60,      // 1 hour
-		RefreshTokenLife: 60 * 60 * 24, // 1 day
-	}
-	opt := model.ClientOptionAdmin | model.ClientOption(model.MasterSystemFlag)
-	client, err := db.RegisterClient(context.Background(), adminClient, opt)
-	if err != nil {
-		return nil, err
-	}
-
-	userUUID, err := uuid.NewV4()
-	if err != nil {
-		return nil, err
-	}
-	passwordHash, err := passwordutil.GeneratePasswordHash(config.Current.OAuth.Admin.Password)
-	if err != nil {
-		return nil, err
-	}
-	err = db.CreateUser(context.Background(), userUUID.String(), config.Current.OAuth.Admin.Username, passwordHash)
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
 }
 
 func (db *BadgerDB) getAdminClient() (*model.ClientInfo, error) {
@@ -268,10 +219,17 @@ func (db *BadgerDB) GetClient(ctx context.Context, clientID string) (client *mod
 }
 
 // UpdateClient updates the client with the provided information.
-func (db *BadgerDB) UpdateClient(ctx context.Context, client *model.ClientInfo) (*model.ClientInfo, error) {
-	key := makeClientKey(client.ID)
-	err := db.DB.Update(func(txn *badger.Txn) error {
-		b, err := json.Marshal(client)
+func (db *BadgerDB) UpdateClient(ctx context.Context, clientUpdate model.ClientInfoUpdate) (*model.ClientInfo, error) {
+	// Get the currently saved client
+	clientInfo, err := db.GetClient(ctx, clientUpdate.ID)
+	if err != nil {
+		return nil, err
+	}
+	clientInfo = clientInfo.Update(clientUpdate)
+
+	key := makeClientKey(clientUpdate.ID)
+	err = db.DB.Update(func(txn *badger.Txn) error {
+		b, err := json.Marshal(clientInfo)
 		if err != nil {
 			return err
 		}
@@ -280,7 +238,7 @@ func (db *BadgerDB) UpdateClient(ctx context.Context, client *model.ClientInfo) 
 	if err != nil {
 		return nil, err
 	}
-	return client, nil
+	return clientInfo, nil
 }
 
 // RegisterClient registers the client with the provided information.

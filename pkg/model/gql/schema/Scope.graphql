@@ -1,0 +1,4 @@
+type Scope {
+  name: String! @id
+  clients: [ClientInfo!] @hasInverse(field: "scopes")
+}

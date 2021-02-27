@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sync"
 
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"golang.org/x/oauth2"
@@ -15,10 +16,15 @@ type OAuthConfig struct {
 	JWKSet    *jwt.KeySet
 	JWKSetURL string
 	*oauth2.Config
+
+	// Protects jwkSet
+	mu sync.Mutex
 }
 
 // DownloadJWKsIfAvailable downloads the keyset, if available, and not already downloaded.
 func (config *OAuthConfig) DownloadJWKsIfAvailable() error {
+	config.mu.Lock()
+	defer config.mu.Unlock()
 	if config.JWKSet != nil {
 		return nil
 	}

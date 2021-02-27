@@ -1,0 +1,96 @@
+type ClientInfo @auth(
+  query: {
+    or: [
+      {
+        rule: "{$ROLE: {eq: \"ADMIN\"}}"
+      },
+      {
+        rule: """
+          query($client_id: String!) {
+            queryClientInfo(filter: {id: { eq: $client_id }}) {
+              id
+            }
+          }
+        """
+      },
+      {
+        rule: """
+        query($client_id: String!){
+          queryClientInfo(filter: {id: {eq: $client_id}}) {
+          	scopes(filter: {name: {eq: "admin"}}) {
+              name
+            }
+          }
+        }
+        """
+      }
+    ]
+  },
+  add: {
+    or: [
+    	{
+        rule: "{$ROLE: {eq: \"ADMIN\"}}"
+      },
+    	{
+        rule: """
+        query($client_id: String!){
+          queryClientInfo(filter: {id: {eq: $client_id}}) {
+          	scopes(filter: {name: {eq: "admin"}}) {
+              name
+            }
+          }
+        }
+        """
+      }
+  	]
+  },
+  update: {
+    or: [
+    	{
+        rule: "{$ROLE: {eq: \"ADMIN\"}}"
+      },
+    	{
+        rule: """
+        query($client_id: String!){
+          queryClientInfo(filter: {id: {eq: $client_id}}) {
+          	scopes(filter: {name: {eq: "admin"}}) {
+              name
+            }
+          }
+        }
+        """
+      }
+  	]
+  },
+  delete: {
+    or: [
+    	{
+        rule: "{$ROLE: {eq: \"ADMIN\"}}"
+      },
+    	{
+        rule: """
+        query($client_id: String!){
+          queryClientInfo(filter: {id: {eq: $client_id}}) {
+          	scopes(filter: {name: {eq: "admin"}}) {
+              name
+            }
+          }
+        }
+        """
+      }
+  	]
+  }
+) {
+	id: String! @id
+	name: String
+	type: ClientType! 
+	secret: String 
+	secret_expiry: DateTime 
+	redirect_uris: [String!]!
+	jwks_uri: String 
+	logo_uri: String 
+    scopes: [Scope!]! @hasInverse(field: "clients")
+	grant_types: [GrantType]!
+	access_token_life: Int!
+	refresh_token_life: Int!
+}

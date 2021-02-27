@@ -34,7 +34,7 @@ type clientTestSuite struct {
 func (suite *clientTestSuite) SetupSuite() {
 	config.LoadConfig()
 
-	db, err := database.InitializeBadgerDB(database.Options{InMemory: true, SeedDB: true})
+	db, err := database.InitializeBadgerDB(database.BadgerOptions{InMemory: true, SeedDB: true})
 	require.NoError(suite.T(), err)
 
 	admin := db.AdminClient
@@ -45,12 +45,14 @@ func (suite *clientTestSuite) SetupSuite() {
 	suite.r = mux.NewRouter()
 	SetupRoutes(suite.r, db)
 
-	jwt, err := token.IssueAccessToken(admin, &model.User{ID: "test"}, "default admin")
+	token, err := token.IssueAccessToken(admin, &model.User{ID: "test"}, "default admin")
 	require.NoError(suite.T(), err)
 
-	suite.token = jwt
+	suite.token = token
 
-	tokenJWT, err := jwt.Encode(config.Current.OAuth.Tokens.PrivateKey)
+	privateKey := config.Current.DefaultSigningKey()
+	require.NoError(suite.T(), err)
+	tokenJWT, err := token.Encode(privateKey)
 	require.NoError(suite.T(), err)
 	suite.tokenJWT = tokenJWT
 }
@@ -86,7 +88,8 @@ func (suite *clientTestSuite) TestListClients() {
 			name: "Valid Auth",
 			headers: func() http.Header {
 				header := http.Header{}
-				signed, err := suite.token.Encode(config.Current.OAuth.Tokens.PrivateKey)
+				privateKey := config.Current.DefaultSigningKey()
+				signed, err := suite.token.Encode(privateKey)
 				assert.NoError(t, err)
 				header.Add("Authorization", fmt.Sprintf("Bearer %s", signed))
 				return header

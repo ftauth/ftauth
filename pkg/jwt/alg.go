@@ -46,6 +46,37 @@ func (alg Algorithm) IsValid() error {
 	}
 }
 
+// ValidForKeyType returns true if the algorithm and key type can be used together.
+func (alg Algorithm) ValidForKeyType(kt KeyType) bool {
+	switch kt {
+	case KeyTypeRSA:
+		switch alg {
+		case AlgorithmRSASHA256,
+			AlgorithmRSASHA384,
+			AlgorithmRSASHA512,
+			AlgorithmPSSSHA256,
+			AlgorithmPSSSHA384,
+			AlgorithmPSSSHA512:
+			return true
+		}
+	case KeyTypeEllipticCurve:
+		switch alg {
+		case AlgorithmECDSASHA256,
+			AlgorithmECDSASHA384,
+			AlgorithmECDSASHA512:
+			return true
+		}
+	case KeyTypeOctet:
+		switch alg {
+		case AlgorithmHMACSHA256,
+			AlgorithmHMACSHA384,
+			AlgorithmHMACSHA512:
+			return true
+		}
+	}
+	return false
+}
+
 // IsSymmetric returns true for symmetric key-based algorithms.
 func (alg Algorithm) IsSymmetric() bool {
 	switch alg {

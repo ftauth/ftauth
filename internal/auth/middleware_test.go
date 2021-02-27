@@ -21,7 +21,7 @@ import (
 func TestBearerAuthentated(t *testing.T) {
 	config.LoadConfig()
 
-	db, err := database.InitializeBadgerDB(database.Options{InMemory: true, SeedDB: true})
+	db, err := database.InitializeBadgerDB(database.BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -50,6 +50,9 @@ func TestBearerAuthentated(t *testing.T) {
 		RedirectURIs:     []string{"localhost"},
 		AccessTokenLife:  1,
 		RefreshTokenLife: 1,
+		Providers: []model.Provider{
+			model.ProviderFTAuth,
+		},
 	}
 	require.NoError(t, client.IsValid())
 
@@ -82,7 +85,7 @@ func TestBearerAuthentated(t *testing.T) {
 				key, err := rsa.GenerateKey(rand.Reader, 2048)
 				require.NoError(t, err)
 
-				jwk, err := jwt.NewJWKFromRSAPrivateKey(key)
+				jwk, err := jwt.NewJWKFromRSAPrivateKey(key, jwt.AlgorithmRSASHA256)
 				require.NoError(t, err)
 
 				enc, err := accessToken.Encode(jwk)
@@ -137,7 +140,7 @@ func TestBearerAuthentated(t *testing.T) {
 func TestBearerAuthentatedWithScope(t *testing.T) {
 	config.LoadConfig()
 
-	db, err := database.InitializeBadgerDB(database.Options{InMemory: true, SeedDB: true})
+	db, err := database.InitializeBadgerDB(database.BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
@@ -166,6 +169,9 @@ func TestBearerAuthentatedWithScope(t *testing.T) {
 		RedirectURIs:     []string{"localhost"},
 		AccessTokenLife:  1,
 		RefreshTokenLife: 1,
+		Providers: []model.Provider{
+			model.ProviderFTAuth,
+		},
 	}
 	require.NoError(t, client.IsValid())
 
@@ -200,7 +206,7 @@ func TestBearerAuthentatedWithScope(t *testing.T) {
 				key, err := rsa.GenerateKey(rand.Reader, 2048)
 				require.NoError(t, err)
 
-				jwk, err := jwt.NewJWKFromRSAPrivateKey(key)
+				jwk, err := jwt.NewJWKFromRSAPrivateKey(key, jwt.AlgorithmRSASHA256)
 				require.NoError(t, err)
 
 				enc, err := accessToken.Encode(jwk)
@@ -271,14 +277,14 @@ func TestBearerAuthentatedWithScope(t *testing.T) {
 func TestDPoPAuthenticated(t *testing.T) {
 	config.LoadConfig()
 
-	db, err := database.InitializeBadgerDB(database.Options{InMemory: true, SeedDB: true})
+	db, err := database.InitializeBadgerDB(database.BadgerOptions{InMemory: true, SeedDB: true})
 	defer db.Close()
 	require.NoError(t, err)
 
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	privateJWK, err := jwt.NewJWKFromRSAPrivateKey(key)
+	privateJWK, err := jwt.NewJWKFromRSAPrivateKey(key, jwt.AlgorithmRSASHA256)
 	require.NoError(t, err)
 
 	publicJWK := privateJWK.PublicJWK()
@@ -335,7 +341,7 @@ func TestDPoPAuthenticated(t *testing.T) {
 				otherKey, err := rsa.GenerateKey(rand.Reader, 2048)
 				require.NoError(t, err)
 
-				otherJWK, err := jwt.NewJWKFromRSAPublicKey(&otherKey.PublicKey)
+				otherJWK, err := jwt.NewJWKFromRSAPublicKey(&otherKey.PublicKey, jwt.AlgorithmRSASHA256)
 				require.NoError(t, err)
 
 				dpop := &jwt.Token{

@@ -29,6 +29,9 @@ var (
 		},
 		AccessTokenLife:  60 * 60,
 		RefreshTokenLife: 60 * 60 * 24,
+		Providers: []model.Provider{
+			model.ProviderFTAuth,
+		},
 	}
 
 	AdminClient = model.ClientInfo{
@@ -46,6 +49,9 @@ var (
 		},
 		AccessTokenLife:  60 * 60,
 		RefreshTokenLife: 60 * 60 * 24,
+		Providers: []model.Provider{
+			model.ProviderFTAuth,
+		},
 	}
 
 	ConfidentialClient = model.ClientInfo{
@@ -62,5 +68,8 @@ var (
 		},
 		AccessTokenLife:  60 * 60,
 		RefreshTokenLife: 60 * 60 * 24,
+		Providers: []model.Provider{
+			model.ProviderFTAuth,
+		},
 	}
 )

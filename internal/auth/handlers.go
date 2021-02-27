@@ -475,13 +475,14 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	accessJWT, err := accessToken.Encode(config.Current.OAuth.Tokens.PrivateKey)
+	privateKey := config.Current.DefaultSigningKey()
+	accessJWT, err := accessToken.Encode(privateKey)
 	if err != nil {
 		log.Printf("Error encoding access token: %v\n", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	refreshJWT, err := refreshToken.Encode(config.Current.OAuth.Tokens.PrivateKey)
+	refreshJWT, err := refreshToken.Encode(privateKey)
 	if err != nil {
 		log.Printf("Error encoding refresh token: %v\n", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

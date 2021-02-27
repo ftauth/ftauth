@@ -2,10 +2,12 @@ package model_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/ftauth/ftauth/internal/mock"
 	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsValidRedirectURI(t *testing.T) {
@@ -113,7 +115,7 @@ func TestValidateScopes(t *testing.T) {
 		},
 		{
 			client: mock.PublicClient,
-			scopes: "scope",
+			scopes: "model.Scope",
 			valid:  false,
 		},
 		{
@@ -131,9 +133,9 @@ func TestValidateScopes(t *testing.T) {
 	for _, test := range tt {
 		err := test.client.ValidateScopes(test.scopes)
 		if test.valid {
-			assert.NoErrorf(t, err, "Scopes valid: %q Got error %v Want no error", test.scopes, err)
+			assert.NoErrorf(t, err, "model.Scopes valid: %q Got error %v Want no error", test.scopes, err)
 		} else {
-			assert.Errorf(t, err, "Scopes valid: %q Got no error Want error", test.scopes)
+			assert.Errorf(t, err, "model.Scopes valid: %q Got no error Want error", test.scopes)
 		}
 	}
 }
@@ -173,6 +175,9 @@ func TestIsValid(t *testing.T) {
 				},
 				AccessTokenLife:  60 * 60,
 				RefreshTokenLife: 60 * 60 * 24,
+				Providers: []model.Provider{
+					model.ProviderFTAuth,
+				},
 			},
 			valid: false,
 		},
@@ -189,11 +194,14 @@ func TestIsValid(t *testing.T) {
 				},
 				AccessTokenLife:  60 * 60,
 				RefreshTokenLife: 60 * 60 * 24,
+				Providers: []model.Provider{
+					model.ProviderFTAuth,
+				},
 			},
 			valid: false,
 		},
 		{
-			name: "Missing Scopes",
+			name: "Missing model.Scopes",
 			client: model.ClientInfo{
 				Name:         "Invalid Client",
 				Type:         model.ClientTypePublic,
@@ -203,6 +211,9 @@ func TestIsValid(t *testing.T) {
 				},
 				AccessTokenLife:  60 * 60,
 				RefreshTokenLife: 60 * 60 * 24,
+				Providers: []model.Provider{
+					model.ProviderFTAuth,
+				},
 			},
 			valid: false,
 		},
@@ -217,6 +228,9 @@ func TestIsValid(t *testing.T) {
 				},
 				AccessTokenLife:  60 * 60,
 				RefreshTokenLife: 60 * 60 * 24,
+				Providers: []model.Provider{
+					model.ProviderFTAuth,
+				},
 			},
 			valid: false,
 		},
@@ -233,6 +247,9 @@ func TestIsValid(t *testing.T) {
 					model.GrantTypeClientCredentials,
 				},
 				RefreshTokenLife: 60 * 60 * 24,
+				Providers: []model.Provider{
+					model.ProviderFTAuth,
+				},
 			},
 			valid: false,
 		},
@@ -249,6 +266,26 @@ func TestIsValid(t *testing.T) {
 					model.GrantTypeClientCredentials,
 				},
 				AccessTokenLife: 60 * 60,
+				Providers: []model.Provider{
+					model.ProviderFTAuth,
+				},
+			},
+			valid: false,
+		},
+		{
+			name: "Missing Providers",
+			client: model.ClientInfo{
+				Name:         "Invalid Client",
+				Type:         model.ClientTypePublic,
+				RedirectURIs: []string{"localhost"},
+				Scopes: []*model.Scope{
+					{Name: "default"},
+				},
+				GrantTypes: []model.GrantType{
+					model.GrantTypeClientCredentials,
+				},
+				AccessTokenLife:  60 * 60,
+				RefreshTokenLife: 60 * 60 * 24,
 			},
 			valid: false,
 		},
@@ -286,5 +323,138 @@ func TestIsDevClient(t *testing.T) {
 
 	for _, test := range tt {
 		assert.Equal(t, test.isDevClient, test.client.IsDevClient())
+	}
+}
+
+func TestClientInfoGQL(t *testing.T) {
+	id := "c44426d2-a3da-432e-829c-3bde3bc6f8c9"
+	secret := "9dc86683-1fda-46b9-b9de-056b6c206158"
+	secretExpiry := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+	newName := "newName"
+	jwksUri := "https://example.com/jwks.json"
+	logoUri := "https://example.com/logo.png"
+	accessTokenLife := 3600
+	refreshTokenLife := 86400
+
+	tt := []struct {
+		name   string
+		update model.ClientInfo
+		want   string
+	}{
+		{
+			name: "Complete info",
+			update: model.ClientInfo{
+				ID:           id,
+				Name:         newName,
+				Type:         model.ClientTypeConfidential,
+				Secret:       secret,
+				SecretExpiry: &secretExpiry,
+				RedirectURIs: []string{
+					"localhost",
+					"myapp://auth",
+				},
+				JWKsURI: jwksUri,
+				LogoURI: logoUri,
+				Scopes: []*model.Scope{
+					{Name: "default"},
+					{Name: "admin"},
+				},
+				GrantTypes: []model.GrantType{
+					model.GrantTypeAuthorizationCode,
+					model.GrantTypeClientCredentials,
+				},
+				AccessTokenLife:  accessTokenLife,
+				RefreshTokenLife: refreshTokenLife,
+				Providers: []model.Provider{
+					model.ProviderFTAuth,
+					model.ProviderApple,
+				},
+			},
+			want: `{id: "c44426d2-a3da-432e-829c-3bde3bc6f8c9"
+name: "newName"
+type: confidential
+secret: "9dc86683-1fda-46b9-b9de-056b6c206158"
+secret_expiry: "2021-01-01T00:00:00Z"
+redirect_uris: ["localhost","myapp://auth"]
+jwks_uri: "https://example.com/jwks.json"
+logo_uri: "https://example.com/logo.png"
+scopes: [{name:"default"},{name:"admin"}]
+grant_types: [authorization_code,client_credentials]
+access_token_life: 3600
+refresh_token_life: 86400
+providers: [ftauth,apple]}`,
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			got := test.update.GQL()
+			require.Equal(t, test.want, got)
+		})
+	}
+}
+
+func TestClientUpdateGQL(t *testing.T) {
+	newName := "new name"
+	jwksUri := "https://example.com/jwks.json"
+	logoUri := "https://example.com/logo.png"
+	accessTokenLife := 3600
+	refreshTokenLife := 86400
+
+	tt := []struct {
+		name   string
+		update model.ClientInfoUpdate
+		want   string
+	}{
+		{
+			name:   "Empty update",
+			update: model.ClientInfoUpdate{},
+			want:   "{}",
+		},
+		{
+			name: "ID should not be included",
+			update: model.ClientInfoUpdate{
+				ID: "new ID",
+			},
+			want: "{}",
+		},
+		{
+			name: "Complete update",
+			update: model.ClientInfoUpdate{
+				Name: &newName,
+				RedirectURIs: &[]string{
+					"localhost",
+					"myapp://auth",
+				},
+				Scopes: &[]*model.Scope{
+					{Name: "default"},
+					{Name: "admin"},
+				},
+				JWKsURI:          &jwksUri,
+				LogoURI:          &logoUri,
+				AccessTokenLife:  &accessTokenLife,
+				RefreshTokenLife: &refreshTokenLife,
+				Providers: &[]model.Provider{
+					model.ProviderFTAuth,
+					model.ProviderApple,
+				},
+			},
+			want: `{name: "new name"
+redirect_uris: ["localhost","myapp://auth"]
+scopes: [{name:"default"},{name:"admin"}]
+jwks_uri: "https://example.com/jwks.json"
+logo_uri: "https://example.com/logo.png"
+access_token_life: 3600
+refresh_token_life: 86400
+providers: [ftauth,apple]
+}`,
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			got := test.update.GQL()
+			require.Equal(t, test.want, got)
+		})
 	}
 }

@@ -19,7 +19,7 @@ func main() {
 	config.LoadConfig()
 
 	// Setup database
-	db, err := database.InitializeDgraphDatabase()
+	db, err := database.InitializeDgraphDatabase(context.Background(), database.DgraphOptions{})
 	if err != nil {
 		log.Fatalf("Error initializing DB: %v\n", err)
 	}

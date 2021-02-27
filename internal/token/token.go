@@ -46,11 +46,12 @@ func IssueAccessToken(clientInfo *model.ClientInfo, user *model.User, scope stri
 	if err != nil {
 		return nil, err
 	}
+	privateKey := config.Current.DefaultSigningKey()
 	token := &jwt.Token{
 		Header: &jwt.Header{
 			Type:      jwt.TypeAccess,
-			Algorithm: jwt.AlgorithmPSSSHA256,
-			KeyID:     config.Current.OAuth.Tokens.PublicKey.KeyID,
+			Algorithm: privateKey.Algorithm,
+			KeyID:     privateKey.KeyID,
 		},
 		Claims: &jwt.Claims{
 			Issuer:         "http://localhost:8080",
@@ -66,7 +67,7 @@ func IssueAccessToken(clientInfo *model.ClientInfo, user *model.User, scope stri
 			},
 		},
 	}
-	_, err = token.Encode(config.Current.OAuth.Tokens.PrivateKey)
+	_, err = token.Encode(privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +86,8 @@ func IssueRefreshToken(clientInfo *model.ClientInfo, accessToken *jwt.Token) (*j
 	if accessToken == nil {
 		return nil, util.ErrMissingParameter("accessToken")
 	}
-	if err := accessToken.Verify(config.Current.OAuth.Tokens.PublicKey); err != nil {
+	publicKey := config.Current.DefaultVerificationKey()
+	if err := accessToken.Verify(publicKey); err != nil {
 		return nil, errors.Wrap(err, "invalid access token")
 	}
 	if accessToken.Claims.JwtID == "" {
@@ -102,8 +104,8 @@ func IssueRefreshToken(clientInfo *model.ClientInfo, accessToken *jwt.Token) (*j
 	token := &jwt.Token{
 		Header: &jwt.Header{
 			Type:      jwt.TypeAccess,
-			Algorithm: jwt.AlgorithmPSSSHA256,
-			KeyID:     config.Current.OAuth.Tokens.PublicKey.KeyID,
+			Algorithm: publicKey.Algorithm,
+			KeyID:     publicKey.KeyID,
 		},
 		Claims: &jwt.Claims{
 			Issuer:         "http://localhost:8080",
@@ -119,7 +121,8 @@ func IssueRefreshToken(clientInfo *model.ClientInfo, accessToken *jwt.Token) (*j
 			},
 		},
 	}
-	_, err = token.Encode(config.Current.OAuth.Tokens.PrivateKey)
+	privateKey := config.Current.DefaultSigningKey()
+	_, err = token.Encode(privateKey)
 	if err != nil {
 		return nil, err
 	}

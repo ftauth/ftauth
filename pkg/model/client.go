@@ -1,13 +1,23 @@
 package model
 
 import (
+	_ "embed" // For GraphQL embeds
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
+	"github.com/ftauth/ftauth/pkg/graphql"
 	"github.com/ftauth/ftauth/pkg/util"
 	"github.com/ftauth/ftauth/pkg/util/sqlutil"
+	"github.com/gofrs/uuid"
+)
+
+// GraphQL embeds
+var (
+	//go:embed gql/fragments/AllClientInfo.graphql
+	AllClientInfo string
 )
 
 // ClientType identifies the level of confidentiality the
@@ -36,21 +46,26 @@ const (
 	ClientTypePublic ClientType = "public"
 )
 
+// GQL returns the GraphQL representation.
+func (typ ClientType) GQL() string {
+	return string(typ)
+}
+
 // ClientInfo holds all relevant information about a client.
 type ClientInfo struct {
-	ID               string      `json:"uid"` // A UUID v4 string which uniquely idenitifes a particular client.
-	Name             string      `json:"client_name"`
-	Type             ClientType  `json:"client_type"`
-	Secret           string      `json:"client_secret,omitempty"`
-	SecretExpiry     *time.Time  `json:"client_secret_expires_at,omitempty"` // Required if client_secret is issued. Time at which secret expires or 0 for no expiry.
+	ID               string      `json:"id"` // A UUID v4 string which uniquely idenitifes a particular client.
+	Name             string      `json:"name"`
+	Type             ClientType  `json:"type"`
+	Secret           string      `json:"secret,omitempty"`
+	SecretExpiry     *time.Time  `json:"secret_expires_at,omitempty"` // Required if client_secret is issued. Time at which secret expires or 0 for no expiry.
 	RedirectURIs     []string    `json:"redirect_uris"`
 	Scopes           []*Scope    `json:"scopes"`
 	JWKsURI          string      `json:"jwks_uri,omitempty"`
 	LogoURI          string      `json:"logo_uri,omitempty"`
 	GrantTypes       []GrantType `json:"grant_types"`
-	AccessTokenLife  int         `json:"access_token_life"`     // Lifetime of access token, in seconds
-	RefreshTokenLife int         `json:"refresh_token_life"`    // Lifetime of refresh token, in seconds
-	DType            []string    `json:"dgraph.type,omitempty"` // The Dgraph type
+	AccessTokenLife  int         `json:"access_token_life"`  // Lifetime of access token, in seconds
+	RefreshTokenLife int         `json:"refresh_token_life"` // Lifetime of refresh token, in seconds
+	Providers        []Provider  `json:"providers"`
 }
 
 // NewClient creates a new client with the provided values. This
@@ -65,7 +80,8 @@ func NewClient(
 	logoURI string,
 	accessTokenLife,
 	refreshTokenLife int,
-) *ClientInfo {
+	providers []Provider,
+) (*ClientInfo, error) {
 	var secret string
 	if typ == ClientTypeConfidential {
 		secret = GenerateAuthorizationCode()
@@ -76,8 +92,12 @@ func NewClient(
 	} else if typ == ClientTypePublic {
 		grantTypes = []GrantType{GrantTypeAuthorizationCode, GrantTypeRefreshToken}
 	}
+	id, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
+	}
 	return &ClientInfo{
-		ID:               "_:client",
+		ID:               id.String(),
 		Name:             name,
 		Type:             typ,
 		Secret:           secret,
@@ -88,8 +108,8 @@ func NewClient(
 		GrantTypes:       grantTypes,
 		AccessTokenLife:  accessTokenLife,
 		RefreshTokenLife: refreshTokenLife,
-		DType:            []string{"Client"},
-	}
+		Providers:        providers,
+	}, nil
 }
 
 // Update creates a new copy of client and updates fields from clientUpdate.
@@ -126,10 +146,53 @@ func (client *ClientInfo) Update(clientUpdate ClientInfoUpdate) *ClientInfo {
 		changedValues = true
 		updatedClient.RefreshTokenLife = *clientUpdate.RefreshTokenLife
 	}
+	if clientUpdate.Providers != nil {
+		changedValues = true
+		updatedClient.Providers = *clientUpdate.Providers
+	}
 	if changedValues {
 		return &updatedClient
 	}
 	return client
+}
+
+// GQL returns the GraphQL representation.
+func (client *ClientInfo) GQL() string {
+	gql := `{id: "%s"
+name: "%s"
+type: %s
+secret: "%s"
+%s
+redirect_uris: %s
+jwks_uri: "%s"
+logo_uri: "%s"
+scopes: %s
+grant_types: %s
+access_token_life: %d
+refresh_token_life: %d
+providers: %s}`
+
+	var secretExpiry string
+	if client.SecretExpiry != nil {
+		secretExpiry = fmt.Sprintf(`secret_expiry: "%s"`, client.SecretExpiry.Format(time.RFC3339))
+	}
+
+	return fmt.Sprintf(
+		gql,
+		client.ID,
+		client.Name,
+		client.Type,
+		client.Secret,
+		secretExpiry,
+		graphql.BuildGraphQLArray(client.RedirectURIs),
+		client.JWKsURI,
+		client.LogoURI,
+		graphql.MarshalGQL(client.Scopes),
+		graphql.MarshalGQL(client.GrantTypes),
+		client.AccessTokenLife,
+		client.RefreshTokenLife,
+		graphql.MarshalGQL(client.Providers),
+	)
 }
 
 // IsDevClient returns true if the client permits localhost redirect URIs.
@@ -193,80 +256,24 @@ func (client *ClientInfo) IsValid() error {
 	if client.RefreshTokenLife <= 0 {
 		return util.ErrInvalidParameter("refresh_token")
 	}
+	if len(client.Providers) == 0 {
+		return util.ErrInvalidParameter("providers")
+	}
 
 	return nil
 }
 
 // ClientInfoUpdate holds updateable parameters for ClientInfo.
 type ClientInfoUpdate struct {
-	ID               string    `json:"uid"`
-	Name             *string   `json:"client_name,omitempty"`
-	RedirectURIs     *[]string `json:"redirect_uris,omitempty"`
-	Scopes           *[]*Scope `json:"scopes,omitempty"`
-	JWKsURI          *string   `json:"jwks_uri,omitempty"`
-	LogoURI          *string   `json:"logo_uri,omitempty"`
-	AccessTokenLife  *int      `json:"access_token_life,omitempty"`
-	RefreshTokenLife *int      `json:"refresh_token_life,omitempty"`
-}
-
-// ClientInfoEntity holds client info for transfer on the wire,
-// e.g. when communicating with a DB.
-type ClientInfoEntity struct {
-	ID               string     `db:"id"`
-	Name             string     `db:"name"`
-	Type             ClientType `db:"type"`
-	Secret           string     `db:"secret"`
-	SecretExpiry     *time.Time `db:"secret_expiry"`
-	RedirectURIs     string     `db:"redirect_uris"`
-	Scopes           string     `db:"scopes"`
-	JWKsURI          string     `db:"jwks_uri"`
-	LogoURI          string     `db:"logo_uri"`
-	GrantTypes       string     `db:"grant_types"`
-	AccessTokenLife  int        `db:"access_token_life"`
-	RefreshTokenLife int        `db:"refresh_token_life"`
-}
-
-// ToEntity converts the model type to the entity type.
-func (client *ClientInfo) ToEntity() *ClientInfoEntity {
-	var scopes []string
-	for _, scope := range client.Scopes {
-		scopes = append(scopes, scope.Name)
-	}
-	var grants []string
-	for _, grant := range client.GrantTypes {
-		grants = append(grants, string(grant))
-	}
-	return &ClientInfoEntity{
-		ID:               client.ID,
-		Name:             client.Name,
-		Type:             client.Type,
-		Secret:           client.Secret,
-		SecretExpiry:     client.SecretExpiry,
-		RedirectURIs:     sqlutil.GenerateArrayString(client.RedirectURIs),
-		Scopes:           sqlutil.GenerateArrayString(scopes),
-		JWKsURI:          client.JWKsURI,
-		LogoURI:          client.LogoURI,
-		GrantTypes:       sqlutil.GenerateArrayString(grants),
-		AccessTokenLife:  client.AccessTokenLife,
-		RefreshTokenLife: client.RefreshTokenLife,
-	}
-}
-
-// ToModel converts the entity type to the model type.
-func (entity *ClientInfoEntity) ToModel(scopes []*Scope) *ClientInfo {
-	return &ClientInfo{
-		ID:               entity.ID,
-		Name:             entity.Name,
-		Type:             entity.Type,
-		Secret:           entity.Secret,
-		RedirectURIs:     sqlutil.ParseArray(entity.RedirectURIs),
-		Scopes:           scopes,
-		JWKsURI:          entity.JWKsURI,
-		LogoURI:          entity.LogoURI,
-		GrantTypes:       parseGrantTypes(entity.GrantTypes),
-		AccessTokenLife:  entity.AccessTokenLife,
-		RefreshTokenLife: entity.RefreshTokenLife,
-	}
+	ID               string      `json:"id"`
+	Name             *string     `json:"client_name,omitempty"`
+	RedirectURIs     *[]string   `json:"redirect_uris,omitempty"`
+	Scopes           *[]*Scope   `json:"scopes,omitempty"`
+	JWKsURI          *string     `json:"jwks_uri,omitempty"`
+	LogoURI          *string     `json:"logo_uri,omitempty"`
+	AccessTokenLife  *int        `json:"access_token_life,omitempty"`
+	RefreshTokenLife *int        `json:"refresh_token_life,omitempty"`
+	Providers        *[]Provider `json:"providers,omitempty"`
 }
 
 func parseGrantTypes(grants string) []GrantType {
@@ -280,11 +287,57 @@ func parseGrantTypes(grants string) []GrantType {
 	return grantTypes
 }
 
+// GQL returns the GraphQL representation.
+func (clientUpdate *ClientInfoUpdate) GQL() string {
+	bldr := strings.Builder{}
+	if clientUpdate.Name != nil {
+		bldr.WriteString(fmt.Sprintf(`name: "%s"`, *clientUpdate.Name))
+		bldr.WriteByte('\n')
+	}
+	if clientUpdate.RedirectURIs != nil {
+		bldr.WriteString("redirect_uris: " + graphql.BuildGraphQLArray(*clientUpdate.RedirectURIs))
+		bldr.WriteByte('\n')
+	}
+	if clientUpdate.Scopes != nil {
+		bldr.WriteString("scopes: " + graphql.MarshalGQL(*clientUpdate.Scopes))
+		bldr.WriteByte('\n')
+	}
+	if clientUpdate.JWKsURI != nil {
+		bldr.WriteString(fmt.Sprintf(`jwks_uri: "%s"`, *clientUpdate.JWKsURI))
+		bldr.WriteByte('\n')
+	}
+	if clientUpdate.LogoURI != nil {
+		bldr.WriteString(fmt.Sprintf(`logo_uri: "%s"`, *clientUpdate.LogoURI))
+		bldr.WriteByte('\n')
+	}
+	if clientUpdate.AccessTokenLife != nil {
+		bldr.WriteString(fmt.Sprintf("access_token_life: %d", *clientUpdate.AccessTokenLife))
+		bldr.WriteByte('\n')
+	}
+	if clientUpdate.RefreshTokenLife != nil {
+		bldr.WriteString(fmt.Sprintf("refresh_token_life: %d", *clientUpdate.RefreshTokenLife))
+		bldr.WriteByte('\n')
+	}
+	if clientUpdate.Providers != nil {
+		bldr.WriteString("providers: " + graphql.MarshalGQL(*clientUpdate.Providers))
+		bldr.WriteByte('\n')
+	}
+
+	return "{" + bldr.String() + "}"
+}
+
 // Scope identifies an access scope for a client
 type Scope struct {
-	Name    string   `db:"name" json:"name"`                 // Primary key
-	Ruleset string   `db:"ruleset" json:"ruleset,omitempty"` // Set of rules - in JSON format
-	DType   []string `json:"dgraph.type,omitempty"`
+	Name    string `db:"name" json:"name"`                 // Primary key
+	Ruleset string `db:"ruleset" json:"ruleset,omitempty"` // Set of rules - in JSON format
+}
+
+// GQL returns the GraphQL representation.
+func (scope *Scope) GQL() string {
+	return fmt.Sprintf(
+		`{name:"%s"}`,
+		scope.Name,
+	)
 }
 
 // ValidateScopes affirms whether the client supports the given scopes.
@@ -343,7 +396,7 @@ func (err ClientRegistrationError) Description(invalidParameter string) string {
 	return "An unknown error occurred."
 }
 
-// ClientOption is a bitmask for different client flagss.
+// ClientOption is a bitmask for different client flags.
 type ClientOption byte
 
 // Flags for clients
@@ -353,7 +406,7 @@ const (
 )
 
 // IsValidRedirectURI returns true if the given URI is a localhost URI or
-// matches one of the
+// matches one of the registered URIs.
 func (client *ClientInfo) IsValidRedirectURI(uri string) bool {
 	redirectURI, err := url.Parse(uri)
 	if err != nil {
