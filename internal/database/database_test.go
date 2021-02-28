@@ -18,7 +18,14 @@ import (
 )
 
 func runDgraph() bool {
-	return config.Current.Database.URL != ""
+	if dgraphClient != nil {
+		return true
+	}
+	var err error
+	dgraphClient, err = InitializeDgraphDatabase(context.Background(), DgraphOptions{
+		SeedDB: true,
+	})
+	return err == nil
 }
 
 func requireNotFound(t *testing.T, err error) {
@@ -28,14 +35,7 @@ func requireNotFound(t *testing.T, err error) {
 var dgraphClient *DgraphDatabase
 
 func setupDgraph(t *testing.T) {
-	ctx := context.Background()
-	if dgraphClient == nil {
-		var err error
-		dgraphClient, err = InitializeDgraphDatabase(ctx, DgraphOptions{
-			SeedDB: true,
-		})
-		require.NoError(t, err)
-	} else {
+	if dgraphClient != nil {
 		_, err := createAdminClient(dgraphClient)
 		require.NoError(t, err)
 	}
@@ -816,13 +816,17 @@ func TestVerifyUsernameAndPassword(t *testing.T) {
 		err = db.RegisterUser(ctx, user)
 		require.NoError(t, err)
 
-		err = db.VerifyUsernameAndPassword(ctx, "username", "client", "password")
+		retrievedUser, err := db.VerifyUsernameAndPassword(ctx, "username", "client", "password")
 		require.NoError(t, err)
+		require.Equal(t, user.ID, retrievedUser.ID)
+		require.Equal(t, user.ClientID, retrievedUser.ClientID)
+		require.Equal(t, user.Username, retrievedUser.Username)
+		require.Equal(t, user.PasswordHash, retrievedUser.PasswordHash)
 
-		err = db.VerifyUsernameAndPassword(ctx, "username", "client", "wrong_password")
+		_, err = db.VerifyUsernameAndPassword(ctx, "username", "client", "wrong_password")
 		require.Error(t, err)
 
-		err = db.VerifyUsernameAndPassword(ctx, "wrong_username", "client", "password")
+		_, err = db.VerifyUsernameAndPassword(ctx, "wrong_username", "client", "password")
 		require.Error(t, err)
 	}
 

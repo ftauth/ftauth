@@ -512,15 +512,15 @@ func (db *BadgerDB) GetUserByUsername(ctx context.Context, username, clientID st
 }
 
 // VerifyUsernameAndPassword returns an error if the username and password combo do not match what's in the DB.
-func (db *BadgerDB) VerifyUsernameAndPassword(ctx context.Context, username, clientID, password string) error {
+func (db *BadgerDB) VerifyUsernameAndPassword(ctx context.Context, username, clientID, password string) (*model.User, error) {
 	user, err := db.GetUserByUsername(ctx, username, clientID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !passwordutil.CheckPasswordHash(password, user.PasswordHash) {
-		return errors.New("invalid password")
+		return nil, errors.New("invalid password")
 	}
-	return nil
+	return user, nil
 }
 
 // ListScopes returns all scopes in the database.

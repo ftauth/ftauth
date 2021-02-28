@@ -53,6 +53,7 @@ func createAdminClient(db Database) (*model.ClientInfo, error) {
 	}
 	user := &model.User{
 		ID:           userUUID.String(),
+		ClientID:     clientID,
 		Username:     config.Current.OAuth.Admin.Username,
 		PasswordHash: passwordHash,
 	}

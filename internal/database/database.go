@@ -34,7 +34,7 @@ const DefaultTimeout = time.Second * 3
 type Database interface {
 	ClientDB
 	AuthorizationDB
-	AuthenticationDB
+	UserDB
 	DiscoveryDB
 	ScopeDB
 	GetDefaultAdminClient(ctx context.Context) (*model.ClientInfo, error)
@@ -70,13 +70,13 @@ type AuthorizationDB interface {
 	GetTokenByID(ctx context.Context, tokenID string) (string, error)
 }
 
-// AuthenticationDB handles interactions with the authentication databse,
+// UserDB handles interactions with the authentication databse,
 // which may or may not be the same as other databases.
-type AuthenticationDB interface {
+type UserDB interface {
 	RegisterUser(ctx context.Context, user *model.User) error
 	GetUserByID(ctx context.Context, id string) (*model.User, error)
 	GetUserByUsername(ctx context.Context, username, clientID string) (*model.User, error)
-	VerifyUsernameAndPassword(ctx context.Context, username, clientID, password string) error
+	VerifyUsernameAndPassword(ctx context.Context, username, clientID, password string) (*model.User, error)
 }
 
 // DiscoveryDB handles interactions with the discovery database, which contains

@@ -986,7 +986,7 @@ func (key *Key) PublicJWK() *Key {
 	publicJWK := &Key{
 		KeyType:               key.KeyType,
 		PublicKeyUse:          key.PublicKeyUse,
-		KeyOperations:         key.KeyOperations,
+		KeyOperations:         []KeyOperation{KeyOperationVerify},
 		Algorithm:             key.Algorithm,
 		KeyID:                 key.KeyID,
 		X509Url:               key.X509Url,

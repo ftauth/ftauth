@@ -108,7 +108,7 @@ func main() {
 	auth.SetupRoutes(r, db, db, db)
 	discovery.SetupRoutes(r, db)
 	admin.SetupRoutes(r, db, db)
-	user.SetupRoutes(r)
+	user.SetupRoutes(r, db)
 
 	err = templates.SetupTemplates(staticFS)
 	if err != nil {

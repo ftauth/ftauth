@@ -19,6 +19,10 @@ type Type string
 const (
 	TypeBearer = "bearer"
 	TypeDPoP   = "DPoP"
+
+	Namespace = "https://ftauth.io"
+	UserKey   = "user_id"
+	ClientKey = "client_id"
 )
 
 // IssueAccessToken provisions and signs a new JWT for the given client and scopes.
@@ -29,11 +33,17 @@ func IssueAccessToken(clientInfo *model.ClientInfo, user *model.User, scope stri
 	if err := clientInfo.IsValid(); err != nil {
 		return nil, err
 	}
-	if user == nil {
-		return nil, util.ErrMissingParameter("user")
-	}
-	if user.ID == "" {
-		return nil, util.ErrInvalidParameter("user")
+	var subject string
+	if clientInfo.Type != model.ClientTypeConfidential {
+		if user == nil {
+			return nil, util.ErrMissingParameter("user")
+		}
+		if user.ID == "" {
+			return nil, util.ErrInvalidParameter("user")
+		}
+		subject = user.ID
+	} else {
+		subject = clientInfo.ID
 	}
 	if err := clientInfo.ValidateScopes(scope); err != nil {
 		return nil, err
@@ -55,17 +65,16 @@ func IssueAccessToken(clientInfo *model.ClientInfo, user *model.User, scope stri
 		},
 		Claims: &jwt.Claims{
 			Issuer:         "http://localhost:8080",
-			Subject:        user.ID,
+			Subject:        subject,
 			Audience:       clientInfo.ID,
-			ClientID:       clientInfo.ID,
 			IssuedAt:       iat,
 			ExpirationTime: exp,
 			JwtID:          id.String(),
 			Scope:          scope,
 			CustomClaims: jwt.CustomClaims{
-				"userInfo": user.ToUserData(),
-				"https://ftauth.io": map[string]interface{}{
-					"client_id": clientInfo.ID,
+				Namespace: map[string]interface{}{
+					ClientKey: clientInfo.ID,
+					UserKey:   user.ID,
 				},
 			},
 		},
@@ -114,13 +123,15 @@ func IssueRefreshToken(clientInfo *model.ClientInfo, accessToken *jwt.Token) (*j
 			Issuer:         "http://localhost:8080",
 			Subject:        accessToken.Claims.JwtID,
 			Audience:       clientInfo.ID,
-			ClientID:       clientInfo.ID,
 			IssuedAt:       iat,
 			ExpirationTime: exp,
 			JwtID:          id.String(),
 			Scope:          accessToken.Claims.Scope,
 			CustomClaims: jwt.CustomClaims{
-				"userInfo": model.UserData{ID: accessToken.Claims.Audience},
+				Namespace: map[string]interface{}{
+					ClientKey: clientInfo.ID,
+					UserKey:   accessToken.Claims.Subject,
+				},
 			},
 		},
 	}

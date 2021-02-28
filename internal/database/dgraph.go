@@ -509,8 +509,6 @@ func (db *DgraphDatabase) CreateSession(ctx context.Context, request *model.Auth
 
 	mu = fmt.Sprintf(mu, request.GQL())
 
-	fmt.Printf("Create session\n%s\n", mu)
-
 	var response struct {
 		Response struct {
 			NumUIDs int `json:"numUids"`
@@ -614,8 +612,6 @@ func (db *DgraphDatabase) LookupSessionByCode(ctx context.Context, code string) 
 	`
 
 	q = fmt.Sprintf(q, model.AllAuthorizationRequestInfo, code)
-
-	fmt.Println(q)
 
 	var response struct {
 		AuthorizationRequests []*model.AuthorizationRequest `json:"queryAuthorizationRequest"`
@@ -823,13 +819,13 @@ func (db *DgraphDatabase) GetUserByUsername(ctx context.Context, username, clien
 }
 
 // VerifyUsernameAndPassword returns an error if the username and password combo do not match what's in the DB.
-func (db *DgraphDatabase) VerifyUsernameAndPassword(ctx context.Context, username, clientID, password string) error {
+func (db *DgraphDatabase) VerifyUsernameAndPassword(ctx context.Context, username, clientID, password string) (*model.User, error) {
 	user, err := db.GetUserByUsername(ctx, username, clientID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !passwordutil.CheckPasswordHash(password, user.PasswordHash) {
-		return errors.New("invalid password")
+		return nil, errors.New("invalid password")
 	}
-	return nil
+	return user, nil
 }

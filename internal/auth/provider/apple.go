@@ -60,19 +60,19 @@ func (ap *appleProvider) Exchange(ctx context.Context, query url.Values) error {
 	// A JSON web token containing the user’s identity information.
 	// We must verify this because we have no other way to get the
 	// user's email or any identifying information about them.
-	idTokenJWT := query.Get("id_token")
-	idToken, err := ap.verifyIDToken(idTokenJWT)
-	if err != nil {
-		return err
-	}
+	// idTokenJWT := query.Get("id_token")
+	// idToken, err := ap.verifyIDToken(idTokenJWT)
+	// if err != nil {
+	// 	return err
+	// }
 
-	// A single-use authorization code that is valid for five minutes.
-	code := query.Get("code")
+	// // A single-use authorization code that is valid for five minutes.
+	// code := query.Get("code")
 
-	token, err := ap.config.Exchange(ctx, code)
-	if err != nil {
-		return err
-	}
+	// token, err := ap.config.Exchange(ctx, code)
+	// if err != nil {
+	// 	return err
+	// }
 
 	// TODO: Create user, register provider tokens, generate FTAuth tokens
 

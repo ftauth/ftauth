@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"reflect"
 	"testing"
 
 	"github.com/ftauth/ftauth/internal/config"
@@ -83,20 +82,23 @@ func TestIssueAccessToken(t *testing.T) {
 
 	for _, test := range tt {
 		t.Run(test.name, func(t *testing.T) {
-			token, err := IssueAccessToken(test.client, test.user, test.scope)
+			accessToken, err := IssueAccessToken(test.client, test.user, test.scope)
 			if test.wantErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
 
-			userInfo, ok := token.Claims.CustomClaims["userInfo"]
-			require.Truef(t, ok, "Missing userInfo key in custom claims")
+			ftauthClaims, ok := accessToken.Claims.CustomClaims[Namespace]
+			require.Truef(t, ok, "Missing FTAuth claims in custom claims")
 
-			user, ok := userInfo.(*model.UserData)
-			require.Truef(t, ok, "userInfo is not a model.UserData")
+			ftauthMap, ok := ftauthClaims.(map[string]interface{})
+			require.Truef(t, ok, "FTAuth claim is not a map")
 
-			require.True(t, reflect.DeepEqual(test.user.ToUserData(), user))
+			require.NotEmptyf(t, ftauthMap["client_id"], "FTAuth claim is missing client ID")
+			if test.client.Type != model.ClientTypeConfidential {
+				require.NotEmptyf(t, ftauthMap["user_id"], "FTAuth claim is missing user ID")
+			}
 		})
 	}
 }

@@ -73,31 +73,30 @@ func TestDecode(t *testing.T) {
 				},
 			},
 		},
-		{
-			jwt:   "eyJ0eXAiOiJhdCtqd3QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIzY2Y5YTdhYy05MTk4LTQ2OWUtOTJhNy1jYzJmMTVkOGI4N2QiLCJjbGllbnRfaWQiOiIzY2Y5YTdhYy05MTk4LTQ2OWUtOTJhNy1jYzJmMTVkOGI4N2QiLCJleHAiOjE2MTI0Njk5MDcsImlhdCI6MTYxMjQ2NjMwNywiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgwIiwianRpIjoiODg4MmNiMGMtNmY1ZS00OGU3LThiZWUtNWFiNDBiNTZmZDMyIiwic2NvcGUiOiJhZG1pbiBkZWZhdWx0Iiwic3ViIjoiQWRtaW4iLCJ1c2VySW5mbyI6eyJpZCI6IkFkbWluIn19.bAVKdzNLEJLK837Rghgusf8Q77hRXiuFguAIfUoZOwQ9ZubZ94rNTTC_j0B_VXTeOSmn3Ma_iJaols2xpN-Z5TMnZzKW5ECk8HsI3LayTE84j-XN32eRZuPkAoqZX4-X0Ri-rlS8w2y59kPYqotWrHcHfczv4eAqaR4GUI-su7I7jlDUkdbdkdwwkenlehsCU9xPRd_Tkqj-qmc0EFsXs1lIhgj2EylAIaib8yiGxuQ-Ebe3pNeBe4HOxLwEEY4EpL_JXxjUtn4PsMH2Gv-dGGk6hZhtd2qJooI-lyh4BG-2OW1l2-XrpzulFHgbKwwbTepFCfu82iJhXzivK-SZOANt-fCmtRrIbVPN50d_otKuc9JYvbRdxttEuMNGHTf_EFPS8DefVsbPCFCLPwkST9ugOPxYV1sB8OFTjx0RHQFu8dJafUUCqb7WIjcvHTDzLbQGY72dBB6YHb5ITJ1H7bOr4HQlkvAjx4-9W9p6AxppKu1AwzO2JVQZFiqQTbBltyCbPNif0yXxrzvSZFzKZHZtaPwjk9DOTnpU40Bu6TGNPOBfQH2xtSVJXIME30JVuq58Mta0VZR7DvEYpEo4u0V7d9KJKdGSjqt1ceYX1NiQoXeV9-TaooULMqy-3l1xh-UdOwzY5cWB803_V_0tjiXaxBRAwh7FE9G6qvLGSgM",
-			valid: true,
-			want: &Token{
-				Header: &Header{
-					Type:      TypeAccess,
-					Algorithm: AlgorithmRSASHA256,
-				},
-				Claims: &Claims{
-					Audience:       "3cf9a7ac-9198-469e-92a7-cc2f15d8b87d",
-					ClientID:       "3cf9a7ac-9198-469e-92a7-cc2f15d8b87d",
-					ExpirationTime: 1612469907,
-					IssuedAt:       1612466307,
-					Issuer:         "http://localhost:8080",
-					JwtID:          "8882cb0c-6f5e-48e7-8bee-5ab40b56fd32",
-					Scope:          "admin default",
-					Subject:        "Admin",
-					CustomClaims: CustomClaims{
-						"userInfo": map[string]interface{}{
-							"id": "Admin",
-						},
-					},
-				},
-			},
-		},
+		// {
+		// 	jwt:   "eyJ0eXAiOiJhdCtqd3QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIzY2Y5YTdhYy05MTk4LTQ2OWUtOTJhNy1jYzJmMTVkOGI4N2QiLCJjbGllbnRfaWQiOiIzY2Y5YTdhYy05MTk4LTQ2OWUtOTJhNy1jYzJmMTVkOGI4N2QiLCJleHAiOjE2MTI0Njk5MDcsImlhdCI6MTYxMjQ2NjMwNywiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgwIiwianRpIjoiODg4MmNiMGMtNmY1ZS00OGU3LThiZWUtNWFiNDBiNTZmZDMyIiwic2NvcGUiOiJhZG1pbiBkZWZhdWx0Iiwic3ViIjoiQWRtaW4iLCJ1c2VySW5mbyI6eyJpZCI6IkFkbWluIn19.bAVKdzNLEJLK837Rghgusf8Q77hRXiuFguAIfUoZOwQ9ZubZ94rNTTC_j0B_VXTeOSmn3Ma_iJaols2xpN-Z5TMnZzKW5ECk8HsI3LayTE84j-XN32eRZuPkAoqZX4-X0Ri-rlS8w2y59kPYqotWrHcHfczv4eAqaR4GUI-su7I7jlDUkdbdkdwwkenlehsCU9xPRd_Tkqj-qmc0EFsXs1lIhgj2EylAIaib8yiGxuQ-Ebe3pNeBe4HOxLwEEY4EpL_JXxjUtn4PsMH2Gv-dGGk6hZhtd2qJooI-lyh4BG-2OW1l2-XrpzulFHgbKwwbTepFCfu82iJhXzivK-SZOANt-fCmtRrIbVPN50d_otKuc9JYvbRdxttEuMNGHTf_EFPS8DefVsbPCFCLPwkST9ugOPxYV1sB8OFTjx0RHQFu8dJafUUCqb7WIjcvHTDzLbQGY72dBB6YHb5ITJ1H7bOr4HQlkvAjx4-9W9p6AxppKu1AwzO2JVQZFiqQTbBltyCbPNif0yXxrzvSZFzKZHZtaPwjk9DOTnpU40Bu6TGNPOBfQH2xtSVJXIME30JVuq58Mta0VZR7DvEYpEo4u0V7d9KJKdGSjqt1ceYX1NiQoXeV9-TaooULMqy-3l1xh-UdOwzY5cWB803_V_0tjiXaxBRAwh7FE9G6qvLGSgM",
+		// 	valid: true,
+		// 	want: &Token{
+		// 		Header: &Header{
+		// 			Type:      TypeAccess,
+		// 			Algorithm: AlgorithmRSASHA256,
+		// 		},
+		// 		Claims: &Claims{
+		// 			Audience:       "3cf9a7ac-9198-469e-92a7-cc2f15d8b87d",\
+		// 			ExpirationTime: 1612469907,
+		// 			IssuedAt:       1612466307,
+		// 			Issuer:         "http://localhost:8080",
+		// 			JwtID:          "8882cb0c-6f5e-48e7-8bee-5ab40b56fd32",
+		// 			Scope:          "admin default",
+		// 			Subject:        "Admin",
+		// 			CustomClaims: CustomClaims{
+		// 				"userInfo": map[string]interface{}{
+		// 					"id": "Admin",
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// },
 	}
 
 	for _, test := range tt {

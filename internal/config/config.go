@@ -76,7 +76,7 @@ type OAuthConfig struct {
 	}
 	Tokens struct {
 		PrivateKeyFile   string
-		DefaultAlgorithm string
+		DefaultAlgorithm jwt.Algorithm
 		KeySet           map[jwt.Algorithm]TokenConfig
 	}
 	Scopes struct {
@@ -189,22 +189,6 @@ func LoadConfig() {
 	} else {
 		loadPrivateKeys()
 	}
-
-	// rsaPublicJWK, err := Current.GetKeyForAlgorithm(jwt.AlgorithmRSASHA256, true)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// rsaPublicKey := (rsaPublicJWK.PrivateKey).(*rsa.PrivateKey)
-
-	// der := x509.MarshalPKCS1PrivateKey(rsaPublicKey)
-	// var bb bytes.Buffer
-	// pem.Encode(&bb, &pem.Block{
-	// 	Type:  "RSA PRIVATE KEY",
-	// 	Bytes: der,
-	// })
-
-	// fmt.Println(string(bb.Bytes()))
-	// fmt.Println(strings.ReplaceAll(string(bb.Bytes()), "\n", "\\n"))
 }
 
 func getConfigurationDirectory() (string, error) {
@@ -342,12 +326,12 @@ func (config Config) GetKeyForAlgorithm(alg jwt.Algorithm, private bool) (*jwt.K
 
 // DefaultSigningKey returns the server's default key used for token signing.
 func (config Config) DefaultSigningKey() *jwt.Key {
-	key, _ := config.GetKeyForAlgorithm(jwt.Algorithm(config.OAuth.Tokens.DefaultAlgorithm), true)
+	key, _ := config.GetKeyForAlgorithm(config.OAuth.Tokens.DefaultAlgorithm, true)
 	return key
 }
 
 // DefaultVerificationKey returns the server's default key used for token verifications.
 func (config Config) DefaultVerificationKey() *jwt.Key {
-	key, _ := config.GetKeyForAlgorithm(jwt.Algorithm(config.OAuth.Tokens.DefaultAlgorithm), false)
+	key, _ := config.GetKeyForAlgorithm(config.OAuth.Tokens.DefaultAlgorithm, false)
 	return key
 }

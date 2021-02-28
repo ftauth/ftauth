@@ -69,6 +69,11 @@ func (h *Header) IsValid() error {
 			return errMissingParameter("jwk")
 		}
 	}
+	if h.JWK != nil {
+		if err := h.JWK.IsValid(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -98,8 +103,7 @@ type Claims struct {
 	JwtID          string             `mapstructure:"jti,omitempty" json:"jti,omitempty"` // Required for DPoP tokens
 	Nonce          string             `mapstructure:"nonce,omitempty" json:"nonce,omitempty"`
 	Confirmation   *ConfirmationClaim `mapstructure:"cnf,omitempty" json:"cnf,omitempty"`
-	ClientID       string             `mapstructure:"client_id,omitempty" json:"client_id,omitempty"` // Required for non-DPoP tokens
-	Scope          string             `mapstructure:"scope,omitempty" json:"scope,omitempty"`         // Required for non-DPoP tokens
+	Scope          string             `mapstructure:"scope,omitempty" json:"scope,omitempty"` // Required for non-DPoP tokens
 
 	// DPoP claims
 	HTTPMethod string `mapstructure:"htm,omitempty" json:"htm,omitempty"` // The HTTP method for the request to which the JWT is attached
@@ -135,9 +139,6 @@ func (c *Claims) IsValid(typ Type) error {
 			}
 			if c.ExpirationTime == 0 {
 				return errMissingParameter("exp")
-			}
-			if c.ClientID == "" {
-				return errMissingParameter("client_id")
 			}
 			if c.Scope == "" {
 				return errMissingParameter("scope")
@@ -283,7 +284,7 @@ func (t *Token) Verify(key *Key) error {
 	}
 	if t.Header.KeyID != "" {
 		if t.Header.KeyID != key.KeyID {
-			return ErrMismatchedAlgorithms
+			return ErrMismatchedKeyID
 		}
 	}
 

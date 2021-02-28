@@ -85,21 +85,21 @@ func NewClientFromJWT(url string, token *jwt.Token) (*Client, error) {
 		return nil, err
 	}
 
-	var clientID string
-	if token.Claims.ClientID != "" {
-		clientID = token.Claims.ClientID
-	} else if token.Claims.Audience != "" {
-		clientID = token.Claims.Audience
+	ftauthClaims := token.Claims.CustomClaims["https://ftauth.io"]
+	if ftauthClaims == nil {
+		return nil, errors.New("invalid FTAuth token")
+	}
+	var ftauthMap map[string]interface{}
+	if m, ok := ftauthClaims.(map[string]interface{}); ok {
+		ftauthMap = m
 	} else {
-		return nil, errors.New("missing client ID")
+		return nil, errors.New("invalid FTAuth token")
 	}
 
 	client := &Client{
 		URL:      url,
 		jwtToken: token,
-		claims: map[string]interface{}{
-			"clientId": clientID,
-		},
+		claims:   ftauthMap,
 	}
 	return client, nil
 }

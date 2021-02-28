@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -16,6 +17,7 @@ import (
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/ftauth/ftauth/pkg/oauth"
+	"github.com/ftauth/ftauth/pkg/util/passwordutil"
 	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -442,6 +444,7 @@ func TestClientCredentialsGrant(t *testing.T) {
 }
 
 func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
+	ctx := context.Background()
 	config.LoadConfig()
 
 	db, err := database.InitializeBadgerDB(database.BadgerOptions{InMemory: true, SeedDB: true})
@@ -472,11 +475,25 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 	}
 	require.NoError(t, client.IsValid())
 
-	_, err = db.RegisterClient(context.Background(), client, model.ClientOptionNone)
+	_, err = db.RegisterClient(ctx, client, model.ClientOptionNone)
 	require.NoError(t, err)
 
-	adminUsername := config.Current.OAuth.Admin.Username
-	adminPassword := config.Current.OAuth.Admin.Password
+	// Register user for ROPC client
+	username := "username"
+	password := "password"
+
+	userID, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	hash, err := passwordutil.GeneratePasswordHash(password)
+	require.NoError(t, err)
+	err = db.RegisterUser(ctx, &model.User{
+		ID:           userID.String(),
+		ClientID:     client.ID,
+		Username:     username,
+		PasswordHash: hash,
+	})
+	require.NoError(t, err)
 
 	tt := []struct {
 		name       string
@@ -492,8 +509,8 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 			clientID:   "",
 			grantType:  string(model.GrantTypeResourceOwnerPasswordCredentials),
 			scope:      "default",
-			username:   adminUsername,
-			password:   adminPassword,
+			username:   username,
+			password:   password,
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
@@ -501,8 +518,8 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 			clientID:   "5abbc545-6940-40b0-8aba-f448524739ef",
 			grantType:  string(model.GrantTypeResourceOwnerPasswordCredentials),
 			scope:      "default",
-			username:   adminUsername,
-			password:   adminPassword,
+			username:   username,
+			password:   password,
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
@@ -510,8 +527,8 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 			clientID:   client.ID,
 			grantType:  string(model.GrantTypeAuthorizationCode),
 			scope:      "default",
-			username:   adminUsername,
-			password:   adminPassword,
+			username:   username,
+			password:   password,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
@@ -519,8 +536,8 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 			clientID:   client.ID,
 			grantType:  string(model.GrantTypeClientCredentials),
 			scope:      "default",
-			username:   adminUsername,
-			password:   adminPassword,
+			username:   username,
+			password:   password,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
@@ -528,8 +545,8 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 			clientID:   client.ID,
 			grantType:  string(model.GrantTypeRefreshToken),
 			scope:      "default",
-			username:   adminUsername,
-			password:   adminPassword,
+			username:   username,
+			password:   password,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
@@ -537,8 +554,8 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 			clientID:   client.ID,
 			grantType:  string(model.GrantTypeResourceOwnerPasswordCredentials),
 			scope:      "",
-			username:   adminUsername,
-			password:   adminPassword,
+			username:   username,
+			password:   password,
 			wantStatus: http.StatusOK,
 		},
 		{
@@ -546,8 +563,8 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 			clientID:   client.ID,
 			grantType:  string(model.GrantTypeResourceOwnerPasswordCredentials),
 			scope:      "random_scope",
-			username:   adminUsername,
-			password:   adminPassword,
+			username:   username,
+			password:   password,
 			wantStatus: http.StatusBadRequest,
 		},
 		{
@@ -556,7 +573,7 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 			grantType:  string(model.GrantTypeResourceOwnerPasswordCredentials),
 			scope:      "default",
 			username:   "random_username",
-			password:   adminPassword,
+			password:   password,
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
@@ -564,7 +581,7 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 			clientID:   client.ID,
 			grantType:  string(model.GrantTypeResourceOwnerPasswordCredentials),
 			scope:      "default",
-			username:   adminUsername,
+			username:   username,
 			password:   "random_password_123",
 			wantStatus: http.StatusUnauthorized,
 		},
@@ -573,8 +590,8 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 			clientID:   client.ID,
 			grantType:  string(model.GrantTypeResourceOwnerPasswordCredentials),
 			scope:      "default",
-			username:   adminUsername,
-			password:   adminPassword,
+			username:   username,
+			password:   password,
 			wantStatus: http.StatusOK,
 		},
 	}
@@ -658,7 +675,6 @@ func TestRefreshTokenGrant(t *testing.T) {
 	require.NoError(t, err)
 
 	mockClient := mockConfidentialClient{
-		t:       t,
 		client:  client,
 		handler: handler,
 	}
@@ -671,7 +687,7 @@ func TestRefreshTokenGrant(t *testing.T) {
 		{
 			name: "Valid refresh token",
 			refreshToken: func(t *testing.T) string {
-				_, refreshToken := mockClient.retrieveTokens()
+				_, refreshToken := mockClient.retrieveTokens(t)
 				refreshTokenEnc, err := refreshToken.Raw()
 				require.NoError(t, err)
 
@@ -682,7 +698,7 @@ func TestRefreshTokenGrant(t *testing.T) {
 		{
 			name: "Expired refresh token",
 			refreshToken: func(t *testing.T) string {
-				_, refreshToken := mockClient.retrieveTokens()
+				_, refreshToken := mockClient.retrieveTokens(t)
 				refreshTokenEnc, err := refreshToken.Raw()
 				require.NoError(t, err)
 
@@ -750,10 +766,9 @@ func TestRefreshTokenGrant(t *testing.T) {
 type mockConfidentialClient struct {
 	client  *model.ClientInfo
 	handler http.Handler
-	t       *testing.T
 }
 
-func (mock mockConfidentialClient) retrieveTokens() (*jwt.Token, *jwt.Token) {
+func (mock mockConfidentialClient) retrieveTokens(t *testing.T) (*jwt.Token, *jwt.Token) {
 	body := url.Values{}
 	body.Set(paramGrantType, string(model.GrantTypeClientCredentials))
 	body.Set(paramScope, "default")
@@ -768,17 +783,20 @@ func (mock mockConfidentialClient) retrieveTokens() (*jwt.Token, *jwt.Token) {
 
 	mock.handler.ServeHTTP(response, request)
 
-	require.Equal(mock.t, http.StatusOK, response.Result().StatusCode)
+	require.Equal(t, http.StatusOK, response.Result().StatusCode)
 
 	var resp model.TokenResponse
 	err := json.NewDecoder(response.Body).Decode(&resp)
-	require.NoError(mock.t, err)
+	require.NoError(t, err)
 
 	accessToken, err := jwt.Decode(resp.AccessToken)
-	require.NoError(mock.t, err)
+	require.NoError(t, err)
 
 	refreshToken, err := jwt.Decode(resp.RefreshToken)
-	require.NoError(mock.t, err)
+	require.NoError(t, err)
+
+	fmt.Println(accessToken.Raw())
+	fmt.Println(refreshToken.Raw())
 
 	return accessToken, refreshToken
 }

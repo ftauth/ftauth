@@ -209,17 +209,17 @@ func (client *ClientInfo) IsDevClient() bool {
 // returning an error if not.
 func (client *ClientInfo) IsValid() error {
 	if client.ID == "" {
-		return util.ErrMissingParameter("client_id")
+		return util.ErrMissingParameter("id")
 	}
 	if client.Name == "" {
-		return util.ErrMissingParameter("client_name")
+		return util.ErrMissingParameter("name")
 	}
 	if client.Type == "" {
-		return util.ErrMissingParameter("client_type")
+		return util.ErrMissingParameter("type")
 	}
 	if client.Type == ClientTypeConfidential {
 		if client.Secret == "" {
-			return util.ErrMissingParameter("client_secret")
+			return util.ErrMissingParameter("secret")
 		}
 	} else {
 		if len(client.RedirectURIs) == 0 {

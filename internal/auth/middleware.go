@@ -71,16 +71,16 @@ func BearerAuthenticatedWithScope(scope string) mux.MiddlewareFunc {
 				w.Write([]byte(err.Error()))
 			}
 			authHeader := r.Header.Get("Authorization")
-			t, err := decodeAndVerifyAuthHeader(authHeader)
+			token, err := decodeAndVerifyAuthHeader(authHeader)
 			if err != nil {
 				log.Printf("Error decoding/verifying auth header: %v\n", err)
 				handleErr(err)
 				return
 			}
 
-			grantedScopes, err := model.ParseScope(t.Claims.Scope)
+			grantedScopes, err := model.ParseScope(token.Claims.Scope)
 			if err != nil {
-				log.Printf("Error parsing scopes '%s': %v", t.Claims.Scope, err)
+				log.Printf("Error parsing scopes '%s': %v", token.Claims.Scope, err)
 				handleErr(err)
 				return
 			}
@@ -95,6 +95,10 @@ func BearerAuthenticatedWithScope(scope string) mux.MiddlewareFunc {
 				handleErr(fmt.Errorf("Token not granted scope: %s", scope))
 				return
 			}
+
+			// Attach token to context
+			ctx := context.WithValue(r.Context(), JwtContextKey, token)
+			r = r.WithContext(ctx)
 
 			next.ServeHTTP(w, r)
 		})
@@ -158,9 +162,6 @@ func decodeAndVerifyAuthHeader(authHeader string) (*jwt.Token, error) {
 	}
 
 	publicKey := config.Current.DefaultVerificationKey()
-	if err != nil {
-		return nil, err
-	}
 	err = token.Verify(publicKey)
 	if err != nil {
 		return nil, err

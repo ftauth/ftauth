@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -8,6 +9,8 @@ import (
 
 	"github.com/ftauth/ftauth/internal/auth"
 	"github.com/ftauth/ftauth/internal/config"
+	"github.com/ftauth/ftauth/internal/database"
+	"github.com/ftauth/ftauth/internal/token"
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/util"
 	"github.com/gorilla/mux"
@@ -18,37 +21,66 @@ const (
 )
 
 // SetupRoutes initializes user routes.
-func SetupRoutes(r *mux.Router) {
-	r.Handle("/user", auth.BearerAuthenticated(http.HandlerFunc(handleUserInfo)))
+func SetupRoutes(r *mux.Router, userDB database.UserDB) {
+	r.Handle("/user", auth.BearerAuthenticated(userHandler{userDB}))
 	r.HandleFunc("/forgot-password", handleForgotPassword)
 }
 
-func handleUserInfo(w http.ResponseWriter, r *http.Request) {
+type userHandler struct {
+	userDB database.UserDB
+}
+
+func (h userHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Retrieve JWT token from context
 	t := r.Context().Value(auth.JwtContextKey)
 	if t == nil {
 		http.Error(w, "Nil access token", http.StatusInternalServerError)
 		return
 	}
-	token, ok := t.(*jwt.Token)
+	accessToken, ok := t.(*jwt.Token)
 	if !ok {
 		http.Error(w, "Invalid access token", http.StatusInternalServerError)
 		return
 	}
 
-	userInfo, ok := token.Claims.CustomClaims["userInfo"]
+	badToken := func() {
+		http.Error(w, "Bad FTAuth token", http.StatusBadRequest)
+	}
+
+	ftauthClaims, ok := accessToken.Claims.CustomClaims[token.Namespace]
 	if !ok {
-		http.Error(w, "User info not found", http.StatusBadRequest)
+		badToken()
 		return
 	}
 
-	userInfoMap, ok := userInfo.(map[string]interface{})
+	ftauthMap, ok := ftauthClaims.(map[string]interface{})
 	if !ok {
-		http.Error(w, "Invalid userInfo format", http.StatusInternalServerError)
+		badToken()
 		return
 	}
 
-	b, err := json.Marshal(userInfoMap)
+	userIDInt, ok := ftauthMap[token.UserKey]
+	if !ok {
+		badToken()
+		return
+	}
+
+	userID, ok := userIDInt.(string)
+	if !ok {
+		badToken()
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
+	defer cancel()
+
+	user, err := h.userDB.GetUserByID(ctx, userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	b, err := json.Marshal(user)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

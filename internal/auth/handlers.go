@@ -78,7 +78,7 @@ const (
 func SetupRoutes(
 	r *mux.Router,
 	authorizationDB database.AuthorizationDB,
-	authenticationDB database.AuthenticationDB,
+	authenticationDB database.UserDB,
 	clientDB database.ClientDB,
 ) {
 	mi := middlewareInjector{db: authorizationDB}
@@ -178,7 +178,7 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 }
 
 type registerHandler struct {
-	authenticationDB database.AuthenticationDB
+	authenticationDB database.UserDB
 }
 
 func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -241,7 +241,7 @@ func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type loginEndpointHandler struct {
-	authenticationDB database.AuthenticationDB
+	authenticationDB database.UserDB
 	authorizationDB  database.AuthorizationDB
 }
 
@@ -258,7 +258,7 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	username := r.FormValue("username")
+	username := strings.ToLower(r.FormValue("username"))
 	if username == "" {
 		log.Println("Username cannot be empty")
 		http.Error(w, "Username cannot be empty", http.StatusBadRequest)
@@ -312,14 +312,14 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	ctx, cancel = context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	err = h.authenticationDB.VerifyUsernameAndPassword(ctx, username, requestInfo.ClientID, password)
+	user, err := h.authenticationDB.VerifyUsernameAndPassword(ctx, username, requestInfo.ClientID, password)
 	if err != nil {
 		log.Printf("Error validating user info: %v\n", err)
 		http.Error(w, "Invalid username and password", http.StatusBadRequest)
 		return
 	}
 
-	requestInfo.UserID = username
+	requestInfo.UserID = user.ID
 
 	ctx, cancel = context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
@@ -337,7 +337,7 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 type tokenEndpointHandler struct {
 	db       database.AuthorizationDB
-	authDB   database.AuthenticationDB
+	authDB   database.UserDB
 	clientDB database.ClientDB
 }
 
@@ -495,6 +495,8 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	fmt.Println(accessJWT)
+
 	response := model.TokenResponse{
 		AccessToken:  accessJWT,
 		TokenType:    tokenType,
@@ -548,22 +550,21 @@ func (h tokenEndpointHandler) validateClientCredentialsRequest(w http.ResponseWr
 	}
 
 	return &tokenRequestInfo{
-		scope:  scope,
-		userID: clientInfo.ID,
+		scope: scope,
 	}
 }
 
 func (h tokenEndpointHandler) validateResourceOwnerPasswordCredentialsRequest(w http.ResponseWriter, r *http.Request, clientInfo *model.ClientInfo) *tokenRequestInfo {
 	// Other grant types could end up here. Let's validate the grant type.
-	foundClientCredentialsGrantType := false
+	foundROPCGrantType := false
 	for _, grantType := range clientInfo.GrantTypes {
 		if grantType == model.GrantTypeResourceOwnerPasswordCredentials {
-			foundClientCredentialsGrantType = true
+			foundROPCGrantType = true
 			break
 		}
 	}
 
-	if !foundClientCredentialsGrantType {
+	if !foundROPCGrantType {
 		handleTokenRequestError(w, model.TokenRequestErrUnauthorizedClient, model.RequestErrorDetails{
 			Details: "This client does not support the resource owner password credentials grant",
 		})
@@ -598,15 +599,9 @@ func (h tokenEndpointHandler) validateResourceOwnerPasswordCredentialsRequest(w 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	err := h.authDB.VerifyUsernameAndPassword(ctx, username, clientInfo.ID, password)
+	user, err := h.authDB.VerifyUsernameAndPassword(ctx, username, clientInfo.ID, password)
 	if err != nil {
 		handleTokenRequestError(w, model.TokenRequestErrInvalidGrant, model.RequestErrorDetails{})
-		return nil
-	}
-
-	user, err := h.authDB.GetUserByUsername(ctx, username, clientInfo.ID)
-	if err != nil {
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return nil
 	}
 
