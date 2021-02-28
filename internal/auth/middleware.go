@@ -12,6 +12,7 @@ import (
 	"github.com/ftauth/ftauth/internal/database"
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/model"
+	"github.com/ftauth/ftauth/pkg/oauth"
 	"github.com/gorilla/mux"
 )
 
@@ -149,7 +150,7 @@ func decodeAndVerifyAuthHeader(authHeader string) (*jwt.Token, error) {
 		return nil, ErrEmptyAuthHeader
 	}
 
-	bearer, err := ParseBearerAuthorizationHeader(authHeader)
+	bearer, err := oauth.ParseBearerAuthorizationHeader(authHeader)
 	if err != nil {
 		return nil, err
 	}

@@ -17,6 +17,7 @@ import (
 	"github.com/ftauth/ftauth/internal/token"
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/model"
+	"github.com/ftauth/ftauth/pkg/oauth"
 	"github.com/ftauth/ftauth/pkg/util/base64url"
 	"github.com/ftauth/ftauth/pkg/util/passwordutil"
 	"github.com/gofrs/uuid"
@@ -364,7 +365,7 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		handleHeaderErr("Authorization header not included")
 		return
 	}
-	clientID, clientSecret, err := ParseBasicAuthorizationHeader(header)
+	clientID, clientSecret, err := oauth.ParseBasicAuthorizationHeader(header)
 	if err != nil {
 		handleHeaderErr(err.Error())
 		return
