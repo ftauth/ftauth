@@ -21,6 +21,7 @@ import (
 	"github.com/ftauth/ftauth/internal/discovery"
 	"github.com/ftauth/ftauth/internal/templates"
 	"github.com/ftauth/ftauth/internal/user"
+	fthttp "github.com/ftauth/ftauth/pkg/http"
 	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/gorilla/mux"
 )
@@ -119,7 +120,7 @@ func main() {
 	r.PathPrefix("/").Handler(http.FileServer(http.FS(staticFS)))
 
 	// Apply middleware
-	r.Use(auth.SuppressReferrer)
+	r.Use(fthttp.SuppressReferrer)
 
 	addr := ":" + config.Current.Server.Port
 	srv := http.Server{

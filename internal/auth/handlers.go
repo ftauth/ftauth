@@ -15,17 +15,14 @@ import (
 	"github.com/ftauth/ftauth/internal/database"
 	"github.com/ftauth/ftauth/internal/templates"
 	"github.com/ftauth/ftauth/internal/token"
+	fthttp "github.com/ftauth/ftauth/pkg/http"
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/model"
-	"github.com/ftauth/ftauth/pkg/oauth"
 	"github.com/ftauth/ftauth/pkg/util/base64url"
 	"github.com/ftauth/ftauth/pkg/util/passwordutil"
 	"github.com/gofrs/uuid"
 	"github.com/gorilla/mux"
 )
-
-type jwtKey string
-type dpopKey string
 
 const (
 	// TokenEndpoint is used by the client to exchange
@@ -66,10 +63,6 @@ const (
 	// Apple parameters
 	paramIDToken = "id_token"
 	paramUser    = "user"
-
-	// JwtContextKey allows attachment/retrieval of JWT tokens from contexts.
-	JwtContextKey  jwtKey  = "jwt"
-	dpopContextKey dpopKey = "dpop"
 
 	// Recommended authorization code lifetime
 	sessionExp = 10 * time.Minute
@@ -365,7 +358,7 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		handleHeaderErr("Authorization header not included")
 		return
 	}
-	clientID, clientSecret, err := oauth.ParseBasicAuthorizationHeader(header)
+	clientID, clientSecret, err := fthttp.ParseBasicAuthorizationHeader(header)
 	if err != nil {
 		handleHeaderErr(err.Error())
 		return

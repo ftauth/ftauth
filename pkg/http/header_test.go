@@ -1,9 +1,10 @@
-package oauth
+package fthttp
 
 import (
 	"fmt"
 	"testing"
 
+	"github.com/ftauth/ftauth/pkg/oauth"
 	"github.com/ftauth/ftauth/pkg/util/base64url"
 	"github.com/stretchr/testify/require"
 )
@@ -90,7 +91,7 @@ func TestParseBasicAuthorizationHeader(t *testing.T) {
 		{
 			name: "Valid format",
 			header: func() string {
-				return CreateBasicAuthorization(clientID, clientSecret)
+				return oauth.CreateBasicAuthorization(clientID, clientSecret)
 			},
 			valid: true,
 		},

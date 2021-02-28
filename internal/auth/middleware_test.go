@@ -11,6 +11,7 @@ import (
 
 	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/internal/database"
+	fthttp "github.com/ftauth/ftauth/pkg/http"
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/ftauth/ftauth/pkg/oauth"
@@ -120,7 +121,9 @@ func TestBearerAuthentated(t *testing.T) {
 		},
 	}
 
-	server := BearerAuthenticated(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	m, err := fthttp.NewMiddleware(config.Current.JWKS(false))
+	require.NoError(t, err)
+	server := m.BearerAuthenticated(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 
 	for _, test := range tt {
 		t.Run(test.name, func(t *testing.T) {
@@ -188,47 +191,47 @@ func TestBearerAuthentatedWithScope(t *testing.T) {
 		scope      string
 		wantStatus int
 	}{
-		// {
-		// 	name: "Empty",
-		// 	authHeader: func(*testing.T) string {
-		// 		return ""
-		// 	},
-		// 	scope:      "default",
-		// 	wantStatus: http.StatusUnauthorized,
-		// },
-		// {
-		// 	name: "Invalid token",
-		// 	authHeader: func(*testing.T) string {
-		// 		accessToken, _ := mockClient.retrieveTokens(t)
+		{
+			name: "Empty",
+			authHeader: func(*testing.T) string {
+				return ""
+			},
+			scope:      "default",
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name: "Invalid token",
+			authHeader: func(*testing.T) string {
+				accessToken, _ := mockClient.retrieveTokens(t)
 
-		// 		key, err := rsa.GenerateKey(rand.Reader, 2048)
-		// 		require.NoError(t, err)
+				key, err := rsa.GenerateKey(rand.Reader, 2048)
+				require.NoError(t, err)
 
-		// 		jwk, err := jwt.NewJWKFromRSAPrivateKey(key, jwt.AlgorithmRSASHA256)
-		// 		require.NoError(t, err)
+				jwk, err := jwt.NewJWKFromRSAPrivateKey(key, jwt.AlgorithmRSASHA256)
+				require.NoError(t, err)
 
-		// 		enc, err := accessToken.Encode(jwk)
-		// 		require.NoError(t, err)
+				enc, err := accessToken.Encode(jwk)
+				require.NoError(t, err)
 
-		// 		return "Bearer " + enc
-		// 	},
-		// 	scope:      "default",
-		// 	wantStatus: http.StatusUnauthorized,
-		// },
-		// {
-		// 	name: "Expired token",
-		// 	authHeader: func(t *testing.T) string {
-		// 		accessToken, _ := mockClient.retrieveTokens(t)
-		// 		accessTokenEnc, err := accessToken.Raw()
-		// 		require.NoError(t, err)
+				return "Bearer " + enc
+			},
+			scope:      "default",
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name: "Expired token",
+			authHeader: func(t *testing.T) string {
+				accessToken, _ := mockClient.retrieveTokens(t)
+				accessTokenEnc, err := accessToken.Raw()
+				require.NoError(t, err)
 
-		// 		<-time.After(6 * time.Second)
+				<-time.After(6 * time.Second)
 
-		// 		return "Bearer " + accessTokenEnc
-		// 	},
-		// 	scope:      "default",
-		// 	wantStatus: http.StatusUnauthorized,
-		// },
+				return "Bearer " + accessTokenEnc
+			},
+			scope:      "default",
+			wantStatus: http.StatusUnauthorized,
+		},
 		{
 			name: "Valid token",
 			authHeader: func(t *testing.T) string {
@@ -241,24 +244,26 @@ func TestBearerAuthentatedWithScope(t *testing.T) {
 			scope:      "default",
 			wantStatus: http.StatusOK,
 		},
-		// {
-		// 	name: "Invalid scope",
-		// 	authHeader: func(t *testing.T) string {
-		// 		accessToken, _ := mockClient.retrieveTokens(t)
-		// 		accessTokenEnc, err := accessToken.Raw()
-		// 		require.NoError(t, err)
+		{
+			name: "Invalid scope",
+			authHeader: func(t *testing.T) string {
+				accessToken, _ := mockClient.retrieveTokens(t)
+				accessTokenEnc, err := accessToken.Raw()
+				require.NoError(t, err)
 
-		// 		return "Bearer " + accessTokenEnc
-		// 	},
-		// 	scope:      "admin",
-		// 	wantStatus: http.StatusUnauthorized,
-		// },
+				return "Bearer " + accessTokenEnc
+			},
+			scope:      "admin",
+			wantStatus: http.StatusUnauthorized,
+		},
 	}
 
 	for _, test := range tt {
 		t.Run(test.name, func(t *testing.T) {
-			middleware := BearerAuthenticatedWithScope(test.scope)
-			server := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+			m, err := fthttp.NewMiddleware(config.Current.JWKS(false))
+			require.NoError(t, err)
+			middleware := m.BearerAuthenticatedWithScope(test.scope)
+			server := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 
 			request := httptest.NewRequest(http.MethodGet, "/", nil)
 			request.Header.Add("Authorization", test.authHeader(t))

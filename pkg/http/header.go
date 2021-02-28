@@ -1,4 +1,4 @@
-package oauth
+package fthttp
 
 import (
 	"encoding/base64"

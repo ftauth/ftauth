@@ -2,109 +2,23 @@ package auth
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/internal/database"
+	fthttp "github.com/ftauth/ftauth/pkg/http"
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/model"
-	"github.com/ftauth/ftauth/pkg/oauth"
 	"github.com/gorilla/mux"
 )
 
-// Middleware errors
+type dpopKey string
+
 var (
-	ErrEmptyAuthHeader = errors.New("empty auth header")
-	ErrEmptyDPoPHeader = errors.New("empty DPoP header")
-	ErrInvalidPayload  = errors.New("invalid payload")
-	ErrExpiredToken    = errors.New("expired token")
+	dpopContextKey dpopKey = "dpop"
 )
-
-// SuppressReferrer follows best practices to avoid leaking
-// the authorization code or state parameter via the Referrer
-// header being maliciously targetted.
-//
-// See Section 4.2.4: https://tools.ietf.org/html/draft-ietf-oauth-security-topics-16
-func SuppressReferrer(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Referrer-Policy", "no-referrer")
-
-		next.ServeHTTP(w, r)
-	})
-}
-
-// BearerAuthenticated protects endpoints based off a user's Bearer auth token.
-func BearerAuthenticated(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		token, err := decodeAndVerifyAuthHeader(authHeader)
-		if err != nil {
-			log.Printf("Error decoding/verifying auth header: %v\n", err)
-			if errors.Is(err, ErrEmptyAuthHeader) {
-				w.Header().Set("WWW-Authenticate", "Bearer")
-			}
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		// Attach token to context
-		ctx := context.WithValue(r.Context(), JwtContextKey, token)
-		r = r.WithContext(ctx)
-
-		next.ServeHTTP(w, r)
-	})
-}
-
-// BearerAuthenticatedWithScope protects endpoints based off a user's Bearer auth token
-// and the assigned scopes on the bearer token.
-func BearerAuthenticatedWithScope(scope string) mux.MiddlewareFunc {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			handleErr := func(err error) {
-				if errors.Is(err, ErrEmptyAuthHeader) {
-					w.Header().Set("WWW-Authenticate", "Bearer")
-				}
-				w.WriteHeader(http.StatusUnauthorized)
-				w.Write([]byte(err.Error()))
-			}
-			authHeader := r.Header.Get("Authorization")
-			token, err := decodeAndVerifyAuthHeader(authHeader)
-			if err != nil {
-				log.Printf("Error decoding/verifying auth header: %v\n", err)
-				handleErr(err)
-				return
-			}
-
-			grantedScopes, err := model.ParseScope(token.Claims.Scope)
-			if err != nil {
-				log.Printf("Error parsing scopes '%s': %v", token.Claims.Scope, err)
-				handleErr(err)
-				return
-			}
-			validScope := false
-			for _, grantedScope := range grantedScopes {
-				if grantedScope == scope {
-					validScope = true
-				}
-			}
-
-			if !validScope {
-				handleErr(fmt.Errorf("Token not granted scope: %s", scope))
-				return
-			}
-
-			// Attach token to context
-			ctx := context.WithValue(r.Context(), JwtContextKey, token)
-			r = r.WithContext(ctx)
-
-			next.ServeHTTP(w, r)
-		})
-	}
-}
 
 type middlewareInjector struct {
 	db database.AuthorizationDB
@@ -145,36 +59,6 @@ func (in *middlewareInjector) DPoPAuthenticated() mux.MiddlewareFunc {
 	}
 }
 
-func decodeAndVerifyAuthHeader(authHeader string) (*jwt.Token, error) {
-	if authHeader == "" {
-		return nil, ErrEmptyAuthHeader
-	}
-
-	bearer, err := oauth.ParseBearerAuthorizationHeader(authHeader)
-	if err != nil {
-		return nil, err
-	}
-
-	// Decode and verify JWT token
-	token, err := jwt.Decode(bearer)
-	if err != nil {
-		log.Printf("Error decoding bearer token: %v\n", err)
-		return nil, err
-	}
-
-	publicKey := config.Current.DefaultVerificationKey()
-	err = token.Verify(publicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	if token.IsExpired() {
-		return nil, ErrExpiredToken
-	}
-
-	return token, nil
-}
-
 func (in *middlewareInjector) decodeAndVerifyDPoP(dpopEnc string, r *http.Request) (*jwt.Token, error) {
 	dpop, err := jwt.Decode(dpopEnc)
 	if err != nil {
@@ -192,12 +76,12 @@ func (in *middlewareInjector) decodeAndVerifyDPoP(dpopEnc string, r *http.Reques
 	method := r.Method
 
 	if uri != dpop.Claims.HTTPURI || method != dpop.Claims.HTTPMethod {
-		return nil, ErrInvalidPayload
+		return nil, fthttp.ErrInvalidPayload
 	}
 
 	// Verify the token was created recently
 	if dpop.IssuedBeforeAgo(10 * time.Minute) {
-		return nil, ErrExpiredToken
+		return nil, fthttp.ErrExpiredToken
 	}
 
 	// Verify the same token has not been used before
@@ -209,7 +93,7 @@ func (in *middlewareInjector) decodeAndVerifyDPoP(dpopEnc string, r *http.Reques
 		return nil, err
 	}
 	if seen {
-		return nil, ErrExpiredToken
+		return nil, fthttp.ErrExpiredToken
 	}
 
 	return dpop, nil

@@ -1,10 +1,12 @@
 package admin
 
 import (
+	"log"
 	"net/http"
 
-	"github.com/ftauth/ftauth/internal/auth"
+	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/internal/database"
+	fthttp "github.com/ftauth/ftauth/pkg/http"
 	"github.com/ftauth/ftauth/pkg/util/cors"
 	"github.com/gorilla/mux"
 )
@@ -14,7 +16,11 @@ func SetupRoutes(r *mux.Router, clientDB database.ClientDB, scopeDB database.Sco
 	s := r.PathPrefix("/api/admin").Subrouter()
 	s.Use(mux.CORSMethodMiddleware(s))
 	s.Use(cors.Middleware)
-	s.Use(auth.BearerAuthenticatedWithScope("admin"))
+	m, err := fthttp.NewMiddleware(config.Current.JWKS(false))
+	if err != nil {
+		log.Fatalln("Error setting up admin routes: ", err)
+	}
+	s.Use(m.BearerAuthenticatedWithScope("admin"))
 
 	// TODO: REMOVE
 	s.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {

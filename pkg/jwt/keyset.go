@@ -1,6 +1,9 @@
 package jwt
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"errors"
+)
 
 // KeySet is a JSON Web Key set, used for representing
 // multiple valid JWKs.
@@ -38,4 +41,24 @@ func DecodeKeySet(keySet string) (*KeySet, error) {
 	return &KeySet{
 		Keys: keys,
 	}, nil
+}
+
+// KeyForAlgorithm returns the key in the set matching the given algorithm.
+func (ks *KeySet) KeyForAlgorithm(alg Algorithm) (*Key, error) {
+	for _, key := range ks.Keys {
+		if key.Algorithm == alg {
+			return key, nil
+		}
+	}
+	return nil, errors.New("key not found")
+}
+
+// KeyForID returns the key in the set matching the given ID.
+func (ks *KeySet) KeyForID(keyID string) (*Key, error) {
+	for _, key := range ks.Keys {
+		if key.KeyID == keyID {
+			return key, nil
+		}
+	}
+	return nil, errors.New("key not found")
 }

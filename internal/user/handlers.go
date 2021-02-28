@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
-	"github.com/ftauth/ftauth/internal/auth"
 	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/internal/database"
 	"github.com/ftauth/ftauth/internal/token"
+	fthttp "github.com/ftauth/ftauth/pkg/http"
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/util"
 	"github.com/gorilla/mux"
@@ -22,7 +23,11 @@ const (
 
 // SetupRoutes initializes user routes.
 func SetupRoutes(r *mux.Router, userDB database.UserDB) {
-	r.Handle("/user", auth.BearerAuthenticated(userHandler{userDB}))
+	m, err := fthttp.NewMiddleware(config.Current.JWKS(false))
+	if err != nil {
+		log.Fatalln("Error setting up user routes: ", err)
+	}
+	r.Handle("/user", m.BearerAuthenticated(userHandler{userDB}))
 	r.HandleFunc("/forgot-password", handleForgotPassword)
 }
 
@@ -32,7 +37,7 @@ type userHandler struct {
 
 func (h userHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Retrieve JWT token from context
-	t := r.Context().Value(auth.JwtContextKey)
+	t := r.Context().Value(fthttp.JwtContextKey)
 	if t == nil {
 		http.Error(w, "Nil access token", http.StatusInternalServerError)
 		return
