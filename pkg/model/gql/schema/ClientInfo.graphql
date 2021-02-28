@@ -1,86 +1,87 @@
-type ClientInfo @auth(
-  query: {
-    or: [
-      {
-        rule: "{$ROLE: {eq: \"ADMIN\"}}"
-      },
-      {
-        rule: """
-          query($client_id: String!) {
-            queryClientInfo(filter: {id: { eq: $client_id }}) {
-              id
-            }
-          }
-        """
-      },
-      {
-        rule: """
-        query($client_id: String!){
-          queryClientInfo(filter: {id: {eq: $client_id}}) {
-          	scopes(filter: {name: {eq: "admin"}}) {
-              name
-            }
-          }
-        }
-        """
-      }
-    ]
-  },
-  add: {
-    or: [
-    	{
-        rule: "{$ROLE: {eq: \"ADMIN\"}}"
-      },
-    	{
-        rule: """
-        query($client_id: String!){
-          queryClientInfo(filter: {id: {eq: $client_id}}) {
-          	scopes(filter: {name: {eq: "admin"}}) {
-              name
-            }
-          }
-        }
-        """
-      }
-  	]
-  },
-  update: {
-    or: [
-    	{
-        rule: "{$ROLE: {eq: \"ADMIN\"}}"
-      },
-    	{
-        rule: """
-        query($client_id: String!){
-          queryClientInfo(filter: {id: {eq: $client_id}}) {
-          	scopes(filter: {name: {eq: "admin"}}) {
-              name
-            }
-          }
-        }
-        """
-      }
-  	]
-  },
-  delete: {
-    or: [
-    	{
-        rule: "{$ROLE: {eq: \"ADMIN\"}}"
-      },
-    	{
-        rule: """
-        query($client_id: String!){
-          queryClientInfo(filter: {id: {eq: $client_id}}) {
-          	scopes(filter: {name: {eq: "admin"}}) {
-              name
-            }
-          }
-        }
-        """
-      }
-  	]
-  }
-) {
+# @auth(
+#   query: {
+#     or: [
+#       {
+#         rule: "{$ROLE: {eq: \"SUPERUSER\"}}"
+#       },
+#       {
+#         rule: """
+#           query($client_id: String!) {
+#             queryClientInfo(filter: {id: { eq: $client_id }}) {
+#               id
+#             }
+#           }
+#         """
+#       },
+#       {
+#         rule: """
+#         query($client_id: String!){
+#           queryClientInfo(filter: {id: {eq: $client_id}}) {
+#           	scopes(filter: {name: {eq: "admin"}}) {
+#               name
+#             }
+#           }
+#         }
+#         """
+#       }
+#     ]
+#   },
+#   add: {
+#     or: [
+#     	{
+#         rule: "{$ROLE: {eq: \"SUPERUSER\"}}"
+#       },
+#     	{
+#         rule: """
+#         query($client_id: String!){
+#           queryClientInfo(filter: {id: {eq: $client_id}}) {
+#           	scopes(filter: {name: {eq: "admin"}}) {
+#               name
+#             }
+#           }
+#         }
+#         """
+#       }
+#   	]
+#   },
+#   update: {
+#     or: [
+#     	{
+#         rule: "{$ROLE: {eq: \"SUPERUSER\"}}"
+#       },
+#     	{
+#         rule: """
+#         query($client_id: String!){
+#           queryClientInfo(filter: {id: {eq: $client_id}}) {
+#           	scopes(filter: {name: {eq: "admin"}}) {
+#               name
+#             }
+#           }
+#         }
+#         """
+#       }
+#   	]
+#   },
+#   delete: {
+#     or: [
+#     	{
+#         rule: "{$ROLE: {eq: \"SUPERUSER\"}}"
+#       },
+#     	{
+#         rule: """
+#         query($client_id: String!){
+#           queryClientInfo(filter: {id: {eq: $client_id}}) {
+#           	scopes(filter: {name: {eq: "admin"}}) {
+#               name
+#             }
+#           }
+#         }
+#         """
+#       }
+#   	]
+#   }
+# )
+type ClientInfo {
 	id: String! @id
 	name: String
 	type: ClientType! 
@@ -93,4 +94,5 @@ type ClientInfo @auth(
 	grant_types: [GrantType]!
 	access_token_life: Int!
 	refresh_token_life: Int!
+    providers: [Provider!]!
 }

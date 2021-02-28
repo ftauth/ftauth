@@ -1,0 +1,6 @@
+enum Provider {
+    ftauth
+    apple
+    microsoft
+    google
+}

@@ -167,13 +167,15 @@ func (v ftauthValidator) ValidateAuthorizationCodeRequest(r *http.Request) (*mod
 	code := model.GenerateAuthorizationCode()
 	exp := time.Now().Add(10 * time.Minute) // TODO: document
 
+	scopes, _ := model.ParseScope(scope)
+	scopeModels := model.ScopesToModel(scopes)
 	authRequest := &model.AuthorizationRequest{
 		ClientID:            clientID,
-		Scope:               scope,
+		Scope:               scopeModels,
 		State:               state,
 		RedirectURI:         redirectURI,
 		Code:                code,
-		Expiry:              exp.Unix(),
+		Expiry:              exp,
 		CodeChallenge:       codeChallenge,
 		CodeChallengeMethod: codeChallengeMethod,
 	}

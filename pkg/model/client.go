@@ -328,8 +328,10 @@ func (clientUpdate *ClientInfoUpdate) GQL() string {
 
 // Scope identifies an access scope for a client
 type Scope struct {
-	Name    string `db:"name" json:"name"`                 // Primary key
-	Ruleset string `db:"ruleset" json:"ruleset,omitempty"` // Set of rules - in JSON format
+	Name    string        `db:"name" json:"name"`                 // Primary key
+	Ruleset string        `db:"ruleset" json:"ruleset,omitempty"` // Set of rules - in JSON format
+	Clients []*ClientInfo `json:"clients,omitempty"`
+	Users   []*User       `json:"users,omitempty"`
 }
 
 // GQL returns the GraphQL representation.

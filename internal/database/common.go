@@ -51,7 +51,12 @@ func createAdminClient(db Database) (*model.ClientInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = db.CreateUser(context.Background(), userUUID.String(), config.Current.OAuth.Admin.Username, passwordHash)
+	user := &model.User{
+		ID:           userUUID.String(),
+		Username:     config.Current.OAuth.Admin.Username,
+		PasswordHash: passwordHash,
+	}
+	err = db.RegisterUser(context.Background(), user)
 	if err != nil {
 		return nil, err
 	}

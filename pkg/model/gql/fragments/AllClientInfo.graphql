@@ -13,4 +13,5 @@ fragment AllClientInfo on ClientInfo {
     grant_types      
     access_token_life 
     refresh_token_life
+    providers
 }

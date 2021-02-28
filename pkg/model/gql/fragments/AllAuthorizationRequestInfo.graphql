@@ -1,0 +1,15 @@
+fragment AllAuthorizationRequestInfo on AuthorizationRequest {
+    id
+    grant_type
+    client_id
+    scope {
+        name
+    }
+    state
+    redirect_uri
+    code
+    expiry
+    code_challenge
+    code_challenge_method
+    user_id
+}

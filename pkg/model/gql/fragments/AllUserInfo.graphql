@@ -1,0 +1,13 @@
+fragment AllUserInfo on User {
+    id
+    client_id
+    username
+    password_hash
+    first_name
+    last_name
+    email
+    phone_number
+    scopes {
+        name
+    }
+}

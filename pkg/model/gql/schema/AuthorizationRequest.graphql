@@ -1,0 +1,13 @@
+type AuthorizationRequest {
+  id: String! @id
+  grant_type: GrantType!
+  client_id: String!
+  scope: [Scope]!
+  state: String!
+  redirect_uri: String!
+  code: String! @search(by: [exact])
+  expiry: DateTime!
+  code_challenge: String!
+  code_challenge_method: String!
+  user_id: String!
+}

@@ -75,7 +75,6 @@ func TestIssueAccessToken(t *testing.T) {
 				ID:        "test",
 				FirstName: "Dillon",
 				LastName:  "Nys",
-				Provider:  model.ProviderFTAuth,
 			},
 			scope:   "default",
 			wantErr: false,

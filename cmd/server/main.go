@@ -61,7 +61,6 @@ func main() {
 	config.LoadConfig()
 
 	// Setup database
-	var clientDB database.ClientDB
 	var db database.Database
 	var adminClient *model.ClientInfo
 	if runEmbedded {
@@ -74,7 +73,6 @@ func main() {
 			log.Fatalf("Error initializing DB: %v\n", err)
 		}
 		db = badgerDB
-		clientDB = badgerDB
 		adminClient = badgerDB.AdminClient
 	} else {
 		opts := database.DgraphOptions{
@@ -85,15 +83,17 @@ func main() {
 			SeedDB:   true,
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		db, err := database.InitializeDgraphDatabase(ctx, opts)
+		ctx := context.Background()
+		var err error
+		db, err = database.InitializeDgraphDatabase(ctx, opts)
 		if err != nil {
 			log.Fatalln("Error initializing DB: ", err)
 		}
-		clientDB = db
-		adminClient, _ = db.GetAdminClient()
+
+		ctx, cancel := context.WithTimeout(ctx, database.DefaultTimeout)
+		defer cancel()
+
+		adminClient, _ = db.GetDefaultAdminClient(ctx)
 	}
 
 	// Print out the admin client
@@ -105,9 +105,9 @@ func main() {
 
 	// Setup routing
 	r := mux.NewRouter()
-	auth.SetupRoutes(r, db, db, clientDB)
+	auth.SetupRoutes(r, db, db, db)
 	discovery.SetupRoutes(r, db)
-	admin.SetupRoutes(r, clientDB)
+	admin.SetupRoutes(r, db, db)
 	user.SetupRoutes(r)
 
 	err = templates.SetupTemplates(staticFS)

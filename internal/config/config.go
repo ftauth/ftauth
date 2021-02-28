@@ -119,7 +119,7 @@ func setConfigDefaults() {
 	})
 
 	viper.SetDefault("database", map[string]interface{}{
-		"url": "http://localhost:9080",
+		"url": "http://localhost:8080/graphql",
 	})
 
 	viper.SetDefault("oauth.admin", map[string]interface{}{
@@ -135,7 +135,7 @@ func setConfigDefaults() {
 		"primaryColor": "#4d87ca",
 		"name":         "Demo",
 	})
-	viper.SetDefault("oauth.tokens.defaultAlgorithm", string(jwt.AlgorithmECDSASHA256))
+	viper.SetDefault("oauth.tokens.defaultAlgorithm", string(jwt.AlgorithmRSASHA256))
 }
 
 // LoadConfig loads the config file from disk.
@@ -308,6 +308,7 @@ func savePrivateKeys(filename string) {
 	if err != nil {
 		panic(fmt.Errorf("Error opening file: %v", err))
 	}
+	defer file.Close()
 
 	err = json.NewEncoder(file).Encode(jwks)
 	if err != nil {

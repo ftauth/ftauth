@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/ftauth/ftauth/internal/config"
@@ -224,7 +225,12 @@ func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error generating password hash: %v\n", err)
 	}
 
-	err = h.authenticationDB.CreateUser(ctx, id.String(), username, hash)
+	user := &model.User{
+		ID:           id.String(),
+		Username:     username,
+		PasswordHash: hash,
+	}
+	err = h.authenticationDB.RegisterUser(ctx, user)
 	if err != nil {
 		log.Printf("Error creating user: %v\n", err)
 		http.Error(w, "An unknown error occurred", http.StatusInternalServerError)
@@ -277,18 +283,8 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
-	defer cancel()
-
-	err = h.authenticationDB.VerifyUsernameAndPassword(ctx, username, password)
-	if err != nil {
-		log.Printf("Error validating user info: %v\n", err)
-		http.Error(w, "Invalid username and password", http.StatusBadRequest)
-		return
-	}
-
 	// Get session information
-	ctx, cancel = context.WithTimeout(r.Context(), database.DefaultTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
 	requestInfo, err := h.authorizationDB.GetRequestInfo(ctx, sessionID)
@@ -308,8 +304,18 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		SameSite: http.SameSiteStrictMode,
 	})
 
-	if time.Unix(requestInfo.Expiry, 0).Before(time.Now()) {
+	if requestInfo.Expiry.Before(time.Now()) {
 		http.Error(w, "Session expired", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel = context.WithTimeout(r.Context(), database.DefaultTimeout)
+	defer cancel()
+
+	err = h.authenticationDB.VerifyUsernameAndPassword(ctx, username, requestInfo.ClientID, password)
+	if err != nil {
+		log.Printf("Error validating user info: %v\n", err)
+		http.Error(w, "Invalid username and password", http.StatusBadRequest)
 		return
 	}
 
@@ -496,16 +502,6 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		ExpiresIn:    clientInfo.AccessTokenLife,
 	}
 
-	ctx, cancel = context.WithTimeout(r.Context(), database.DefaultTimeout)
-	defer cancel()
-
-	commit, rollback, err := h.db.RegisterTokens(ctx, accessToken, refreshToken)
-	if err != nil {
-		log.Printf("Error saving tokens to DB: %v\n", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
 	b, err := json.Marshal(&response)
 	if err != nil {
 		log.Printf("Error marshalling token response: %v\n", err)
@@ -515,18 +511,7 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(b)))
-	_, err = w.Write(b)
-	if err != nil {
-		err = rollback()
-		if err != nil {
-			log.Printf("Error rolling back: %v", err)
-		}
-	} else {
-		err = commit()
-		if err != nil {
-			log.Printf("Error committing changes: %v", err)
-		}
-	}
+	w.Write(b)
 }
 
 func (h tokenEndpointHandler) validateClientCredentialsRequest(w http.ResponseWriter, r *http.Request, clientInfo *model.ClientInfo) *tokenRequestInfo {
@@ -613,13 +598,13 @@ func (h tokenEndpointHandler) validateResourceOwnerPasswordCredentialsRequest(w 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	err := h.authDB.VerifyUsernameAndPassword(ctx, username, password)
+	err := h.authDB.VerifyUsernameAndPassword(ctx, username, clientInfo.ID, password)
 	if err != nil {
 		handleTokenRequestError(w, model.TokenRequestErrInvalidGrant, model.RequestErrorDetails{})
 		return nil
 	}
 
-	user, err := h.authDB.GetUserByUsername(ctx, username)
+	user, err := h.authDB.GetUserByUsername(ctx, username, clientInfo.ID)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return nil
@@ -696,7 +681,7 @@ func (h tokenEndpointHandler) validateAuthorizationCodeRequest(w http.ResponseWr
 	}
 
 	// Refuse request if code is expired
-	if time.Unix(session.Expiry, 0).Before(time.Now()) {
+	if session.Expiry.Before(time.Now()) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return nil
 	}
@@ -716,8 +701,12 @@ func (h tokenEndpointHandler) validateAuthorizationCodeRequest(w http.ResponseWr
 		return nil
 	}
 
+	var scopes []string
+	for _, s := range session.Scope {
+		scopes = append(scopes, s.Name)
+	}
 	return &tokenRequestInfo{
-		scope:  session.Scope,
+		scope:  strings.Join(scopes, " "),
 		userID: session.UserID,
 	}
 }

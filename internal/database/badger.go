@@ -99,7 +99,7 @@ func InitializeBadgerDB(opts BadgerOptions) (*BadgerDB, error) {
 			}
 			badgerDB.AdminClient = admin
 		} else {
-			admin, err := badgerDB.getAdminClient()
+			admin, err := badgerDB.GetDefaultAdminClient(context.Background())
 			if err != nil {
 				return nil, err
 			}
@@ -154,14 +154,18 @@ func (db *BadgerDB) isEmpty() (empty bool) {
 	return
 }
 
-func (db *BadgerDB) getAdminClient() (*model.ClientInfo, error) {
+// GetDefaultAdminClient returns the default admin client for the database.
+func (db *BadgerDB) GetDefaultAdminClient(ctx context.Context) (*model.ClientInfo, error) {
+	if db.AdminClient != nil {
+		return db.AdminClient, nil
+	}
 	opt := model.ClientOptionAdmin | model.ClientOption(model.MasterSystemFlag)
 	clients, err := db.ListClients(context.Background(), opt)
 	if err != nil {
 		return nil, err
 	}
 	if len(clients) == 0 {
-		return nil, badger.ErrKeyNotFound
+		return nil, ErrNotFound
 	}
 	return clients[0], nil
 }
@@ -190,6 +194,38 @@ func (db *BadgerDB) ListClients(ctx context.Context, opts ...model.ClientOption)
 				if err != nil {
 					return err
 				}
+				clients = append(clients, &client)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return clients, nil
+}
+
+// ListClientsByPredicate lists all clients in the database based off a predicate.
+func (db *BadgerDB) ListClientsByPredicate(ctx context.Context, predicate func(*model.ClientInfo) bool) ([]*model.ClientInfo, error) {
+	clients := make([]*model.ClientInfo, 0)
+	err := db.DB.View(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+
+		prefix := []byte(prefixClient)
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+
+			var client model.ClientInfo
+			err := item.Value(func(v []byte) error {
+				return json.Unmarshal(v, &client)
+			})
+			if err != nil {
+				return err
+			}
+			if predicate(&client) {
+
 				clients = append(clients, &client)
 			}
 		}
@@ -339,51 +375,33 @@ func (db *BadgerDB) LookupSessionByCode(ctx context.Context, code string) (reque
 			}
 		}
 
-		return badger.ErrKeyNotFound
+		return ErrNotFound
 	})
 	return
 }
 
-// RegisterTokens saves the given tokens to the database, returning functions to either commit or rollback changes
-// if the tokens cannot reach the end user, for example.
-func (db *BadgerDB) RegisterTokens(ctx context.Context, accessToken, refreshToken *jwt.Token) (commit func() error, rollback func() error, err error) {
-	accessKey := makeTokenKey(accessToken.Claims.JwtID)
-	refreshKey := makeTokenKey(refreshToken.Claims.JwtID)
+// RegisterToken saves the given tokens to the database for later reference.
+func (db *BadgerDB) RegisterToken(ctx context.Context, token *jwt.Token) error {
+	tokenKey := makeTokenKey(token.Claims.JwtID)
 
 	txn := db.DB.NewTransaction(true)
-	commit, rollback = txn.Commit, func() error { txn.Discard(); return nil }
 
-	var accessTokenJwt string
-	accessTokenJwt, err = accessToken.Raw()
+	var tokenJwt string
+	tokenJwt, err := token.Raw()
 	if err != nil {
-		return
+		return err
 	}
 	entry := &badger.Entry{
-		Key:       accessKey,
-		Value:     []byte(accessTokenJwt),
-		ExpiresAt: uint64(accessToken.Claims.ExpirationTime),
+		Key:       tokenKey,
+		Value:     []byte(tokenJwt),
+		ExpiresAt: uint64(token.Claims.ExpirationTime),
 	}
 	err = txn.SetEntry(entry)
 	if err != nil {
-		return
+		return err
 	}
 
-	var refreshTokenJwt string
-	refreshTokenJwt, err = refreshToken.Raw()
-	if err != nil {
-		return
-	}
-	entry = &badger.Entry{
-		Key:       refreshKey,
-		Value:     []byte(refreshTokenJwt),
-		ExpiresAt: uint64(refreshToken.Claims.ExpirationTime),
-	}
-	err = txn.SetEntry(entry)
-	if err != nil {
-		return
-	}
-
-	return
+	return txn.Commit()
 }
 
 // GetTokenByID looks up and returns the encoded token corresponding to the provided ID.
@@ -407,12 +425,16 @@ func (db *BadgerDB) GetTokenByID(ctx context.Context, tokenID string) (token str
 }
 
 // IsTokenSeen returns an error if the token has been seen before. If not, it first
-// records the token information so that subsequent calls return an error.
-func (db *BadgerDB) IsTokenSeen(ctx context.Context, token *jwt.Token) error {
+// records the token information so that subsequent calls return true.
+func (db *BadgerDB) IsTokenSeen(ctx context.Context, token *jwt.Token) (seen bool, err error) {
 	key := makeDPoPKey(token.Claims.JwtID)
-	return db.DB.Update(func(txn *badger.Txn) error {
+	err = db.DB.Update(func(txn *badger.Txn) error {
 		_, err := txn.Get(key)
-		if err != nil && err == badger.ErrKeyNotFound {
+		if err != nil {
+			if err != badger.ErrKeyNotFound {
+				return err
+			}
+			seen = false
 			// Write key to DB
 			b, err := json.Marshal(token)
 			if err != nil {
@@ -420,19 +442,18 @@ func (db *BadgerDB) IsTokenSeen(ctx context.Context, token *jwt.Token) error {
 			}
 			return txn.Set(key, b)
 		}
-		return errors.New("token previously seen")
+
+		seen = true
+		return nil
 	})
+	return
 }
 
-// CreateUser registers a new user in the authentication database.
-func (db *BadgerDB) CreateUser(ctx context.Context, id, username, passwordHash string) error {
-	key := makeUserKey(id)
+// RegisterUser registers a new user in the authentication database.
+func (db *BadgerDB) RegisterUser(ctx context.Context, user *model.User) error {
+	key := makeUserKey(user.ID)
 	return db.DB.Update(func(txn *badger.Txn) error {
-		b, err := json.Marshal(&model.User{
-			ID:           id,
-			Username:     strings.ToLower(username),
-			PasswordHash: passwordHash,
-		})
+		b, err := json.Marshal(user)
 		if err != nil {
 			return err
 		}
@@ -462,7 +483,7 @@ func (db *BadgerDB) GetUserByID(ctx context.Context, id string) (*model.User, er
 }
 
 // GetUserByUsername retrieves user's info based off a username.
-func (db *BadgerDB) GetUserByUsername(ctx context.Context, username string) (user *model.User, err error) {
+func (db *BadgerDB) GetUserByUsername(ctx context.Context, username, clientID string) (user *model.User, err error) {
 	err = db.DB.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
@@ -479,20 +500,20 @@ func (db *BadgerDB) GetUserByUsername(ctx context.Context, username string) (use
 				return err
 			}
 
-			if _user.Username == strings.ToLower(username) {
+			if _user.Username == strings.ToLower(username) && _user.ClientID == clientID {
 				user = &_user
 				return nil
 			}
 		}
 
-		return badger.ErrKeyNotFound
+		return ErrNotFound
 	})
 	return
 }
 
 // VerifyUsernameAndPassword returns an error if the username and password combo do not match what's in the DB.
-func (db *BadgerDB) VerifyUsernameAndPassword(ctx context.Context, username, password string) error {
-	user, err := db.GetUserByUsername(ctx, username)
+func (db *BadgerDB) VerifyUsernameAndPassword(ctx context.Context, username, clientID, password string) error {
+	user, err := db.GetUserByUsername(ctx, username, clientID)
 	if err != nil {
 		return err
 	}
@@ -500,4 +521,100 @@ func (db *BadgerDB) VerifyUsernameAndPassword(ctx context.Context, username, pas
 		return errors.New("invalid password")
 	}
 	return nil
+}
+
+// ListScopes returns all scopes in the database.
+func (db *BadgerDB) ListScopes(ctx context.Context) ([]*model.Scope, error) {
+	scopes := make([]*model.Scope, 0)
+	err := db.DB.View(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+
+		prefix := []byte(prefixScope)
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+
+			var scope model.Scope
+			err := item.Value(func(v []byte) error {
+				return json.Unmarshal(v, &scope)
+			})
+			if err != nil {
+				return err
+			}
+			scopes = append(scopes, &scope)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return scopes, nil
+}
+
+// GetScope retrieves a scope by name.
+func (db *BadgerDB) GetScope(ctx context.Context, scopeName string) (s *model.Scope, err error) {
+	key := makeScopeKey(scopeName)
+	err = db.DB.View(func(txn *badger.Txn) error {
+		item, err := txn.Get(key)
+		if err != nil {
+			return err
+		}
+
+		return item.Value(func(b []byte) error {
+			return json.Unmarshal(b, &s)
+		})
+	})
+	if err != nil {
+		return
+	}
+
+	// Get all client (ids) for the scope
+	clients, err := db.ListClientsByPredicate(ctx, func(client *model.ClientInfo) bool {
+		// Scrap other information we don't need
+		defer func() {
+			*client = model.ClientInfo{
+				ID: client.ID,
+			}
+		}()
+		for _, scope := range client.Scopes {
+			if scope.Name == scopeName {
+				return true
+			}
+		}
+		return false
+	})
+
+	s.Clients = clients
+	return
+}
+
+// RegisterScope adds a new scope to the database.
+func (db *BadgerDB) RegisterScope(ctx context.Context, scope string) (*model.Scope, error) {
+	key := makeScopeKey(scope)
+	scopeModel := &model.Scope{
+		Name: scope,
+	}
+	err := db.DB.Update(func(txn *badger.Txn) error {
+		b, err := json.Marshal(scopeModel)
+		if err != nil {
+			return err
+		}
+		return txn.SetEntry(&badger.Entry{
+			Key:   key,
+			Value: b,
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return scopeModel, nil
+}
+
+// DeleteScope removes a scope from the database.
+func (db *BadgerDB) DeleteScope(ctx context.Context, scope string) error {
+	key := makeScopeKey(scope)
+	return db.DB.Update(func(txn *badger.Txn) error {
+		return txn.Delete(key)
+	})
 }

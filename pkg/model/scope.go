@@ -1,6 +1,7 @@
 package model
 
 import (
+	_ "embed" // GraphQL embeds
 	"errors"
 	"regexp"
 	"strings"
@@ -21,6 +22,12 @@ var (
 
 	// ErrEmptyScope means no scope was provided.
 	ErrEmptyScope = errors.New("empty scope")
+)
+
+// GraphQL embeds
+var (
+	//go:embed gql/fragments/AllScopeInfo.graphql
+	AllScopeInfo string
 )
 
 // ParseScope ensures the provided scope string contains
@@ -45,4 +52,13 @@ func ParseScope(scope string) ([]string, error) {
 	}
 
 	return scopeTokens, nil
+}
+
+// ScopesToModel converts a string array to Scope model objects.
+func ScopesToModel(scopes []string) []*Scope {
+	var scopeModels []*Scope
+	for _, scope := range scopes {
+		scopeModels = append(scopeModels, &Scope{Name: scope})
+	}
+	return scopeModels
 }

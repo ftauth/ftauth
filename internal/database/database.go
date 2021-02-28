@@ -36,6 +36,8 @@ type Database interface {
 	AuthorizationDB
 	AuthenticationDB
 	DiscoveryDB
+	ScopeDB
+	GetDefaultAdminClient(ctx context.Context) (*model.ClientInfo, error)
 	Close() error
 }
 
@@ -48,6 +50,14 @@ type ClientDB interface {
 	DeleteClient(ctx context.Context, clientID string) error
 }
 
+// ScopeDB handles interactions with the scope database.
+type ScopeDB interface {
+	ListScopes(ctx context.Context) ([]*model.Scope, error)
+	GetScope(ctx context.Context, scope string) (*model.Scope, error)
+	RegisterScope(ctx context.Context, scope string) (*model.Scope, error)
+	DeleteScope(ctx context.Context, scope string) error
+}
+
 // AuthorizationDB handles interactions with the authorization database,
 // which may be the same as other databases or not.
 type AuthorizationDB interface {
@@ -55,17 +65,18 @@ type AuthorizationDB interface {
 	GetRequestInfo(ctx context.Context, requestID string) (*model.AuthorizationRequest, error)
 	UpdateRequestInfo(ctx context.Context, requestInfo *model.AuthorizationRequest) error
 	LookupSessionByCode(ctx context.Context, code string) (*model.AuthorizationRequest, error)
-	RegisterTokens(ctx context.Context, accessToken, refreshToken *jwt.Token) (func() error, func() error, error)
-	IsTokenSeen(ctx context.Context, token *jwt.Token) error
+	RegisterToken(ctx context.Context, token *jwt.Token) error
+	IsTokenSeen(ctx context.Context, token *jwt.Token) (bool, error)
 	GetTokenByID(ctx context.Context, tokenID string) (string, error)
 }
 
 // AuthenticationDB handles interactions with the authentication databse,
 // which may or may not be the same as other databases.
 type AuthenticationDB interface {
-	CreateUser(ctx context.Context, id, username, passwordHash string) error
-	GetUserByUsername(ctx context.Context, username string) (*model.User, error)
-	VerifyUsernameAndPassword(ctx context.Context, username, password string) error
+	RegisterUser(ctx context.Context, user *model.User) error
+	GetUserByID(ctx context.Context, id string) (*model.User, error)
+	GetUserByUsername(ctx context.Context, username, clientID string) (*model.User, error)
+	VerifyUsernameAndPassword(ctx context.Context, username, clientID, password string) error
 }
 
 // DiscoveryDB handles interactions with the discovery database, which contains

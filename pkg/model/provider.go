@@ -15,3 +15,10 @@ const (
 func (provider Provider) GQL() string {
 	return string(provider)
 }
+
+// ProviderData holds provider-specific information
+type ProviderData struct {
+	Provider Provider
+	Username string
+	Email    string
+}

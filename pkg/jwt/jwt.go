@@ -26,6 +26,7 @@ var (
 	ErrInvalidHeaderFormat  = errors.New("invalid header format")
 	ErrInvalidPayloadFormat = errors.New("invalid payload format")
 	ErrMismatchedAlgorithms = errors.New("algorithms do not match between key and token")
+	ErrMismatchedKeyID      = errors.New("key id does not match between token and key")
 	ErrInvalidSignature     = errors.New("invalid signature")
 )
 
@@ -279,6 +280,11 @@ func (t *Token) Verify(key *Key) error {
 	// Verify the algorithm of the key matches that of the token
 	if t.Header.Algorithm != key.Algorithm {
 		return ErrMismatchedAlgorithms
+	}
+	if t.Header.KeyID != "" {
+		if t.Header.KeyID != key.KeyID {
+			return ErrMismatchedAlgorithms
+		}
 	}
 
 	// Compare signature with expected based off client Key

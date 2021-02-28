@@ -12,7 +12,6 @@ type Marshaller interface {
 	GQL() string
 }
 
-var timeTyp = reflect.TypeOf(time.Time{})
 var marshallerTyp = reflect.TypeOf((*Marshaller)(nil)).Elem()
 
 // MarshalGQL returns the GraphQL representation of v.
@@ -24,26 +23,41 @@ func MarshalGQL(v interface{}) string {
 		return v.GQL()
 	}
 
+	switch v.(type) {
+	case string:
+		return fmt.Sprintf(`"%s"`, v)
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprintf("%d", v)
+	case float32, float64:
+		return fmt.Sprintf("%f", v)
+	case map[string]interface{}:
+		var lines []string
+		for k, v := range v.(map[string]interface{}) {
+			lines = append(lines, fmt.Sprintf("%s: %s", k, MarshalGQL(v)))
+		}
+		return "{" + strings.Join(lines, "\n") + "}"
+	case time.Time:
+		return "\"" + v.(time.Time).Format(time.RFC3339) + "\""
+	case *time.Time:
+		return "\"" + v.(*time.Time).Format(time.RFC3339) + "\""
+	}
+
 	typ := reflect.TypeOf(v)
 	switch typ.Kind() {
-	case reflect.String:
-		return fmt.Sprintf(`"%s"`, v)
 	case reflect.Array, reflect.Slice:
 		val := typ.Elem()
-		if val.Implements(marshallerTyp) {
-			arr := reflect.ValueOf(v)
-			var vars []string
-			for i := 0; i < arr.Len(); i++ {
-				m := arr.Index(i).Interface().(Marshaller)
+		arr := reflect.ValueOf(v)
+		var vars []string
+		for i := 0; i < arr.Len(); i++ {
+			v := arr.Index(i).Interface()
+			if val.Implements(marshallerTyp) {
+				m := v.(Marshaller)
 				vars = append(vars, m.GQL())
+			} else {
+				vars = append(vars, MarshalGQL(v))
 			}
-			return "[" + strings.Join(vars, ",") + "]"
 		}
-	case timeTyp.Kind():
-		val := reflect.ValueOf(v)
-		if t, ok := val.Interface().(time.Time); ok {
-			return "\"" + t.Format(time.RFC3339) + "\""
-		}
+		return "[" + strings.Join(vars, ",") + "]"
 	}
 
 	return fmt.Sprintf("%v", v)

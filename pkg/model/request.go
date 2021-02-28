@@ -1,10 +1,14 @@
 package model
 
 import (
+	_ "embed" // GraphQL embeds
 	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
+	"time"
+
+	"github.com/ftauth/ftauth/pkg/graphql"
 )
 
 var (
@@ -13,19 +17,80 @@ var (
 	ErrInvalidRedirectURI = errors.New("invalid redirect uri")
 )
 
+// GraphQL embeds
+var (
+	//go:embed gql/fragments/AllAuthorizationRequestInfo.graphql
+	AllAuthorizationRequestInfo string
+)
+
 // AuthorizationRequest holds the request sent to the authorization endpoint.
 type AuthorizationRequest struct {
-	ID                  string              `db:"id"` // The session ID
-	GrantType           string              `db:"grant_type"`
-	ClientID            string              `db:"client_id"`
-	Scope               string              `db:"scope"`
-	State               string              `db:"state"`
-	RedirectURI         string              `db:"redirect_uri"`
-	Code                string              `db:"code"`
-	Expiry              int64               `db:"exp"`
-	CodeChallenge       string              `db:"code_challenge"`
-	CodeChallengeMethod CodeChallengeMethod `db:"code_challenge_method"`
-	UserID              string              `db:"user"`
+	ID                  string              `json:"id"` // The session ID
+	GrantType           GrantType           `json:"grant_type"`
+	ClientID            string              `json:"client_id"`
+	Scope               []*Scope            `json:"scope"`
+	State               string              `json:"state"`
+	RedirectURI         string              `json:"redirect_uri"`
+	Code                string              `json:"code"`
+	Expiry              time.Time           `json:"exp"`
+	CodeChallenge       string              `json:"code_challenge"`
+	CodeChallengeMethod CodeChallengeMethod `json:"code_challenge_method"`
+	UserID              string              `json:"user_id"`
+}
+
+// GQL returns the GraphQL representation.
+func (request *AuthorizationRequest) GQL() string {
+	gql := `
+	{
+		id: "%s"
+		grant_type: %s
+		client_id: "%s"
+		scope: %s
+		state: "%s"
+		redirect_uri: "%s"
+		code: "%s"
+		expiry: "%s"
+		code_challenge: "%s"
+		code_challenge_method: "%s"
+		user_id: "%s"
+	}
+	`
+
+	return fmt.Sprintf(
+		gql,
+		request.ID,
+		request.GrantType,
+		request.ClientID,
+		graphql.MarshalGQL(request.Scope),
+		request.State,
+		request.RedirectURI,
+		request.Code,
+		request.Expiry.Format(time.RFC3339),
+		request.CodeChallenge,
+		request.CodeChallengeMethod,
+		request.UserID,
+	)
+}
+
+// ToUpdate returns the values to use for an update to an AuthorizationRequest.
+func (request *AuthorizationRequest) ToUpdate() *AuthorizationRequestUpdate {
+	return &AuthorizationRequestUpdate{
+		UserID: request.UserID,
+	}
+}
+
+// AuthorizationRequestUpdate holds an update to an AuthorizationRequest.
+type AuthorizationRequestUpdate struct {
+	UserID string `json:"user_id"`
+}
+
+// GQL returns the GraphQL representation.
+func (u *AuthorizationRequestUpdate) GQL() string {
+	gql := `
+	{
+		user_id: "%s"
+	}`
+	return fmt.Sprintf(gql, u.UserID)
 }
 
 // TokenRequest holds information for the request of an access token.

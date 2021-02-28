@@ -1,4 +1,8 @@
+"""
+Scope represents the permissions for a user or client.
+"""
 type Scope {
   name: String! @id
   clients: [ClientInfo!] @hasInverse(field: "scopes")
+  users: [User!] @hasInverse(field: "scopes")
 }

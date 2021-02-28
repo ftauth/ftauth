@@ -43,7 +43,7 @@ func (suite *clientTestSuite) SetupSuite() {
 	suite.admin = admin
 
 	suite.r = mux.NewRouter()
-	SetupRoutes(suite.r, db)
+	SetupRoutes(suite.r, db, nil)
 
 	token, err := token.IssueAccessToken(admin, &model.User{ID: "test"}, "default admin")
 	require.NoError(suite.T(), err)

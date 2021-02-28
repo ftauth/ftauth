@@ -202,8 +202,11 @@ func (in *middlewareInjector) decodeAndVerifyDPoP(dpopEnc string, r *http.Reques
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	err = in.db.IsTokenSeen(ctx, dpop)
+	seen, err := in.db.IsTokenSeen(ctx, dpop)
 	if err != nil {
+		return nil, err
+	}
+	if seen {
 		return nil, ErrExpiredToken
 	}
 

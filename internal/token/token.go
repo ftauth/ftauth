@@ -64,6 +64,9 @@ func IssueAccessToken(clientInfo *model.ClientInfo, user *model.User, scope stri
 			Scope:          scope,
 			CustomClaims: jwt.CustomClaims{
 				"userInfo": user.ToUserData(),
+				"https://ftauth.io": map[string]interface{}{
+					"client_id": clientInfo.ID,
+				},
 			},
 		},
 	}

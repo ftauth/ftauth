@@ -1,0 +1,9 @@
+fragment AllScopeInfo on Scope {
+    name
+    clients {
+        id
+    }
+    users {
+        id
+    }
+}
