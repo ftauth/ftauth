@@ -33,7 +33,6 @@ type authorizationHeaderType string
 const (
 	authorizationHeaderTypeBasic  authorizationHeaderType = "Basic"
 	authorizationHeaderTypeBearer authorizationHeaderType = "Bearer"
-	authorizationHeaderTypeDPoP   authorizationHeaderType = "DPoP"
 )
 
 // ParseBearerAuthorizationHeader parses the Authorization header field
@@ -45,17 +44,6 @@ const (
 // credentials = "Bearer" 1*SP b64token
 func ParseBearerAuthorizationHeader(authHeader string) (string, error) {
 	return validateAuthorizationHeaderFormat(authorizationHeaderTypeBearer, authHeader)
-}
-
-// ParseDPoPAuthorizationHeader parses the Authorization header field
-// and returns the DPoP proof, if present.
-//
-// The format follows the token68 syntax from RFC7235
-// token68    = 1*( ALPHA / DIGIT /
-// 					"-" / "." / "_" / "~" / "+" / "/" ) *"="
-// credentials = "DPoP" 1*SP token68
-func ParseDPoPAuthorizationHeader(authHeader string) (string, error) {
-	return validateAuthorizationHeaderFormat(authorizationHeaderTypeDPoP, authHeader)
 }
 
 // ParseBasicAuthorizationHeader returns the client ID and secret
