@@ -44,8 +44,6 @@ Admin client: {
 - Dart/Flutter: https://github.com/ftauth/sdk-dart
 - iOS: https://github.com/ftauth/sdk-ios
 
-While FTAuth client SDKs provide convenience and added security features out of the box, the FTAuth server supports any OAuth 2.0 client which can handle Proof Key for Code Exchange (PKCE). This includes popular SDKs like [AppAuth](https://appauth.io).
-
 ## Features
 FTAuth supports the OAuth 2.1 protocol, currently in [draft](https://tools.ietf.org/html/draft-ietf-oauth-v2-1-00), which slims the original OAuth 2.0 spec to incorporate best practices for security.
 
