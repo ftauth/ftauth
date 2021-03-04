@@ -192,7 +192,7 @@ func (db *DgraphDatabase) Seed(ctx context.Context) (*model.ClientInfo, error) {
 	}
 
 	// Create admin client if absent
-	return createAdminClient(db)
+	return CreateAdminClient(db)
 }
 
 // Close handles closing all connections to the database.

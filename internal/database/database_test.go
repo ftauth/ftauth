@@ -46,7 +46,7 @@ var dgraphClient *DgraphDatabase
 
 func setupDgraph(t *testing.T) {
 	if dgraphClient != nil {
-		_, err := createAdminClient(dgraphClient)
+		_, err := CreateAdminClient(dgraphClient)
 		require.NoError(t, err)
 	}
 }
@@ -65,7 +65,7 @@ func setupBadger(t *testing.T) {
 		require.NoError(t, err)
 		badgerClient = db
 	} else {
-		_, err := createAdminClient(badgerClient)
+		_, err := CreateAdminClient(badgerClient)
 		require.NoError(t, err)
 	}
 }

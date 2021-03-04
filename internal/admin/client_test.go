@@ -57,6 +57,12 @@ func (suite *clientTestSuite) SetupSuite() {
 	suite.tokenJWT = tokenJWT
 }
 
+func (suite *clientTestSuite) SetupTest() {
+	admin, err := database.CreateAdminClient(suite.db)
+	require.NoError(suite.T(), err)
+	suite.admin = admin
+}
+
 func (suite *clientTestSuite) TearDownTest() {
 	suite.db.Reset()
 }
@@ -111,7 +117,6 @@ func (suite *clientTestSuite) TestListClients() {
 			if test.statusCode == http.StatusOK {
 				var clients []*model.ClientInfo
 				err := json.NewDecoder(resp.Body).Decode(&clients)
-				suite.T().Logf("Got result: %s", resp.Body.Bytes())
 				assert.NoError(t, err)
 
 				require.Len(t, clients, 1)

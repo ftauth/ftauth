@@ -94,7 +94,7 @@ func InitializeBadgerDB(opts BadgerOptions) (*BadgerDB, error) {
 
 	if opts.SeedDB {
 		if badgerDB.isEmpty() {
-			admin, err := createAdminClient(badgerDB)
+			admin, err := CreateAdminClient(badgerDB)
 			if err != nil {
 				return nil, err
 			}

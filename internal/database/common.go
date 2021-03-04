@@ -9,7 +9,8 @@ import (
 	"github.com/gofrs/uuid"
 )
 
-func createAdminClient(db Database) (*model.ClientInfo, error) {
+// CreateAdminClient creates an admin client in the database.
+func CreateAdminClient(db Database) (*model.ClientInfo, error) {
 	clientID := config.Current.OAuth.Admin.ClientID
 	if clientID == "" {
 		id, err := uuid.NewV4()
