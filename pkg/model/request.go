@@ -26,13 +26,12 @@ var (
 // AuthorizationRequest holds the request sent to the authorization endpoint.
 type AuthorizationRequest struct {
 	ID                  string              `json:"id"` // The session ID
-	GrantType           GrantType           `json:"grant_type"`
 	ClientID            string              `json:"client_id"`
 	Scope               []*Scope            `json:"scope"`
 	State               string              `json:"state"`
 	RedirectURI         string              `json:"redirect_uri"`
 	Code                string              `json:"code"`
-	Expiry              time.Time           `json:"exp"`
+	Expiry              time.Time           `json:"expiry"`
 	CodeChallenge       string              `json:"code_challenge"`
 	CodeChallengeMethod CodeChallengeMethod `json:"code_challenge_method"`
 	UserID              string              `json:"user_id"`
@@ -43,7 +42,6 @@ func (request *AuthorizationRequest) GQL() string {
 	gql := `
 	{
 		id: "%s"
-		grant_type: %s
 		client_id: "%s"
 		scope: %s
 		state: "%s"
@@ -59,7 +57,6 @@ func (request *AuthorizationRequest) GQL() string {
 	return fmt.Sprintf(
 		gql,
 		request.ID,
-		request.GrantType,
 		request.ClientID,
 		graphql.MarshalGQL(request.Scope),
 		request.State,

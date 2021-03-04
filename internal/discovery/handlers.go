@@ -109,6 +109,18 @@ func createMetadata() (*model.AuthorizationServerMetadata, error) {
 			model.AuthorizationResponseTypeCode,
 			model.AuthorizationResponseTypeToken,
 		},
+		ResponseModesSupported: []string{"query"},
+		GrantTypesSupported: []model.GrantType{
+			model.GrantTypeAuthorizationCode,
+			model.GrantTypeClientCredentials,
+			model.GrantTypeRefreshToken,
+			model.GrantTypeResourceOwnerPasswordCredentials, // TODO: if enabled
+		},
+		AuthMethodsSupported: []string{"client_secret_basic"},
+		AlgorithmsSupported:  config.Current.SupportedAlgorithms(),
+		CodeChallengeMethodsSupported: []model.CodeChallengeMethod{
+			model.CodeChallengeMethodSHA256,
+		},
 	}, nil
 }
 

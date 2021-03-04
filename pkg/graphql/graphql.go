@@ -89,10 +89,8 @@ func NewClientFromJWT(url string, token *jwt.Token) (*Client, error) {
 	if ftauthClaims == nil {
 		return nil, errors.New("invalid FTAuth token")
 	}
-	var ftauthMap map[string]interface{}
-	if m, ok := ftauthClaims.(map[string]interface{}); ok {
-		ftauthMap = m
-	} else {
+	ftauthMap, ok := ftauthClaims.(map[string]interface{})
+	if !ok {
 		return nil, errors.New("invalid FTAuth token")
 	}
 

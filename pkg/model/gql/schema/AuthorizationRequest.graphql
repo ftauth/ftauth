@@ -1,6 +1,5 @@
 type AuthorizationRequest {
   id: String! @id
-  grant_type: GrantType!
   client_id: String!
   scope: [Scope]!
   state: String!

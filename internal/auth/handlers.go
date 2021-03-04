@@ -380,13 +380,13 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Parameters sent without a value MUST be treated as if they were omitted from the request.
 	err = r.ParseForm()
 	if err != nil {
-		http.Error(w, "Invalid body format. Use application/x-www-form-urlencoded.", http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	// Parameters sent without a value MUST be treated as if they were omitted from the request.
 	grantTypeStr := r.FormValue(paramGrantType)
 	if grantTypeStr == "" {
 		handleTokenRequestError(

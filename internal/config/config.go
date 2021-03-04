@@ -335,3 +335,12 @@ func (config Config) DefaultVerificationKey() *jwt.Key {
 	key, _ := config.GetKeyForAlgorithm(config.OAuth.Tokens.DefaultAlgorithm, false)
 	return key
 }
+
+// SupportedAlgorithms returns a list of all supported signing algorithms.
+func (config *Config) SupportedAlgorithms() []jwt.Algorithm {
+	var algorithms []jwt.Algorithm
+	for alg := range config.OAuth.Tokens.KeySet {
+		algorithms = append(algorithms, alg)
+	}
+	return algorithms
+}

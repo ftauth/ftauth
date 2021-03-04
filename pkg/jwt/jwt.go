@@ -303,6 +303,25 @@ func (t *Token) Verify(key *Key) error {
 	return nil
 }
 
+// Validate verifies the token with the matching key in a key set.
+func (t *Token) Validate(keySet *KeySet) error {
+	if t.Header.KeyID != "" {
+		key, err := keySet.KeyForID(t.Header.KeyID)
+		if err != nil {
+			return err
+		}
+		return t.Verify(key)
+	}
+	if t.Header.Algorithm != "" {
+		key, err := keySet.KeyForAlgorithm(t.Header.Algorithm)
+		if err != nil {
+			return err
+		}
+		return t.Verify(key)
+	}
+	return errors.New("no matching key found")
+}
+
 // Valid returns nil if the token is valid.
 func (t *Token) Valid() error {
 	if err := t.Header.IsValid(); err != nil {

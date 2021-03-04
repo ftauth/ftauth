@@ -83,6 +83,7 @@ func InitializeBadgerDB(opts BadgerOptions) (*BadgerDB, error) {
 	} else {
 		badgerOpts = badger.DefaultOptions(opts.Path)
 	}
+	badgerOpts.ValueLogFileSize = 1 << 24 // 16 MB
 	db, err := badger.Open(badgerOpts)
 	if err != nil {
 		return nil, err
@@ -118,7 +119,7 @@ func (db *BadgerDB) Close() error {
 // Reset clears all non-mandatory keys from the database.
 func (db *BadgerDB) Reset() error {
 	if !db.DB.Opts().InMemory {
-		return fmt.Errorf("cannot clear db on disk")
+		return errors.New("cannot clear db on disk")
 	}
 	return db.DB.Update(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
@@ -127,11 +128,9 @@ func (db *BadgerDB) Reset() error {
 
 		for it.Rewind(); it.Valid(); it.Next() {
 			item := it.Item()
-			if item.UserMeta()>>7 == 0 {
-				err := txn.Delete(item.Key())
-				if err != nil {
-					return err
-				}
+			err := txn.Delete(item.Key())
+			if err != nil {
+				return err
 			}
 		}
 

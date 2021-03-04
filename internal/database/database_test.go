@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -17,15 +18,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var _runDgraph *bool
+
 func runDgraph() bool {
 	if dgraphClient != nil {
 		return true
 	}
-	var err error
-	dgraphClient, err = InitializeDgraphDatabase(context.Background(), DgraphOptions{
-		SeedDB: true,
-	})
-	return err == nil
+	if _runDgraph == nil {
+		var err error
+		dgraphClient, err = InitializeDgraphDatabase(context.Background(), DgraphOptions{
+			SeedDB: true,
+		})
+		_runDgraph = new(bool)
+		*_runDgraph = err == nil
+		if err != nil {
+			fmt.Println("Not running Dgraph tests due to error: ", err)
+		}
+	}
+	return *_runDgraph
 }
 
 func requireNotFound(t *testing.T, err error) {
@@ -47,6 +57,25 @@ func teardownDgraph(t *testing.T) {
 	require.NoError(t, err)
 }
 
+var badgerClient *BadgerDB
+
+func setupBadger(t *testing.T) {
+	if badgerClient == nil {
+		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
+		require.NoError(t, err)
+		badgerClient = db
+	} else {
+		_, err := createAdminClient(badgerClient)
+		require.NoError(t, err)
+	}
+}
+
+func teardownBadger(t *testing.T) {
+	err := badgerClient.Close()
+	require.NoError(t, err)
+	badgerClient = nil
+}
+
 func TestCreateAdmin(t *testing.T) {
 	config.LoadConfig()
 	ctx := context.Background()
@@ -62,11 +91,9 @@ func TestCreateAdmin(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
-		defer db.Close()
-		require.NoError(t, err)
-
-		test(db)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
@@ -96,11 +123,9 @@ func TestRegisterClient(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true})
-		defer db.Close()
-		require.NoError(t, err)
-
-		test(db)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
@@ -125,9 +150,9 @@ func TestGetClient(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
-		defer db.Close()
-		require.NoError(t, err)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
@@ -197,10 +222,9 @@ func TestUpdateClient(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true})
-		defer db.Close()
-		require.NoError(t, err)
-		test(db)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
@@ -223,10 +247,9 @@ func TestGetAdminClient(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
-		defer db.Close()
-		require.NoError(t, err)
-		test(db)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
@@ -264,10 +287,9 @@ func TestListClients(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
-		defer db.Close()
-		require.NoError(t, err)
-		test(db)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
@@ -299,10 +321,9 @@ func TestDeleteClient(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true})
-		defer db.Close()
-		require.NoError(t, err)
-		test(db)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
@@ -327,7 +348,6 @@ func TestCreateSession(t *testing.T) {
 
 		req := &model.AuthorizationRequest{
 			ID:                  id.String(),
-			GrantType:           model.GrantTypeAuthorizationCode,
 			ClientID:            admin.ID,
 			Scope:               []*model.Scope{{Name: "default"}},
 			State:               "state",
@@ -342,10 +362,9 @@ func TestCreateSession(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
-		defer db.Close()
-		require.NoError(t, err)
-		test(db)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
@@ -370,7 +389,6 @@ func TestGetRequestInfo(t *testing.T) {
 
 		req := &model.AuthorizationRequest{
 			ID:                  id.String(),
-			GrantType:           model.GrantTypeAuthorizationCode,
 			ClientID:            admin.ID,
 			Scope:               []*model.Scope{{Name: "default"}},
 			State:               "state",
@@ -390,10 +408,9 @@ func TestGetRequestInfo(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
-		defer db.Close()
-		require.NoError(t, err)
-		test(db)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
@@ -418,7 +435,6 @@ func TestUpdateRequestInfo(t *testing.T) {
 
 		req := &model.AuthorizationRequest{
 			ID:                  id.String(),
-			GrantType:           model.GrantTypeAuthorizationCode,
 			ClientID:            admin.ID,
 			Scope:               []*model.Scope{{Name: "default"}},
 			State:               "state",
@@ -447,10 +463,9 @@ func TestUpdateRequestInfo(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
-		defer db.Close()
-		require.NoError(t, err)
-		test(db)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
@@ -475,7 +490,6 @@ func TestLookupSessionByCode(t *testing.T) {
 
 		req1 := model.AuthorizationRequest{
 			ID:                  id.String(),
-			GrantType:           model.GrantTypeAuthorizationCode,
 			ClientID:            admin.ID,
 			Scope:               []*model.Scope{{Name: "default"}},
 			State:               "state",
@@ -517,10 +531,9 @@ func TestLookupSessionByCode(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
-		defer db.Close()
-		require.NoError(t, err)
-		test(db)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
@@ -581,10 +594,9 @@ func TestRegisterTokens(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
-		defer db.Close()
-		require.NoError(t, err)
-		test(db)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
@@ -645,10 +657,9 @@ func TestGetTokenByID(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
-		defer db.Close()
-		require.NoError(t, err)
-		test(db)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
@@ -681,10 +692,9 @@ func TestIsTokenSeen(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
-		defer db.Close()
-		require.NoError(t, err)
-		test(db)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
@@ -710,10 +720,9 @@ func TestRegisterUser(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true})
-		defer db.Close()
-		require.NoError(t, err)
-		test(db)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
@@ -749,10 +758,9 @@ func TestGetUserByID(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true})
-		defer db.Close()
-		require.NoError(t, err)
-		test(db)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
@@ -789,10 +797,9 @@ func TestGetUserByUsername(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true})
-		defer db.Close()
-		require.NoError(t, err)
-		test(db)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
@@ -831,10 +838,9 @@ func TestVerifyUsernameAndPassword(t *testing.T) {
 	}
 
 	t.Run("Badger", func(t *testing.T) {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true})
-		defer db.Close()
-		require.NoError(t, err)
-		test(db)
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
 	})
 
 	if runDgraph() {
