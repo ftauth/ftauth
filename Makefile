@@ -4,6 +4,7 @@ BuildDate := $(shell date -u)
 LDFLAGS := "-X 'main.Version=$(Version)' -X 'main.GitCommit=$(GitCommit)' -X 'main.BuildDate=$(BuildDate)'"
 
 COVERFILE := coverage.txt
+GOARCH := $(shell echo ${GOARCH:-amd64})
 
 .PHONY: test
 test: clean server-test admin-test # landing-test
@@ -15,7 +16,7 @@ server-test:
 .PHONY: server
 server: clean
 	mkdir -p bin
-	GOOS=linux CGO_ENABLED=0 GOARCH=${GOARCH:=amd64} go build -ldflags $(LDFLAGS) -o bin/ftauth ./cmd/server
+	GOOS=linux CGO_ENABLED=0 GOARCH=$(GOARCH) go build -ldflags $(LDFLAGS) -o bin/ftauth ./cmd/server
 	GOOS=darwin CGO_ENABLED=0 go build -ldflags $(LDFLAGS) -o bin/ftauth-macos ./cmd/server
 	GOOS=windows CGO_ENABLED=0 go build -ldflags $(LDFLAGS) -o bin/ftauth.exe ./cmd/server
 
