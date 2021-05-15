@@ -4,7 +4,7 @@ BuildDate := $(shell date -u)
 LDFLAGS := "-X 'main.Version=$(Version)' -X 'main.GitCommit=$(GitCommit)' -X 'main.BuildDate=$(BuildDate)'"
 
 COVERFILE := coverage.txt
-GOARCH := $(shell echo ${GOARCH:-amd64})
+GOARCH ?= amd64
 
 .PHONY: test
 test: clean server-test admin-test # landing-test
