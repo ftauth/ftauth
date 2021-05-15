@@ -1,7 +1,8 @@
-FROM golang:1.16 AS build-server
+FROM --platform=$BUILDPLATFORM golang:1.16 AS build-server
 WORKDIR /app
 COPY . .
-RUN make server
+RUN GOARCH=$(echo $TARGETPLATFORM | cut -d / -f 2) \
+    make server
 
 # FROM google/dart:2.10 AS build-admin
 # WORKDIR /app

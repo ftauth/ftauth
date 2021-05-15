@@ -15,9 +15,9 @@ server-test:
 .PHONY: server
 server: clean
 	mkdir -p bin
-	GOOS=linux CGO_ENABLED=0 go build -ldflags $(LDFLAGS) -o bin/ftauth ./cmd/server
+	GOOS=linux CGO_ENABLED=0 GOARCH=${GOARCH:=amd64} go build -ldflags $(LDFLAGS) -o bin/ftauth ./cmd/server
 	GOOS=darwin CGO_ENABLED=0 go build -ldflags $(LDFLAGS) -o bin/ftauth-macos ./cmd/server
-	GOOS=windows  CGO_ENABLED=0 go build -ldflags $(LDFLAGS) -o bin/ftauth.exe ./cmd/server
+	GOOS=windows CGO_ENABLED=0 go build -ldflags $(LDFLAGS) -o bin/ftauth.exe ./cmd/server
 
 .PHONY: landing-static
 landing-static: clean
