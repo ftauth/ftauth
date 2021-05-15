@@ -3,7 +3,7 @@ module github.com/ftauth/ftauth
 go 1.16
 
 require (
-	github.com/dgraph-io/badger/v3 v3.2011.0
+	github.com/dgraph-io/badger/v3 v3.2011.1
 	github.com/dgraph-io/dgo/v200 v200.0.0-20210212152539-e0a5bde40ba2
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/gofrs/uuid v4.0.0+incompatible
