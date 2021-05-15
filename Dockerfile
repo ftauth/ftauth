@@ -1,6 +1,7 @@
 FROM --platform=$BUILDPLATFORM golang:1.16 AS build-server
 WORKDIR /app
 COPY . .
+ARG TARGETPLATFORM
 RUN GOARCH=$(echo $TARGETPLATFORM | cut -d / -f 2) \
     make server
 
