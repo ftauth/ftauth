@@ -64,7 +64,7 @@ func IssueAccessToken(clientInfo *model.ClientInfo, user *model.User, scope stri
 			KeyID:     privateKey.KeyID,
 		},
 		Claims: &jwt.Claims{
-			Issuer:         config.Current.Server.URL(),
+			Issuer:         config.Current.Server.URL() + "/",
 			Subject:        subject,
 			Audience:       clientInfo.ID,
 			IssuedAt:       iat,
@@ -120,7 +120,7 @@ func IssueRefreshToken(clientInfo *model.ClientInfo, accessToken *jwt.Token) (*j
 			KeyID:     publicKey.KeyID,
 		},
 		Claims: &jwt.Claims{
-			Issuer:         config.Current.Server.URL(),
+			Issuer:         config.Current.Server.URL() + "/",
 			Subject:        accessToken.Claims.JwtID,
 			Audience:       clientInfo.ID,
 			IssuedAt:       iat,
