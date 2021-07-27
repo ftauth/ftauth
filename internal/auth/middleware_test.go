@@ -23,8 +23,8 @@ func TestBearerAuthentated(t *testing.T) {
 	config.LoadConfig()
 
 	db, err := database.InitializeBadgerDB(database.BadgerOptions{InMemory: true, SeedDB: true})
-	defer db.Close()
 	require.NoError(t, err)
+	defer db.Close()
 
 	handler := tokenEndpointHandler{
 		db:       db,
@@ -143,8 +143,8 @@ func TestBearerAuthentatedWithScope(t *testing.T) {
 	config.LoadConfig()
 
 	db, err := database.InitializeBadgerDB(database.BadgerOptions{InMemory: true, SeedDB: true})
-	defer db.Close()
 	require.NoError(t, err)
+	defer db.Close()
 
 	handler := tokenEndpointHandler{
 		db:       db,
@@ -281,8 +281,8 @@ func TestDPoPAuthenticated(t *testing.T) {
 	config.LoadConfig()
 
 	db, err := database.InitializeBadgerDB(database.BadgerOptions{InMemory: true, SeedDB: true})
-	defer db.Close()
 	require.NoError(t, err)
+	defer db.Close()
 
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)

@@ -22,6 +22,7 @@ import (
 
 // ServerConfig holds configuration variables for the server.
 type ServerConfig struct {
+	Name   string
 	Scheme string
 	Host   string
 	Port   string
@@ -113,6 +114,7 @@ var (
 
 func setConfigDefaults() {
 	viper.SetDefault("server", map[string]interface{}{
+		"name":   "FTAuth",
 		"scheme": "http",
 		"host":   "localhost",
 		"port":   "8000",
@@ -162,7 +164,7 @@ func LoadConfig() {
 				panic(err)
 			}
 		} else {
-			panic(fmt.Errorf("Unable to read config file: %v", err))
+			panic(fmt.Errorf("unable to read config file: %v", err))
 		}
 	} else {
 		configPath = viper.ConfigFileUsed()
@@ -170,7 +172,7 @@ func LoadConfig() {
 
 	err = viper.Unmarshal(&Current)
 	if err != nil {
-		panic(fmt.Errorf("Error unmarshalling config: %v", err))
+		panic(fmt.Errorf("error unmarshalling config: %v", err))
 	}
 
 	Current.OAuth.Tokens.KeySet = make(map[jwt.Algorithm]TokenConfig)
@@ -231,12 +233,12 @@ func loadPrivateKeys() {
 	// Read and parse server's public/private key pair
 	b, err := ioutil.ReadFile(Current.OAuth.Tokens.PrivateKeyFile)
 	if err != nil {
-		panic(fmt.Errorf("Error reading private key file: %v", err))
+		panic(fmt.Errorf("error reading private key file: %v", err))
 	}
 
 	jwks, err := jwt.DecodeKeySet(string(b))
 	if err != nil {
-		panic(fmt.Errorf("Error decoding private key file: %v", err))
+		panic(fmt.Errorf("error decoding private key file: %v", err))
 	}
 
 	for _, key := range jwks.Keys {
@@ -290,13 +292,13 @@ func savePrivateKeys(filename string) {
 
 	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0700)
 	if err != nil {
-		panic(fmt.Errorf("Error opening file: %v", err))
+		panic(fmt.Errorf("error opening file: %v", err))
 	}
 	defer file.Close()
 
 	err = json.NewEncoder(file).Encode(jwks)
 	if err != nil {
-		panic(fmt.Errorf("Error writing file: %v", err))
+		panic(fmt.Errorf("error writing file: %v", err))
 	}
 }
 

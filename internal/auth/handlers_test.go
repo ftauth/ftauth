@@ -68,8 +68,8 @@ func TestAuthorizationEndpoint(t *testing.T) {
 	config.LoadConfig()
 
 	db, err := database.InitializeBadgerDB(database.BadgerOptions{InMemory: true, SeedDB: true})
-	defer db.Close()
 	require.NoError(t, err)
+	defer db.Close()
 
 	admin := db.AdminClient
 
@@ -318,8 +318,8 @@ func TestClientCredentialsGrant(t *testing.T) {
 	config.LoadConfig()
 
 	db, err := database.InitializeBadgerDB(database.BadgerOptions{InMemory: true, SeedDB: true})
-	defer db.Close()
 	require.NoError(t, err)
+	defer db.Close()
 
 	handler := tokenEndpointHandler{
 		db:       db,
@@ -448,8 +448,8 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 	config.LoadConfig()
 
 	db, err := database.InitializeBadgerDB(database.BadgerOptions{InMemory: true, SeedDB: true})
-	defer db.Close()
 	require.NoError(t, err)
+	defer db.Close()
 
 	handler := tokenEndpointHandler{
 		db:       db,
@@ -637,8 +637,8 @@ func TestRefreshTokenGrant(t *testing.T) {
 	config.LoadConfig()
 
 	db, err := database.InitializeBadgerDB(database.BadgerOptions{InMemory: true, SeedDB: true})
-	defer db.Close()
 	require.NoError(t, err)
+	defer db.Close()
 
 	handler := tokenEndpointHandler{
 		db:       db,
@@ -652,6 +652,7 @@ func TestRefreshTokenGrant(t *testing.T) {
 	secret, err := uuid.NewV4()
 	require.NoError(t, err)
 
+	const mockRefreshTokenLife = 3
 	client := &model.ClientInfo{
 		ID:     id.String(),
 		Name:   "Confidential Client",
@@ -664,7 +665,7 @@ func TestRefreshTokenGrant(t *testing.T) {
 		},
 		RedirectURIs:     []string{"localhost"},
 		AccessTokenLife:  60 * 60,
-		RefreshTokenLife: 1,
+		RefreshTokenLife: mockRefreshTokenLife,
 		Providers: []model.Provider{
 			model.ProviderFTAuth,
 		},
@@ -702,7 +703,7 @@ func TestRefreshTokenGrant(t *testing.T) {
 				refreshTokenEnc, err := refreshToken.Raw()
 				require.NoError(t, err)
 
-				<-time.After(1 * time.Second)
+				<-time.After(mockRefreshTokenLife * time.Second)
 				return refreshTokenEnc
 			},
 			wantStatus: http.StatusUnauthorized,

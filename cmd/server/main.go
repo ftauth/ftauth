@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -115,9 +116,19 @@ func main() {
 	if err != nil {
 		log.Fatalln("Error parsing templates: ", err)
 	}
+	// Index handler
+	r.Path("/").Methods(http.MethodGet).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		templates.All.ExecuteTemplate(w, "login", map[string]string{
+			"Name": config.Current.Server.Name,
+		})
+	})
 
 	// Static file handling
-	r.PathPrefix("/").Handler(http.FileServer(http.FS(staticFS)))
+	stripped, err := fs.Sub(staticFS, "static")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	r.PathPrefix("/").Handler(http.FileServer(http.FS(stripped)))
 
 	// Apply middleware
 	r.Use(fthttp.SuppressReferrer)
@@ -136,7 +147,7 @@ func main() {
 		log.Fatal(srv.ListenAndServe())
 	}()
 
-	c := make(chan os.Signal)
+	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 
 	<-c
