@@ -17,6 +17,7 @@ var (
 // User is a user/resource owner.
 type User struct {
 	ID           string         `json:"id"` // uuid
+	Subject      string         `json:"sub,omitempty"`
 	ClientID     string         `json:"client_id"`
 	Username     string         `json:"username,omitempty"`
 	PasswordHash string         `json:"password_hash,omitempty"`

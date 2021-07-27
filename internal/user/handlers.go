@@ -84,6 +84,8 @@ func (h userHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	user.PasswordHash = ""
+	user.Subject = user.ID
 
 	b, err := json.Marshal(user)
 	if err != nil {
