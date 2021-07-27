@@ -169,7 +169,6 @@ func createOIDCMetadata() (*model.OIDCProviderMetadata, error) {
 		CodeChallengeMethodsSupported:    metadata.CodeChallengeMethodsSupported,
 		IdTokenSigningAlgValuesSupported: metadata.AlgorithmsSupported,
 		SubjectTypesSupported: []model.SubjectIdentifierType{
-			model.SubjectIdentifierTypePairwise,
 			model.SubjectIdentifierTypePublic,
 		},
 	}, nil
