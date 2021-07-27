@@ -118,9 +118,15 @@ func main() {
 	}
 	// Index handler
 	r.Path("/").Methods(http.MethodGet).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		templates.All.ExecuteTemplate(w, "login", map[string]string{
-			"Name": config.Current.Server.Name,
-		})
+		err := templates.All.ExecuteTemplate(w, "login", config.Current.Server)
+		if err != nil {
+			log.Printf("Error templating index: %v\n", err)
+		}
+	})
+
+	// Health check handler
+	r.Path("/ok").Methods(http.MethodGet).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("OK"))
 	})
 
 	// Static file handling

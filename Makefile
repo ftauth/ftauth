@@ -57,3 +57,7 @@ docker:
 .PHONY: clean
 clean:
 	rm -rf bin/ $(COVERFILE) web/admin/build/ web/landing/build/
+
+.PHONY: zip
+zip:
+	zip -r eb.zip .ebextensions/ docker-compose.yaml

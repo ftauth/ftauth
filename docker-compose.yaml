@@ -1,0 +1,15 @@
+version: "3"
+services:
+  server:
+    image: ftauth/ftauth:latest
+    ports:
+      - "80:${PORT}"
+      - "443:${PORT}"
+    volumes:
+      - /etc/ftauth:/etc/ftauth
+    environment: 
+      - FTAUTH_OAUTH_ADMIN_USERNAME=${USERNAME}
+      - FTAUTH_OAUTH_ADMIN_PASSWORD=${PASSWORD}
+      - FTAUTH_SERVER_SCHEME=${SCHEME}
+      - FTAUTH_SERVER_HOST=${HOST}
+      - FTAUTH_SERVER_PORT=${PORT}
