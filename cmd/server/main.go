@@ -24,6 +24,7 @@ import (
 	"github.com/ftauth/ftauth/internal/user"
 	fthttp "github.com/ftauth/ftauth/pkg/http"
 	"github.com/ftauth/ftauth/pkg/model"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
 
@@ -138,6 +139,7 @@ func main() {
 
 	// Apply middleware
 	r.Use(fthttp.SuppressReferrer)
+	r.Use(requestLogger)
 
 	addr := ":" + config.Current.Server.Port
 	srv := http.Server{
@@ -172,4 +174,8 @@ func main() {
 	if err != nil {
 		log.Printf("Error closing database: %v\n", err)
 	}
+}
+
+func requestLogger(next http.Handler) http.Handler {
+	return handlers.LoggingHandler(log.Writer(), next)
 }
