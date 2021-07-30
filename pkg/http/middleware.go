@@ -112,7 +112,7 @@ func (m *Middleware) BearerAuthenticatedWithScope(scope string) func(http.Handle
 			}
 
 			if !validScope {
-				handleErr(fmt.Errorf("Token not granted scope: %s", scope))
+				handleErr(fmt.Errorf("token not granted scope: %s", scope))
 				return
 			}
 
