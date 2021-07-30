@@ -771,14 +771,21 @@ func (h tokenEndpointHandler) validateRefreshTokenRequest(w http.ResponseWriter,
 		}
 	}
 
-	var userID string
-	userInfo, ok := refreshToken.Claims.CustomClaims["userInfo"]
-	if ok {
-		userID, _ = userInfo.(map[string]interface{})["id"].(string)
+	claims, err := fthttp.ParseClaims(refreshToken)
+	if err != nil {
+		handleTokenRequestError(
+			w,
+			model.TokenRequestErrInvalidGrant,
+			model.RequestErrorDetails{
+				ParamName: "FTAuth Claims",
+				Details:   err.Error(),
+			},
+		)
+		return nil
 	}
 	return &tokenRequestInfo{
 		scope:  refreshToken.Claims.Scope,
-		userID: userID,
+		userID: claims.UserID,
 	}
 }
 
