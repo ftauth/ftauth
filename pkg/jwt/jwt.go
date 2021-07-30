@@ -341,7 +341,7 @@ func (t *Token) IssuedBefore(u time.Time) bool {
 // IssuedBeforeAgo returns true if the token was issued before the given duration before now.
 func (t *Token) IssuedBeforeAgo(d time.Duration) bool {
 	issuedAt := time.Unix(t.Claims.IssuedAt, 0)
-	diff := time.Now().Sub(issuedAt).Seconds()
+	diff := time.Since(issuedAt).Seconds()
 	return diff > d.Seconds()
 }
 

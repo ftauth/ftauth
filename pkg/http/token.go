@@ -2,7 +2,6 @@ package fthttp
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -50,7 +49,11 @@ func ParseClaims(token *jwt.Token) (*FTClaims, error) {
 
 // DownloadKeyset retrieves and deserializes the JWKS at the given URL.
 func DownloadKeyset(ctx context.Context, jwksUrl string) (*jwt.KeySet, error) {
-	resp, err := http.Get(jwksUrl)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, jwksUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -65,12 +68,11 @@ func DownloadKeyset(ctx context.Context, jwksUrl string) (*jwt.KeySet, error) {
 		return nil, fmt.Errorf("%s (%d): %s", http.StatusText(resp.StatusCode), resp.StatusCode, bb)
 	}
 
-	var keySet jwt.KeySet
-	err = json.Unmarshal(bb, &keySet)
+	keySet, err := jwt.DecodeKeySet(string(bb))
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshalling keyset: %v", err)
 	}
-	return &keySet, nil
+	return keySet, nil
 }
 
 // ValidateToken asserts valid FTAuth claims in the token and

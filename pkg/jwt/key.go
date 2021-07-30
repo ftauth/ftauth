@@ -228,7 +228,7 @@ func (key *Key) HasPrivateKeyInfo() error {
 			for i, oth := range key.OtherPrimes {
 				err := oth.IsValid()
 				if err != nil {
-					return fmt.Errorf("Error with oth[%d]: %v", i, err)
+					return fmt.Errorf("error with oth[%d]: %v", i, err)
 				}
 			}
 		}
@@ -649,7 +649,7 @@ func (key *Key) isValidSymmetric() error {
 // specified by the X509Url parameter, if included.
 func (key *Key) RetrieveX509Certificate() (cert []byte, err error) {
 	if key.X509Url == "" {
-		err = errors.New("X.509 URL parameter not present")
+		err = errMissingParameter("x5u")
 		return
 	}
 
@@ -658,7 +658,7 @@ func (key *Key) RetrieveX509Certificate() (cert []byte, err error) {
 		return
 	}
 	if parsedURL.Scheme != "https" {
-		err = fmt.Errorf("Protocol is not supported for certificate retrieval: %s", parsedURL.Scheme)
+		err = fmt.Errorf("protocol is not supported for certificate retrieval: %s", parsedURL.Scheme)
 		return
 	}
 	resp, err := http.Get(key.X509Url)
@@ -668,7 +668,7 @@ func (key *Key) RetrieveX509Certificate() (cert []byte, err error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("Error downloading X.509 certificate from URL: %s", key.X509Url)
+		err = fmt.Errorf("error downloading X.509 certificate from URL: %s", key.X509Url)
 		return
 	}
 	cert, err = ioutil.ReadAll(resp.Body)
