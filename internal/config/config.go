@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/ftauth/ftauth/pkg/jwt"
+	"github.com/ftauth/ftauth/pkg/model"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 )
@@ -103,6 +104,19 @@ type Config struct {
 	Database *DatabaseConfig
 	OAuth    *OAuthConfig
 	Remain   map[string]interface{} `mapstructure:",remain"`
+}
+
+// DefaultScopes returns the default user scopes of this config.
+func (c Config) DefaultScopes() ([]*model.Scope, error) {
+	defaultScopeNames, err := model.ParseScope(c.OAuth.Scopes.Default)
+	if err != nil {
+		return nil, err
+	}
+	var scopes []*model.Scope
+	for _, scopeName := range defaultScopeNames {
+		scopes = append(scopes, &model.Scope{Name: scopeName})
+	}
+	return scopes, nil
 }
 
 var (

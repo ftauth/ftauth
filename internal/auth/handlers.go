@@ -61,8 +61,8 @@ const (
 	paramErrorURI            = "error_uri"
 
 	// Apple parameters
-	paramIDToken = "id_token"
-	paramUser    = "user"
+	// paramIDToken = "id_token"
+	// paramUser    = "user"
 
 	// Recommended authorization code lifetime
 	sessionExp = 10 * time.Minute
@@ -219,10 +219,17 @@ func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error generating password hash: %v\n", err)
 	}
 
+	scopes, err := config.Current.DefaultScopes()
+	if err != nil {
+		log.Printf("Error parsing scopes: %v\n", err)
+		http.Error(w, "An unknown error occurred", http.StatusInternalServerError)
+		return
+	}
 	user := &model.User{
 		ID:           id.String(),
 		Username:     username,
 		PasswordHash: hash,
+		Scopes:       scopes,
 	}
 	err = h.authenticationDB.RegisterUser(ctx, user)
 	if err != nil {

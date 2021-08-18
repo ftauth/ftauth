@@ -115,12 +115,17 @@ func createMetadata() (*model.AuthorizationServerMetadata, error) {
 	}
 	jwksEndpoint.Path = path.Join(jwksEndpoint.Path, "jwks.json")
 
+	scopes, err := model.ParseScope(config.Current.OAuth.Scopes.Default)
+	if err != nil {
+		return nil, err
+	}
+	scopes = append(scopes, "admin")
 	return &model.AuthorizationServerMetadata{
 		Issuer:                host,
 		AuthorizationEndpoint: authEndpoint.String(),
 		TokenEndpoint:         tokenEndpoint.String(),
 		JwksURI:               jwksEndpoint.String(),
-		ScopesSupported:       []string{"default", "admin"},
+		ScopesSupported:       scopes,
 		ResponseTypesSupported: []model.AuthorizationResponseType{
 			model.AuthorizationResponseTypeCode,
 			model.AuthorizationResponseTypeToken,

@@ -19,15 +19,17 @@ func CreateAdminClient(db Database) (*model.ClientInfo, error) {
 		}
 		clientID = id.String()
 	}
+	scopes, err := config.Current.DefaultScopes()
+	if err != nil {
+		return nil, err
+	}
+	scopes = append(scopes, &model.Scope{Name: "admin"})
 	adminClient := &model.ClientInfo{
 		ID:           clientID,
 		Name:         "Admin",
 		Type:         model.ClientTypePublic,
 		RedirectURIs: []string{"localhost", "myapp://auth"},
-		Scopes: []*model.Scope{
-			{Name: "default"},
-			{Name: "admin"},
-		},
+		Scopes:       scopes,
 		GrantTypes: []model.GrantType{
 			model.GrantTypeAuthorizationCode,
 			model.GrantTypeRefreshToken,

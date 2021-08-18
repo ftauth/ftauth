@@ -7,7 +7,8 @@ services:
       - "443:${PORT}"
     volumes:
       - /etc/ftauth:/etc/ftauth
-    environment: 
+    environment:
+      - FTAUTH_OAUTH_SCOPES_DEFAULT=${SCOPES}
       - FTAUTH_OAUTH_ADMIN_USERNAME=${USERNAME}
       - FTAUTH_OAUTH_ADMIN_PASSWORD=${PASSWORD}
       - FTAUTH_SERVER_SCHEME=${SCHEME}
