@@ -36,23 +36,25 @@ type ServerConfig struct {
 	// certificate will be created and used to serve HTTPS.
 	//
 	// Requires Host to be non-empty as well.
-	TLS struct {
-		ServerCertFile string
-		ServerKeyFile  string
+	TLS *TlsConfig
+}
 
-		// Creates a self-signed certificate and installs it to the machine.
-		Bootstrap bool
+type TlsConfig struct {
+	ServerCertFile string
+	ServerKeyFile  string
 
-		// Bootstrap information
+	// Creates a self-signed certificate and installs it to the machine.
+	Bootstrap bool
 
-		CountryCode        string
-		State              string
-		Locality           string
-		Organization       string
-		OrganizationalUnit string
-		CommonName         string
-		EmailAddress       string
-	}
+	// Bootstrap information
+
+	CountryCode        string
+	State              string
+	Locality           string
+	Organization       string
+	OrganizationalUnit string
+	CommonName         string
+	EmailAddress       string
 }
 
 // URL returns the main gateway URL for the server.
@@ -190,16 +192,18 @@ func LoadConfig() {
 	if err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Println("No configuration found. Running with defaults...")
-			configPath, err = getConfigurationDirectory()
+			configDir, err := getConfigurationDirectory()
 			if err != nil {
 				panic(err)
 			}
+			configPath = filepath.Join(configDir, "config.yaml")
 		} else {
 			panic(fmt.Errorf("unable to read config file: %v", err))
 		}
 	} else {
 		configPath = viper.ConfigFileUsed()
 	}
+	configDir := filepath.Dir(configPath)
 
 	err = viper.Unmarshal(&Current)
 	if err != nil {
@@ -210,10 +214,10 @@ func LoadConfig() {
 
 	// Set paths with known configPath
 	if Current.OAuth.Tokens.PrivateKeyFile == "" {
-		Current.OAuth.Tokens.PrivateKeyFile = filepath.Join(configPath, "jwks.json")
+		Current.OAuth.Tokens.PrivateKeyFile = filepath.Join(configDir, "jwks.json")
 	}
 	if Current.Database.Dir == "" {
-		Current.Database.Dir = filepath.Join(configPath, "data")
+		Current.Database.Dir = filepath.Join(configDir, "data")
 	}
 
 	if _, err := os.Stat(Current.OAuth.Tokens.PrivateKeyFile); errors.Is(err, os.ErrNotExist) {
@@ -223,7 +227,7 @@ func LoadConfig() {
 		loadPrivateKeys()
 	}
 
-	loadTlsConfig(Current.Server, configPath)
+	Current.Server.loadTlsConfig(configDir)
 }
 
 func getConfigurationDirectory() (string, error) {
@@ -335,26 +339,24 @@ func savePrivateKeys(filename string) {
 	}
 }
 
-func loadTlsConfig(serverConfig *ServerConfig, configPath string) {
+func (serverConfig *ServerConfig) loadTlsConfig(configDir string) {
 	if !serverConfig.UseTLS() {
 		return
 	}
 
 	tlsConfig := serverConfig.TLS
 
-	serverKeyFilepath := tlsConfig.ServerKeyFile
-	if !filepath.IsAbs(serverKeyFilepath) {
-		serverKeyFilepath = filepath.Join(configPath, serverKeyFilepath)
+	if serverKeyFilepath := tlsConfig.ServerKeyFile; !filepath.IsAbs(serverKeyFilepath) {
+		tlsConfig.ServerKeyFile = filepath.Join(configDir, serverKeyFilepath)
 	}
-	serverCertFilepath := tlsConfig.ServerCertFile
-	if !filepath.IsAbs(serverCertFilepath) {
-		serverCertFilepath = filepath.Join(configPath, serverCertFilepath)
+	if serverCertFilepath := tlsConfig.ServerCertFile; !filepath.IsAbs(serverCertFilepath) {
+		tlsConfig.ServerCertFile = filepath.Join(configDir, serverCertFilepath)
 	}
 
-	_, err := os.Stat(serverKeyFilepath)
+	_, err := os.Stat(tlsConfig.ServerKeyFile)
 	serverKeyExists := !errors.Is(err, os.ErrNotExist)
 
-	_, err = os.Stat(serverCertFilepath)
+	_, err = os.Stat(tlsConfig.ServerCertFile)
 	serverCertExists := !errors.Is(err, os.ErrNotExist)
 
 	var flag int
@@ -366,19 +368,19 @@ func loadTlsConfig(serverConfig *ServerConfig, configPath string) {
 		panic(fmt.Errorf("invalid state: cannot bootstrap, but files do not exist"))
 	}
 
-	serverKeyFile, err := os.OpenFile(serverKeyFilepath, flag, 0600)
+	serverKeyFile, err := os.OpenFile(tlsConfig.ServerKeyFile, flag, 0600)
 	if err != nil {
-		panic(fmt.Errorf("error opening file %s: %v", serverKeyFilepath, err))
+		panic(fmt.Errorf("error opening file %s: %v", tlsConfig.ServerKeyFile, err))
 	}
 	defer serverKeyFile.Close()
 
-	serverCertFile, err := os.OpenFile(serverCertFilepath, flag, 0600)
+	serverCertFile, err := os.OpenFile(tlsConfig.ServerCertFile, flag, 0600)
 	if err != nil {
-		panic(fmt.Errorf("error opening file %s: %v", serverCertFilepath, err))
+		panic(fmt.Errorf("error opening file %s: %v", tlsConfig.ServerCertFile, err))
 	}
 	defer serverCertFile.Close()
 
-	if !tlsConfig.Bootstrap {
+	if serverKeyExists && serverCertExists {
 		// TODO: Verify files contain valid info
 		return
 	}

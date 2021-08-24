@@ -2,6 +2,8 @@ module github.com/ftauth/ftauth
 
 go 1.16
 
+replace github.com/google/flatbuffers v1.12.0 => github.com/google/flatbuffers v1.12.1
+
 require (
 	github.com/dgraph-io/badger/v3 v3.2103.1
 	github.com/dgraph-io/dgo/v200 v200.0.0-20210401091508-95bfd74de60e
