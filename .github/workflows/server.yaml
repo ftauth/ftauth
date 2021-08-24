@@ -1,13 +1,63 @@
-name: Docker (Latest)
+name: Server
 
 on:
   push:
     branches:
-      - main
+      - '*'
+  pull_request:
+    branches:
+      - '*'
 
 jobs:
-  docker-latest:
+  build:
+    name: Build
+    strategy:
+      matrix:
+        go-version: [1.16]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    container:
+      image: golang:${{ matrix.go-version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Build
+        run: make server
+  test:
+    name: Test
+    needs: build
+    strategy:
+      matrix:
+        dgraph-version: [v20.11.2]
+        go-version: [1.16]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    container:
+      image: golang:${{ matrix.go-version }}
+    services:
+      dgraph:
+        image: dgraph/standalone:${{ matrix.dgraph-version }}
+        ports:
+        - 9080:9080
+        - 8080:8080
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Test
+        run: make server-test
+        env:
+          FTAUTH_DATABASE_URL: http://dgraph:8080/graphql
+      - name: Upload Coverage
+        uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.txt
+          fail_ci_if_error: true
+          verbose: true
+  deploy:
     name: Docker (Latest)
+    needs: [build, test]
+    if: ${{ github.ref == 'refs/heads/main' }}
     strategy:
       matrix:
         go-version: [1.16]
