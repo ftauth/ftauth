@@ -1,7 +1,16 @@
 server:
-  scheme: http
+  name: FTAuth
+  scheme: https
   host: localhost
   port: 8000
+  tls:
+    serverCertFile: server.crt
+    serverKeyFile: server.key
+    bootstrap: true
+
+    countryCode: US
+    organization: FTAuth
+    commonName: demo.ftauth.io
 database:
   host: localhost
   port: 5432
@@ -9,7 +18,7 @@ database:
 oauth:
   tokens:
     # The paths to the RSA private key for signing JWT tokens
-    privateKeyFile: ~/.ftauth/private.pem
+    # privateKeyFile: jwks.json
   scopes:
     default: default
   authentication:

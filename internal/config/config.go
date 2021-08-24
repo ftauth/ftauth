@@ -5,6 +5,8 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ftauth/ftauth/internal/ssl"
 	"github.com/ftauth/ftauth/pkg/jwt"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
@@ -26,6 +29,30 @@ type ServerConfig struct {
 	Scheme string
 	Host   string
 	Port   string
+
+	// If provided, FTAuth will first attempt to load the files at these
+	// paths and run the server with the given TLS config. If the files
+	// do not exist and Bootstrap is also true, then a new server key and
+	// certificate will be created and used to serve HTTPS.
+	//
+	// Requires Host to be non-empty as well.
+	TLS struct {
+		ServerCertFile string
+		ServerKeyFile  string
+
+		// Creates a self-signed certificate and installs it to the machine.
+		Bootstrap bool
+
+		// Bootstrap information
+
+		CountryCode        string
+		State              string
+		Locality           string
+		Organization       string
+		OrganizationalUnit string
+		CommonName         string
+		EmailAddress       string
+	}
 }
 
 // URL returns the main gateway URL for the server.
@@ -49,6 +76,10 @@ func (s *ServerConfig) URL() string {
 		Host:   host,
 	}
 	return uri.String()
+}
+
+func (s ServerConfig) UseTLS() bool {
+	return s.TLS.ServerCertFile != "" && s.TLS.ServerKeyFile != ""
 }
 
 // DatabaseConfig holds configuration variables for the database.
@@ -185,12 +216,14 @@ func LoadConfig() {
 		Current.Database.Dir = filepath.Join(configPath, "data")
 	}
 
-	if _, err := os.Stat(Current.OAuth.Tokens.PrivateKeyFile); os.IsNotExist(err) {
+	if _, err := os.Stat(Current.OAuth.Tokens.PrivateKeyFile); errors.Is(err, os.ErrNotExist) {
 		generatePrivateKeys()
 		savePrivateKeys(Current.OAuth.Tokens.PrivateKeyFile)
 	} else {
 		loadPrivateKeys()
 	}
+
+	loadTlsConfig(Current.Server, configPath)
 }
 
 func getConfigurationDirectory() (string, error) {
@@ -290,7 +323,7 @@ func generatePrivateKeys() {
 func savePrivateKeys(filename string) {
 	jwks := Current.JWKS(true)
 
-	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0700)
+	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		panic(fmt.Errorf("error opening file: %v", err))
 	}
@@ -299,6 +332,101 @@ func savePrivateKeys(filename string) {
 	err = json.NewEncoder(file).Encode(jwks)
 	if err != nil {
 		panic(fmt.Errorf("error writing file: %v", err))
+	}
+}
+
+func loadTlsConfig(serverConfig *ServerConfig, configPath string) {
+	if !serverConfig.UseTLS() {
+		return
+	}
+
+	tlsConfig := serverConfig.TLS
+
+	serverKeyFilepath := tlsConfig.ServerKeyFile
+	if !filepath.IsAbs(serverKeyFilepath) {
+		serverKeyFilepath = filepath.Join(configPath, serverKeyFilepath)
+	}
+	serverCertFilepath := tlsConfig.ServerCertFile
+	if !filepath.IsAbs(serverCertFilepath) {
+		serverCertFilepath = filepath.Join(configPath, serverCertFilepath)
+	}
+
+	_, err := os.Stat(serverKeyFilepath)
+	serverKeyExists := !errors.Is(err, os.ErrNotExist)
+
+	_, err = os.Stat(serverCertFilepath)
+	serverCertExists := !errors.Is(err, os.ErrNotExist)
+
+	var flag int
+	if serverKeyExists && serverCertExists {
+		flag = os.O_RDONLY
+	} else if !serverKeyExists && !serverCertExists && tlsConfig.Bootstrap {
+		flag = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+	} else {
+		panic(fmt.Errorf("invalid state: cannot bootstrap, but files do not exist"))
+	}
+
+	serverKeyFile, err := os.OpenFile(serverKeyFilepath, flag, 0600)
+	if err != nil {
+		panic(fmt.Errorf("error opening file %s: %v", serverKeyFilepath, err))
+	}
+	defer serverKeyFile.Close()
+
+	serverCertFile, err := os.OpenFile(serverCertFilepath, flag, 0600)
+	if err != nil {
+		panic(fmt.Errorf("error opening file %s: %v", serverCertFilepath, err))
+	}
+	defer serverCertFile.Close()
+
+	if !tlsConfig.Bootstrap {
+		// TODO: Verify files contain valid info
+		return
+	}
+
+	rsaBits := 2048
+	privateKey, err := ssl.GenerateKey(x509.RSA, &rsaBits, nil)
+	if err != nil {
+		panic(fmt.Errorf("could not generate key: %v", err))
+	}
+
+	subject := pkix.Name{}
+
+	if tlsConfig.CountryCode != "" {
+		subject.Country = append(subject.Country, tlsConfig.CountryCode)
+	}
+	if tlsConfig.State != "" {
+		subject.Province = append(subject.Province, tlsConfig.State)
+	}
+	if tlsConfig.Locality != "" {
+		subject.Locality = append(subject.Locality, tlsConfig.Locality)
+	}
+	if tlsConfig.Organization != "" {
+		subject.Organization = append(subject.Organization, tlsConfig.Organization)
+	}
+	if tlsConfig.OrganizationalUnit != "" {
+		subject.OrganizationalUnit = append(subject.OrganizationalUnit, tlsConfig.OrganizationalUnit)
+	}
+	subject.CommonName = tlsConfig.CommonName
+
+	certPem, keyPem, err := ssl.GenerateCertificate(
+		serverConfig.Host,
+		subject,
+		privateKey,
+		nil, // Use default
+		nil, // Use default
+		false,
+	)
+	if err != nil {
+		panic(fmt.Errorf("could not generate cert: %v", err))
+	}
+
+	_, err = serverCertFile.Write(certPem)
+	if err != nil {
+		panic(fmt.Errorf("could not write server cert: %v", err))
+	}
+	_, err = serverKeyFile.Write(keyPem)
+	if err != nil {
+		panic(fmt.Errorf("could not write server cert: %v", err))
 	}
 }
 

@@ -149,8 +149,16 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Listening on localhost%s\n", addr)
-		log.Fatal(srv.ListenAndServe())
+		if config.Current.Server.UseTLS() {
+			log.Printf("Listening on https://localhost%s\n", addr)
+			log.Fatal(srv.ListenAndServeTLS(
+				config.Current.Server.TLS.ServerCertFile,
+				config.Current.Server.TLS.ServerKeyFile,
+			))
+		} else {
+			log.Printf("Listening on http://localhost%s\n", addr)
+			log.Fatal(srv.ListenAndServe())
+		}
 	}()
 
 	c := make(chan os.Signal, 1)
