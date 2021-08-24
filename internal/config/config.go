@@ -81,7 +81,7 @@ func (s *ServerConfig) URL() string {
 }
 
 func (s ServerConfig) UseTLS() bool {
-	return s.TLS.ServerCertFile != "" && s.TLS.ServerKeyFile != ""
+	return s.TLS != nil && s.TLS.ServerCertFile != "" && s.TLS.ServerKeyFile != ""
 }
 
 // DatabaseConfig holds configuration variables for the database.
