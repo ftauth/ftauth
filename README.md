@@ -1,6 +1,8 @@
 # FTAuth [![codecov](https://codecov.io/gh/ftauth/ftauth/branch/main/graph/badge.svg?token=G9KXI1UAGB)](https://codecov.io/gh/ftauth/ftauth)
 FTAuth (Fault-Tolerant Auth) is a secure, lightweight OAuth 2.1 server, written in Go.
 
+> Note: This project is still in development and should not be used in production. 
+
 ## Quick Start
 Run the following command to create a local instance of FTAuth:
 
