@@ -156,7 +156,7 @@ func createOIDCMetadata() (*model.OIDCProviderMetadata, error) {
 	if err != nil {
 		return nil, err
 	}
-	userInfoEndpoint.Path = path.Join(userInfoEndpoint.Path, "user")
+	userInfoEndpoint.Path = path.Join(userInfoEndpoint.Path, "userinfo")
 
 	return &model.OIDCProviderMetadata{
 		Issuer:                           metadata.Issuer,

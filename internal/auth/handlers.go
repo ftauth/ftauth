@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -86,7 +87,10 @@ func SetupRoutes(
 		TokenEndpoint,
 		dpopMiddleware(tokenEndpointHandler{db: authorizationDB, clientDB: clientDB, authDB: authenticationDB}),
 	)
-	r.Handle(LoginEndpoint, loginEndpointHandler{authenticationDB, authorizationDB})
+	r.Handle(
+		LoginEndpoint,
+		loginEndpointHandler{authenticationDB, authorizationDB},
+	)
 	r.Handle(RegisterEndpoint, registerHandler{authenticationDB: authenticationDB})
 }
 
@@ -252,25 +256,49 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Parse form body for username and password
-	err := r.ParseForm()
-	if err != nil {
-		http.Error(w, "POST endpoint accepts valid form encoding only", http.StatusBadRequest)
-		return
+	var loginData struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	var redirect bool
+	switch r.Header.Get("Content-Type") {
+	case "application/x-www-form-urlencoded":
+		redirect = true
+		// Parse form body for username and password
+		err := r.ParseForm()
+		if err != nil {
+			http.Error(w, "POST endpoint accepts valid form encoding only", http.StatusBadRequest)
+			return
+		}
+		loginData.Username = strings.ToLower(r.FormValue("username"))
+		loginData.Password = r.FormValue("password")
+	default:
+		redirect = false
+		defer r.Body.Close()
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "Could not read body", http.StatusBadRequest)
+			return
+		}
+		err = json.Unmarshal(body, &loginData)
+		if err != nil {
+			http.Error(w, "Bad JSON", http.StatusBadRequest)
+			return
+		}
 	}
 
-	username := strings.ToLower(r.FormValue("username"))
-	if username == "" {
+	if loginData.Username == "" {
 		log.Println("Username cannot be empty")
 		http.Error(w, "Username cannot be empty", http.StatusBadRequest)
 		return
 	}
-	password := r.FormValue("password")
-	if password == "" {
+
+	if loginData.Password == "" {
 		log.Println("Password cannot be empty")
 		http.Error(w, "Password cannot be empty", http.StatusBadRequest)
 		return
 	}
+
 	sessionCookie, err := r.Cookie("session")
 	if err != nil {
 		log.Println("No session found for user")
@@ -313,7 +341,12 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	ctx, cancel = context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	user, err := h.authenticationDB.VerifyUsernameAndPassword(ctx, username, requestInfo.ClientID, password)
+	user, err := h.authenticationDB.VerifyUsernameAndPassword(
+		ctx,
+		loginData.Username,
+		requestInfo.ClientID,
+		loginData.Password,
+	)
 	if err != nil {
 		log.Printf("Error validating user info: %v\n", err)
 		http.Error(w, "Invalid username and password", http.StatusBadRequest)
@@ -332,8 +365,26 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	redirect := fmt.Sprintf("%s?code=%s&state=%s", requestInfo.RedirectURI, requestInfo.Code, requestInfo.State)
-	http.Redirect(w, r, redirect, http.StatusFound)
+	if redirect {
+		redirectUrl := fmt.Sprintf("%s?code=%s&state=%s", requestInfo.RedirectURI, requestInfo.Code, requestInfo.State)
+		http.Redirect(w, r, redirectUrl, http.StatusFound)
+	} else {
+		response := struct {
+			Code  string `json:"code"`
+			State string `json:"state"`
+		}{
+			Code:  requestInfo.Code,
+			State: requestInfo.State,
+		}
+		data, err := json.Marshal(response)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
+		w.Write(data)
+	}
 }
 
 type tokenEndpointHandler struct {
@@ -495,8 +546,6 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-
-	fmt.Println(accessJWT)
 
 	response := model.TokenResponse{
 		AccessToken:  accessJWT,

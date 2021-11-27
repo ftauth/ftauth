@@ -27,7 +27,7 @@ func SetupRoutes(r *mux.Router, userDB database.UserDB) {
 	if err != nil {
 		log.Fatalln("Error setting up user routes: ", err)
 	}
-	r.Handle("/user", m.BearerAuthenticated(userHandler{userDB}))
+	r.Handle("/userinfo", m.BearerAuthenticated(userHandler{userDB}))
 	r.HandleFunc("/forgot-password", handleForgotPassword)
 }
 
@@ -84,10 +84,9 @@ func (h userHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	user.PasswordHash = ""
-	user.Subject = user.ID
+	userData := user.ToUserData()
 
-	b, err := json.Marshal(user)
+	b, err := json.Marshal(userData)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

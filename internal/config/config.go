@@ -181,7 +181,7 @@ func LoadConfig() {
 			panic(fmt.Errorf("unable to read config file: %v", err))
 		}
 	} else {
-		configPath = viper.ConfigFileUsed()
+		configPath = filepath.Dir(viper.ConfigFileUsed())
 	}
 
 	err = viper.Unmarshal(&Current)
@@ -199,7 +199,7 @@ func LoadConfig() {
 		Current.Database.Dir = filepath.Join(configPath, "data")
 	}
 
-	if _, err := os.Stat(Current.OAuth.Tokens.PrivateKeyFile); os.IsNotExist(err) {
+	if _, err := os.Stat(Current.OAuth.Tokens.PrivateKeyFile); errors.Is(err, os.ErrNotExist) {
 		generatePrivateKeys()
 		savePrivateKeys(Current.OAuth.Tokens.PrivateKeyFile)
 	} else {

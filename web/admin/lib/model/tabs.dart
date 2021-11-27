@@ -1,4 +1,0 @@
-enum Tabs {
-  clients,
-  templates,
-}

@@ -75,6 +75,7 @@ func (u *User) ToUserData() *UserData {
 	return &UserData{
 		ID:           u.ID,
 		ClientID:     u.ClientID,
+		Subject:      u.ID,
 		Username:     u.Username,
 		FirstName:    u.FirstName,
 		LastName:     u.LastName,
@@ -89,6 +90,7 @@ func (u *User) ToUserData() *UserData {
 type UserData struct {
 	ID           string         `json:"id"` // uuid
 	ClientID     string         `json:"client_id"`
+	Subject      string         `json:"sub,omitempty"`
 	Username     string         `json:"username,omitempty"`
 	FirstName    string         `json:"first_name,omitempty"`
 	LastName     string         `json:"last_name,omitempty"`

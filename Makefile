@@ -7,7 +7,7 @@ COVERFILE := coverage.txt
 GOARCH ?= amd64
 
 .PHONY: test
-test: clean server-test admin-test # landing-test
+test: clean server-test
 
 .PHONY: server-test
 server-test:
@@ -17,38 +17,9 @@ server-test:
 server: clean
 	mkdir -p bin
 	GOOS=linux CGO_ENABLED=0 GOARCH=$(GOARCH) go build -ldflags $(LDFLAGS) -o bin/ftauth ./cmd/server
-	
-# GOOS=darwin CGO_ENABLED=0 go build -ldflags $(LDFLAGS) -o bin/ftauth-macos ./cmd/server
-# GOOS=windows CGO_ENABLED=0 go build -ldflags $(LDFLAGS) -o bin/ftauth.exe ./cmd/server
 
-.PHONY: landing-static
-landing-static: clean
-	cd web/landing; \
-	dart pub get; \
-	dart tool/grind.dart
-
-.PHONY: landing-test
-landing-test:
-	cd web/landing; \
-	dart pub get; \
-	dart tool/grind.dart test
-
-.PHONY: landing
-landing: landing-static
-	mkdir -p bin
-	GOOS=linux go build -o bin/landing ./cmd/landing
-
-.PHONY: admin-static
-admin-static: clean
-	cd web/admin; \
-	flutter pub get; \
-	flutter build web;
-
-.PHONY: admin-test
-admin-test:
-	cd web/admin; \
-	flutter pub get; \
-	flutter test
+	# GOOS=darwin CGO_ENABLED=0 go build -ldflags $(LDFLAGS) -o bin/ftauth-macos ./cmd/server
+	# GOOS=windows CGO_ENABLED=0 go build -ldflags $(LDFLAGS) -o bin/ftauth.exe ./cmd/server
 
 .PHONY: docker
 docker:
@@ -56,8 +27,4 @@ docker:
 
 .PHONY: clean
 clean:
-	rm -rf bin/ $(COVERFILE) web/admin/build/ web/landing/build/
-
-.PHONY: zip
-zip:
-	zip -r eb.zip .ebextensions/ docker-compose.yaml
+	rm -rf bin/ $(COVERFILE)

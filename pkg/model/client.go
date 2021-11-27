@@ -231,7 +231,7 @@ func (client *ClientInfo) IsValid() error {
 			}
 			redirectURI, err := url.Parse(uri)
 			if err != nil {
-				return fmt.Errorf("Invalid redirect URI: %s: %v", uri, err)
+				return fmt.Errorf("invalid redirect URI: %s: %v", uri, err)
 			}
 			if redirectURI.Hostname() == "localhost" {
 				continue
