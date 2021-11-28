@@ -62,9 +62,11 @@ func makeKey(prefix, id string) []byte {
 
 // NewBadgerDB creates a new database with a Badger backend.
 // Pass `true` to create an in-memory database (useful in tests, for example).
-func NewBadgerDB(inMemory bool) (*BadgerDB, error) {
-	opts := config.Current.Database
-	path := config.Current.Database.Dir
+func NewBadgerDB(inMemory bool, opts *config.DatabaseConfig) (*BadgerDB, error) {
+	if opts == nil {
+		opts = config.Current.Database
+	}
+	path := opts.Dir
 	if path == "" && !inMemory {
 		return nil, errors.New("missing path")
 	}
@@ -115,6 +117,7 @@ func (db *BadgerDB) Close() error {
 }
 
 func (db *BadgerDB) DropAll(ctx context.Context) error {
+	db.AdminClient = nil
 	return db.DB.DropAll()
 }
 

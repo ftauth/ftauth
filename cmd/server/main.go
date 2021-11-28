@@ -75,7 +75,7 @@ func main() {
 	var db database.Database
 	var adminClient *model.ClientInfo
 	if runEmbedded {
-		badgerDB, err := database.NewBadgerDB(false)
+		badgerDB, err := database.NewBadgerDB(false, nil)
 		if err != nil {
 			log.Fatalf("Error initializing DB: %v\n", err)
 		}
@@ -84,7 +84,7 @@ func main() {
 	} else {
 		ctx := context.Background()
 		var err error
-		db, err = database.NewDgraphDatabase(ctx)
+		db, err = database.NewDgraphDatabase(ctx, nil)
 		if err != nil {
 			log.Fatalln("Error initializing DB: ", err)
 		}

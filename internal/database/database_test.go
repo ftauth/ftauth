@@ -2,7 +2,7 @@ package database
 
 import (
 	"context"
-	"fmt"
+	"os"
 	"reflect"
 	"testing"
 
@@ -18,32 +18,43 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var _runDgraph *bool
+var (
+	badgerClient  *BadgerDB
+	dgraphClient  *DgraphDatabase
+	appsyncClient *AppSyncDatabase
+
+	dgraphGraphQLUrl = os.Getenv("DGRAPH_URL")
+	dgraphGrpcUrl    = os.Getenv("DGRAPH_GRPC")
+	dgraphApiKey     = os.Getenv("DGRAPH_API_KEY")
+
+	appsyncUrl    = os.Getenv("APPSYNC_URL")
+	appsyncApiKey = os.Getenv("APPSYNC_API_KEY")
+)
 
 func runDgraph() bool {
-	if dgraphClient != nil {
-		return true
-	}
-	if _runDgraph == nil {
-		var err error
-		dgraphClient, err = NewDgraphDatabase(context.Background())
-		_runDgraph = new(bool)
-		*_runDgraph = err == nil
-		if err != nil {
-			fmt.Println("Not running Dgraph tests due to error: ", err)
-		}
-	}
-	return *_runDgraph
+	return dgraphGraphQLUrl != "" && dgraphGrpcUrl != ""
+}
+
+func runAppSync() bool {
+	return appsyncUrl != "" && appsyncApiKey != ""
 }
 
 func requireNotFound(t *testing.T, err error) {
 	require.True(t, err == badger.ErrKeyNotFound || err == ErrNotFound)
 }
 
-var dgraphClient *DgraphDatabase
-
 func setupDgraph(t *testing.T) {
-	if dgraphClient != nil {
+	if dgraphClient == nil {
+		var err error
+		dgraphClient, err = NewDgraphDatabase(context.Background(), &config.DatabaseConfig{
+			URL:     dgraphGraphQLUrl,
+			Grpc:    dgraphGrpcUrl,
+			APIKey:  dgraphApiKey,
+			SeedDB:  true,
+			DropAll: true,
+		})
+		require.NoError(t, err)
+	} else {
 		_, err := CreateAdminClient(context.Background(), dgraphClient)
 		require.NoError(t, err)
 	}
@@ -55,13 +66,14 @@ func teardownDgraph(t *testing.T) {
 	require.NoError(t, err)
 }
 
-var badgerClient *BadgerDB
-
 func setupBadger(t *testing.T) {
 	if badgerClient == nil {
-		db, err := NewBadgerDB(true)
+		var err error
+		badgerClient, err = NewBadgerDB(true, &config.DatabaseConfig{
+			SeedDB:  true,
+			DropAll: true,
+		})
 		require.NoError(t, err)
-		badgerClient = db
 	} else {
 		_, err := CreateAdminClient(context.Background(), badgerClient)
 		require.NoError(t, err)
@@ -72,6 +84,71 @@ func teardownBadger(t *testing.T) {
 	err := badgerClient.Close()
 	require.NoError(t, err)
 	badgerClient = nil
+}
+
+func setupAppSync(t *testing.T) {
+	if appsyncClient == nil {
+		var err error
+		appsyncClient, err = NewAppSyncDatabase(context.Background(), &config.DatabaseConfig{
+			URL:     appsyncUrl,
+			APIKey:  appsyncApiKey,
+			SeedDB:  true,
+			DropAll: true,
+		})
+		require.NoError(t, err)
+	} else {
+		_, err := CreateAdminClient(context.Background(), appsyncClient)
+		require.NoError(t, err)
+	}
+}
+
+func teardownAppSync(t *testing.T) {
+	err := appsyncClient.DropAll(context.Background())
+	require.NoError(t, err)
+}
+
+func runTest(t *testing.T, test func(Database)) {
+	t.Run("Badger", func(t *testing.T) {
+		setupBadger(t)
+		test(badgerClient)
+		teardownBadger(t)
+	})
+
+	if runDgraph() {
+		t.Run("Dgraph", func(t *testing.T) {
+			setupDgraph(t)
+			test(dgraphClient)
+			teardownDgraph(t)
+		})
+	}
+
+	if runAppSync() {
+		t.Run("AppSync", func(t *testing.T) {
+			setupAppSync(t)
+			test(appsyncClient)
+			teardownAppSync(t)
+		})
+	}
+}
+
+func TestDropAll(t *testing.T) {
+	config.LoadConfig()
+	ctx := context.Background()
+
+	test := func(db Database) {
+		admin, err := db.GetDefaultAdminClient(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, admin)
+
+		err = db.DropAll(ctx)
+		require.NoError(t, err)
+
+		admin, err = db.GetDefaultAdminClient(ctx)
+		require.Nil(t, admin)
+		require.Equal(t, ErrNotFound, err)
+	}
+
+	runTest(t, test)
 }
 
 func TestCreateAdmin(t *testing.T) {
@@ -88,19 +165,7 @@ func TestCreateAdmin(t *testing.T) {
 		assert.True(t, reflect.DeepEqual(client, admin))
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }
 
 func TestRegisterClient(t *testing.T) {
@@ -120,19 +185,7 @@ func TestRegisterClient(t *testing.T) {
 		assert.True(t, reflect.DeepEqual(client, &mock.PublicClient))
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }
 
 func TestGetClient(t *testing.T) {
@@ -147,19 +200,7 @@ func TestGetClient(t *testing.T) {
 		assert.True(t, reflect.DeepEqual(client, admin))
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }
 
 func TestUpdateClient(t *testing.T) {
@@ -219,19 +260,7 @@ func TestUpdateClient(t *testing.T) {
 		assert.Equal(t, refreshTokenLife, updatedClient.RefreshTokenLife)
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }
 
 func TestGetAdminClient(t *testing.T) {
@@ -244,19 +273,7 @@ func TestGetAdminClient(t *testing.T) {
 		require.NotNil(t, admin)
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }
 
 func TestListClients(t *testing.T) {
@@ -284,19 +301,7 @@ func TestListClients(t *testing.T) {
 		}
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }
 
 func TestDeleteClient(t *testing.T) {
@@ -318,19 +323,7 @@ func TestDeleteClient(t *testing.T) {
 		requireNotFound(t, err)
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }
 
 func TestCreateSession(t *testing.T) {
@@ -359,19 +352,7 @@ func TestCreateSession(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }
 
 func TestGetRequestInfo(t *testing.T) {
@@ -405,19 +386,7 @@ func TestGetRequestInfo(t *testing.T) {
 		assert.True(t, reflect.DeepEqual(req, session))
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }
 
 func TestUpdateRequestInfo(t *testing.T) {
@@ -460,19 +429,7 @@ func TestUpdateRequestInfo(t *testing.T) {
 		require.True(t, reflect.DeepEqual(req, session))
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }
 
 func TestLookupSessionByCode(t *testing.T) {
@@ -528,19 +485,7 @@ func TestLookupSessionByCode(t *testing.T) {
 		require.True(t, reflect.DeepEqual(&req1, session))
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }
 
 func TestRegisterTokens(t *testing.T) {
@@ -591,19 +536,7 @@ func TestRegisterTokens(t *testing.T) {
 		assert.Equal(t, refreshRaw, retrievedRefreshRaw)
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }
 
 func TestGetTokenByID(t *testing.T) {
@@ -654,19 +587,7 @@ func TestGetTokenByID(t *testing.T) {
 		assert.Equal(t, refreshRaw, retrievedRefreshRaw)
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }
 
 func TestIsTokenSeen(t *testing.T) {
@@ -689,19 +610,7 @@ func TestIsTokenSeen(t *testing.T) {
 		require.True(t, seen)
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }
 
 func TestRegisterUser(t *testing.T) {
@@ -717,19 +626,7 @@ func TestRegisterUser(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }
 
 func TestGetUserByID(t *testing.T) {
@@ -755,19 +652,7 @@ func TestGetUserByID(t *testing.T) {
 		requireNotFound(t, err)
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }
 
 func TestGetUserByUsername(t *testing.T) {
@@ -794,19 +679,7 @@ func TestGetUserByUsername(t *testing.T) {
 		requireNotFound(t, err)
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }
 
 func TestVerifyUsernameAndPassword(t *testing.T) {
@@ -835,17 +708,5 @@ func TestVerifyUsernameAndPassword(t *testing.T) {
 		require.Error(t, err)
 	}
 
-	t.Run("Badger", func(t *testing.T) {
-		setupBadger(t)
-		test(badgerClient)
-		teardownBadger(t)
-	})
-
-	if runDgraph() {
-		t.Run("Dgraph", func(t *testing.T) {
-			setupDgraph(t)
-			test(dgraphClient)
-			teardownDgraph(t)
-		})
-	}
+	runTest(t, test)
 }

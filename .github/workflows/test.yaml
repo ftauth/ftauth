@@ -13,8 +13,8 @@ jobs:
     name: Server
     strategy:
       matrix:
-        dgraph-version: [v20.11.2]
-        go-version: [1.16]
+        dgraph-version: [v21.03.2]
+        go-version: [1.17]
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     container:
@@ -31,7 +31,8 @@ jobs:
       - name: Test
         run: make server-test
         env:
-          FTAUTH_DATABASE_URL: http://dgraph:8080/graphql
+          DGRAPH_URL: http://dgraph:8080/graphql
+          DGRAPH_GRPC: http://dgraph:9080
       - name: Upload Coverage
         uses: codecov/codecov-action@v1
         with:

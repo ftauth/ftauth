@@ -34,7 +34,7 @@ type clientTestSuite struct {
 func (suite *clientTestSuite) SetupSuite() {
 	config.LoadConfig()
 
-	db, err := database.NewBadgerDB(true)
+	db, err := database.NewBadgerDB(true, nil)
 	require.NoError(suite.T(), err)
 
 	admin := db.AdminClient

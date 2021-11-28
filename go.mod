@@ -3,6 +3,10 @@ module github.com/ftauth/ftauth
 go 1.16
 
 require (
+	github.com/aws/aws-sdk-go-v2 v1.11.1 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.10.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/appsync v1.9.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.8.1 // indirect
 	github.com/dgraph-io/badger/v3 v3.2103.1
 	github.com/dgraph-io/dgo/v210 v210.0.0-20210825123656-d3f867fe9cc3
 	github.com/gofrs/uuid v4.0.0+incompatible

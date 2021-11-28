@@ -67,7 +67,7 @@ func TestHandleTokenRequestError(t *testing.T) {
 func TestAuthorizationEndpoint(t *testing.T) {
 	config.LoadConfig()
 
-	db, err := database.NewBadgerDB(true)
+	db, err := database.NewBadgerDB(true, nil)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -317,7 +317,7 @@ func TestAuthorizationEndpoint(t *testing.T) {
 func TestClientCredentialsGrant(t *testing.T) {
 	config.LoadConfig()
 
-	db, err := database.NewBadgerDB(true)
+	db, err := database.NewBadgerDB(true, nil)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -447,7 +447,7 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 	ctx := context.Background()
 	config.LoadConfig()
 
-	db, err := database.NewBadgerDB(true)
+	db, err := database.NewBadgerDB(true, nil)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -636,7 +636,7 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 func TestRefreshTokenGrant(t *testing.T) {
 	config.LoadConfig()
 
-	db, err := database.NewBadgerDB(true)
+	db, err := database.NewBadgerDB(true, nil)
 	require.NoError(t, err)
 	defer db.Close()
 

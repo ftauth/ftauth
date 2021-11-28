@@ -203,6 +203,11 @@ func (client *GraphQLClient) Do(ctx context.Context, req *graphql.Request) (*gra
 	}
 	defer response.Body.Close()
 
+	if response.StatusCode != http.StatusOK {
+		body, err := io.ReadAll(response.Body)
+		return nil, fmt.Errorf("%d: %s (%v)", response.StatusCode, body, err)
+	}
+
 	resp := graphql.Response{
 		Data: req.Response,
 	}

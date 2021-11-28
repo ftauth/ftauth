@@ -71,34 +71,47 @@ func setupDgoClient(ctx context.Context) (*grpc.ClientConn, *dgo.Dgraph, error) 
 	if grpcURL.Port() == "" {
 		grpcURL.Host = fmt.Sprintf("%s:%d", grpcURL.Hostname(), 9080)
 	}
-	grpcURL.Scheme = ""
 
-	// From dgo
-	pool, err := x509.SystemCertPool()
-	if err != nil {
-		return nil, nil, err
+	var dialOpts []grpc.DialOption
+	if grpcURL.Scheme == "https" {
+		// From dgo
+		pool, err := x509.SystemCertPool()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		creds := credentials.NewClientTLSFromCert(pool, "")
+
+		dialOpts = []grpc.DialOption{
+			grpc.WithTransportCredentials(creds),
+			grpc.WithPerRPCCredentials(&authCreds{opts.APIKey}),
+		}
+	} else {
+		dialOpts = []grpc.DialOption{
+			grpc.WithInsecure(),
+		}
 	}
 
-	creds := credentials.NewClientTLSFromCert(pool, "")
-
+	grpcURL.Scheme = ""
 	grpcConn, err := grpc.DialContext(
 		ctx,
 		grpcURL.Host,
-		grpc.WithTransportCredentials(creds),
-		grpc.WithPerRPCCredentials(&authCreds{opts.APIKey}),
+		dialOpts...,
 	)
 	if err != nil {
 		return nil, nil, err
 	}
 	dgraphClient := dgo.NewDgraphClient(api.NewDgraphClient(grpcConn))
 
-	return grpcConn, dgraphClient, err
+	return grpcConn, dgraphClient, nil
 }
 
 // NewDgraphDatabase creates a new Dgraph database connection
 // uses settings from the loaded configuration.
-func NewDgraphDatabase(ctx context.Context) (*DgraphDatabase, error) {
-	opts := config.Current.Database
+func NewDgraphDatabase(ctx context.Context, opts *config.DatabaseConfig) (*DgraphDatabase, error) {
+	if opts == nil {
+		opts = config.Current.Database
+	}
 	privateKey, err := config.Current.GetKeyForAlgorithm(jwt.AlgorithmRSASHA256, true)
 	if err != nil {
 		return nil, err
@@ -132,7 +145,7 @@ func NewDgraphDatabase(ctx context.Context) (*DgraphDatabase, error) {
 	}
 
 	if opts.DropAll {
-		ctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
 		err = db.DropAll(ctx)
@@ -208,7 +221,7 @@ func (db *DgraphDatabase) GetDefaultAdminClient(ctx context.Context) (*model.Cli
 	if err != nil {
 		return nil, err
 	}
-	if len(response.QueryScope) != 1 {
+	if len(response.QueryScope) == 0 {
 		return nil, ErrNotFound
 	}
 	if len(response.QueryScope[0].Clients) == 0 {
@@ -241,7 +254,8 @@ func (db *DgraphDatabase) Close() error {
 func (db *DgraphDatabase) DropAll(ctx context.Context) error {
 	db.adminClient = nil
 	op := &api.Operation{
-		DropOp: api.Operation_DATA,
+		DropOp:          api.Operation_DATA,
+		RunInBackground: false,
 	}
 	return db.dgoClient.Alter(ctx, op)
 }

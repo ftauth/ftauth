@@ -22,7 +22,7 @@ import (
 func TestBearerAuthentated(t *testing.T) {
 	config.LoadConfig()
 
-	db, err := database.NewBadgerDB(true)
+	db, err := database.NewBadgerDB(true, nil)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -142,7 +142,7 @@ func TestBearerAuthentated(t *testing.T) {
 func TestBearerAuthentatedWithScope(t *testing.T) {
 	config.LoadConfig()
 
-	db, err := database.NewBadgerDB(true)
+	db, err := database.NewBadgerDB(true, nil)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -280,7 +280,7 @@ func TestBearerAuthentatedWithScope(t *testing.T) {
 func TestDPoPAuthenticated(t *testing.T) {
 	config.LoadConfig()
 
-	db, err := database.NewBadgerDB(true)
+	db, err := database.NewBadgerDB(true, nil)
 	require.NoError(t, err)
 	defer db.Close()
 
