@@ -33,6 +33,9 @@ jobs:
         env:
           DGRAPH_URL: http://dgraph:8080/graphql
           DGRAPH_GRPC: http://dgraph:9080
+          DGRAPH_SLASH_URL: ${{ secrets.DGRAPH_SLASH_URL }}
+          DGRAPH_SLASH_GRPC: ${{ secrets.DGRAPH_SLASH_GRPC }}
+          DGRAPH_SLASH_API_KEY: ${{ secrets.DGRAPH_SLASH_API_KEY }}
       - name: Upload Coverage
         uses: codecov/codecov-action@v1
         with:
@@ -40,61 +43,3 @@ jobs:
           file: ./coverage.txt
           fail_ci_if_error: true
           verbose: true
-
-  # admin:
-  #   name: Admin
-  #   strategy:
-  #     matrix:
-  #       # Test on multiple Flutter versions to ensure
-  #       # regressions do not occur - and to give a heads
-  #       # up for upcoming breaking changes.
-  #       flutter-version: [beta, dev]
-  #       os: [ubuntu-latest]
-  #     fail-fast: false
-  #   runs-on: ${{ matrix.os }}
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v2
-  #     - name: Setup Flutter
-  #       uses: subosito/flutter-action@v1
-  #       with:
-  #         channel: ${{ matrix.flutter-version }}
-  #     - name: Cache Pubcache
-  #       uses: actions/cache@v2
-  #       env:
-  #         cache-name: pubcache
-  #       with:
-  #         path: ~/.pub-cache
-  #         key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('web/admin/pubspec.lock') }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-build-${{ env.cache-name }}-
-  #     - name: Test
-  #       run: make admin-test
-  
-  # landing:
-  #   name: Landing
-  #   strategy:
-  #     matrix:
-  #       go-version: [1.15]
-  #       dart-sdk: [stable]
-  #       os: [ubuntu-latest]
-  #   runs-on: ${{ matrix.os }}
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v2
-  #     - name: Setup Dart
-  #       uses: dart-lang/setup-dart@main
-  #       with:
-  #         sdk: ${{ matrix.dart-sdk }}
-  #     - name: Cache Pubcache
-  #       uses: actions/cache@v2
-  #       env:
-  #         cache-name: pubcache
-  #       with:
-  #         path: ~/.pub-cache
-  #         key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('web/landing/pubspec.lock') }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-build-${{ env.cache-name }}-
-  #     - run: apt-get update && apt-get install chromium-browser
-  #     - name: Test
-  #       run: make landing-test

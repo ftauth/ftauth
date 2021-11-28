@@ -62,8 +62,7 @@ var (
 	ErrNotFound = errors.New("not found")
 )
 
-func setupDgoClient(ctx context.Context) (*grpc.ClientConn, *dgo.Dgraph, error) {
-	opts := config.Current.Database
+func setupDgoClient(ctx context.Context, opts *config.DatabaseConfig) (*grpc.ClientConn, *dgo.Dgraph, error) {
 	grpcURL, err := url.Parse(opts.Grpc)
 	if err != nil {
 		return nil, nil, err
@@ -122,7 +121,7 @@ func NewDgraphDatabase(ctx context.Context, opts *config.DatabaseConfig) (*Dgrap
 	if err != nil {
 		return nil, err
 	}
-	grpcConn, dgoClient, err := setupDgoClient(ctx)
+	grpcConn, dgoClient, err := setupDgoClient(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +144,7 @@ func NewDgraphDatabase(ctx context.Context, opts *config.DatabaseConfig) (*Dgrap
 	}
 
 	if opts.DropAll {
-		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
 		err = db.DropAll(ctx)
@@ -161,7 +160,7 @@ func NewDgraphDatabase(ctx context.Context, opts *config.DatabaseConfig) (*Dgrap
 		}
 
 		{
-			ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
 
 			err := client.UpdateSchema(ctx, schema)

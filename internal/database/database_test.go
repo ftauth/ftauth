@@ -19,24 +19,25 @@ import (
 )
 
 var (
-	badgerClient  *BadgerDB
-	dgraphClient  *DgraphDatabase
-	appsyncClient *AppSyncDatabase
+	badgerClient      *BadgerDB
+	dgraphClient      *DgraphDatabase
+	dgraphSlashClient *DgraphDatabase
 
 	dgraphGraphQLUrl = os.Getenv("DGRAPH_URL")
 	dgraphGrpcUrl    = os.Getenv("DGRAPH_GRPC")
 	dgraphApiKey     = os.Getenv("DGRAPH_API_KEY")
 
-	appsyncUrl    = os.Getenv("APPSYNC_URL")
-	appsyncApiKey = os.Getenv("APPSYNC_API_KEY")
+	dgraphSlashGraphQlUrl = os.Getenv("DGRAPH_SLASH_URL")
+	dgraphSlashGrpcUrl    = os.Getenv("DGRAPH_SLASH_GRPC")
+	dgraphSlashApiKey     = os.Getenv("DGRAPH_SLASH_API_KEY")
 )
 
 func runDgraph() bool {
 	return dgraphGraphQLUrl != "" && dgraphGrpcUrl != ""
 }
 
-func runAppSync() bool {
-	return appsyncUrl != "" && appsyncApiKey != ""
+func runDgraphSlash() bool {
+	return dgraphSlashGraphQlUrl != "" && dgraphSlashGrpcUrl != "" && dgraphSlashApiKey != ""
 }
 
 func requireNotFound(t *testing.T, err error) {
@@ -60,9 +61,32 @@ func setupDgraph(t *testing.T) {
 	}
 }
 
+func setupDgraphSlash(t *testing.T) {
+	if dgraphSlashClient == nil {
+		var err error
+		dgraphSlashClient, err = NewDgraphDatabase(context.Background(), &config.DatabaseConfig{
+			URL:     dgraphSlashGraphQlUrl,
+			Grpc:    dgraphSlashGrpcUrl,
+			APIKey:  dgraphSlashApiKey,
+			SeedDB:  true,
+			DropAll: true,
+		})
+		require.NoError(t, err)
+	} else {
+		_, err := CreateAdminClient(context.Background(), dgraphSlashClient)
+		require.NoError(t, err)
+	}
+}
+
 func teardownDgraph(t *testing.T) {
 	ctx := context.Background()
 	err := dgraphClient.DropAll(ctx)
+	require.NoError(t, err)
+}
+
+func teardownDgraphSlash(t *testing.T) {
+	ctx := context.Background()
+	err := dgraphSlashClient.DropAll(ctx)
 	require.NoError(t, err)
 }
 
@@ -85,28 +109,6 @@ func teardownBadger(t *testing.T) {
 	require.NoError(t, err)
 	badgerClient = nil
 }
-
-func setupAppSync(t *testing.T) {
-	if appsyncClient == nil {
-		var err error
-		appsyncClient, err = NewAppSyncDatabase(context.Background(), &config.DatabaseConfig{
-			URL:     appsyncUrl,
-			APIKey:  appsyncApiKey,
-			SeedDB:  true,
-			DropAll: true,
-		})
-		require.NoError(t, err)
-	} else {
-		_, err := CreateAdminClient(context.Background(), appsyncClient)
-		require.NoError(t, err)
-	}
-}
-
-func teardownAppSync(t *testing.T) {
-	err := appsyncClient.DropAll(context.Background())
-	require.NoError(t, err)
-}
-
 func runTest(t *testing.T, test func(Database)) {
 	t.Run("Badger", func(t *testing.T) {
 		setupBadger(t)
@@ -122,11 +124,11 @@ func runTest(t *testing.T, test func(Database)) {
 		})
 	}
 
-	if runAppSync() {
-		t.Run("AppSync", func(t *testing.T) {
-			setupAppSync(t)
-			test(appsyncClient)
-			teardownAppSync(t)
+	if runDgraphSlash() {
+		t.Run("Dgraph Slash", func(t *testing.T) {
+			setupDgraphSlash(t)
+			test(dgraphSlashClient)
+			teardownDgraphSlash(t)
 		})
 	}
 }
