@@ -109,6 +109,7 @@ func teardownBadger(t *testing.T) {
 	require.NoError(t, err)
 	badgerClient = nil
 }
+
 func runTest(t *testing.T, test func(Database)) {
 	t.Run("Badger", func(t *testing.T) {
 		setupBadger(t)
@@ -708,6 +709,96 @@ func TestVerifyUsernameAndPassword(t *testing.T) {
 
 		_, err = db.VerifyUsernameAndPassword(ctx, "wrong_username", "client", "password")
 		require.Error(t, err)
+	}
+
+	runTest(t, test)
+}
+
+func TestRegisterScope(t *testing.T) {
+	ctx := context.Background()
+	config.LoadConfig()
+
+	test := func(db Database) {
+		const scopeName = "my_scope"
+
+		scope, err := db.RegisterScope(ctx, scopeName)
+		require.NoError(t, err)
+		require.Equal(t, scopeName, scope.Name)
+	}
+
+	runTest(t, test)
+}
+
+func TestGetScope(t *testing.T) {
+	ctx := context.Background()
+	config.LoadConfig()
+
+	test := func(db Database) {
+		const scopeName = "my_scope"
+
+		scope, err := db.RegisterScope(ctx, scopeName)
+		require.NoError(t, err)
+		require.Equal(t, scopeName, scope.Name)
+
+		scope, err = db.GetScope(ctx, scopeName)
+		require.NoError(t, err)
+		require.Equal(t, scopeName, scope.Name)
+	}
+
+	runTest(t, test)
+}
+
+func TestDeleteScope(t *testing.T) {
+	ctx := context.Background()
+	config.LoadConfig()
+
+	test := func(db Database) {
+		const scopeName = "my_scope"
+
+		scope, err := db.RegisterScope(ctx, scopeName)
+		require.NoError(t, err)
+		require.Equal(t, scopeName, scope.Name)
+
+		scope, err = db.GetScope(ctx, scopeName)
+		require.NoError(t, err)
+		require.Equal(t, scopeName, scope.Name)
+
+		err = db.DeleteScope(ctx, scopeName)
+		require.NoError(t, err)
+
+		_, err = db.GetScope(ctx, scopeName)
+		require.EqualError(t, err, "Key not found")
+	}
+
+	runTest(t, test)
+}
+
+func TestListScopes(t *testing.T) {
+	ctx := context.Background()
+	config.LoadConfig()
+
+	test := func(db Database) {
+		scopeNames := []string{"scope1", "scope2", "scope3"}
+
+		for _, scopeName := range scopeNames {
+			scope, err := db.RegisterScope(ctx, scopeName)
+			require.NoError(t, err)
+			require.Equal(t, scopeName, scope.Name)
+		}
+
+		scopes, err := db.ListScopes(ctx)
+		require.NoError(t, err)
+		for _, scopeName := range scopeNames {
+			var found bool
+			for _, scope := range scopes {
+				if scope.Name == scopeName {
+					found = true
+					break
+				}
+			}
+			require.True(t, found)
+		}
+
 	}
 
 	runTest(t, test)

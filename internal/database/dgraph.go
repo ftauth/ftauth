@@ -59,7 +59,7 @@ type DgraphOptions struct {
 
 // Common errors
 var (
-	ErrNotFound = errors.New("not found")
+	ErrNotFound = errors.New("Key not found")
 )
 
 func setupDgoClient(ctx context.Context, opts *config.DatabaseConfig) (*grpc.ClientConn, *dgo.Dgraph, error) {
@@ -341,7 +341,7 @@ func (db *DgraphDatabase) UpdateClient(ctx context.Context, clientUpdate model.C
 	if err != nil {
 		return nil, err
 	}
-	if response.UpdateClientInfo.NumUIDs != 1 {
+	if response.UpdateClientInfo.NumUIDs == 0 {
 		return nil, ErrNotFound
 	}
 
@@ -377,7 +377,7 @@ func (db *DgraphDatabase) RegisterClient(ctx context.Context, clientInfo *model.
 	if err != nil {
 		return nil, err
 	}
-	if response.AddClientInfo.ClientInfo == nil || len(response.AddClientInfo.ClientInfo) != 1 {
+	if len(response.AddClientInfo.ClientInfo) == 0 {
 		return nil, errors.New("error saving client")
 	}
 
@@ -413,7 +413,7 @@ func (db *DgraphDatabase) DeleteClient(ctx context.Context, clientID string) err
 	if err != nil {
 		return err
 	}
-	if response.DeleteClientInfo.NumUIDs != 1 {
+	if response.DeleteClientInfo.NumUIDs == 0 {
 		return ErrNotFound
 	}
 
@@ -451,15 +451,10 @@ func (db *DgraphDatabase) GetScope(ctx context.Context, scopeName string) (*mode
 	q := `
 	%s
 	query {
-		getScope(
-			filter: {
-				name: { eq: "%s" }
-			}
-		) {
+		getScope(name: "%s") {
 			...AllScopeInfo
 		}
-	}
-	`
+	}`
 
 	q = fmt.Sprintf(q, model.AllScopeInfo, scopeName)
 
@@ -472,6 +467,9 @@ func (db *DgraphDatabase) GetScope(ctx context.Context, scopeName string) (*mode
 	})
 	if err != nil {
 		return nil, err
+	}
+	if response.Scope == nil {
+		return nil, ErrNotFound
 	}
 
 	return response.Scope, nil
@@ -503,7 +501,7 @@ func (db *DgraphDatabase) RegisterScope(ctx context.Context, scopeName string) (
 	if err != nil {
 		return nil, err
 	}
-	if response.AddScope.NumUIDs != 1 {
+	if response.AddScope.NumUIDs == 0 {
 		return nil, errors.New("error saving scope")
 	}
 
@@ -537,7 +535,7 @@ func (db *DgraphDatabase) DeleteScope(ctx context.Context, scope string) error {
 	if err != nil {
 		return err
 	}
-	if response.DeleteScope.NumUIDs != 1 {
+	if response.DeleteScope.NumUIDs == 0 {
 		return errors.New("error deleting scope")
 	}
 
@@ -571,7 +569,7 @@ func (db *DgraphDatabase) CreateSession(ctx context.Context, request *model.Auth
 	if err != nil {
 		return err
 	}
-	if response.Response.NumUIDs != 1 {
+	if response.Response.NumUIDs == 0 {
 		return errors.New("error creating session")
 	}
 
@@ -639,7 +637,7 @@ func (db *DgraphDatabase) UpdateRequestInfo(ctx context.Context, requestInfo *mo
 	if err != nil {
 		return err
 	}
-	if response.Response.NumUIDs != 1 {
+	if response.Response.NumUIDs == 0 {
 		return errors.New("error updating request")
 	}
 
@@ -673,7 +671,7 @@ func (db *DgraphDatabase) LookupSessionByCode(ctx context.Context, code string) 
 	if err != nil {
 		return nil, err
 	}
-	if len(response.AuthorizationRequests) != 1 {
+	if len(response.AuthorizationRequests) == 0 {
 		return nil, ErrNotFound
 	}
 
@@ -716,7 +714,7 @@ func (db *DgraphDatabase) registerJWT(ctx context.Context, id, jwt string) error
 	if err != nil {
 		return err
 	}
-	if response.Response.NumUIDs != 1 {
+	if response.Response.NumUIDs == 0 {
 		return errors.New("error saving token")
 	}
 
@@ -796,7 +794,7 @@ func (db *DgraphDatabase) RegisterUser(ctx context.Context, user *model.User) er
 	if err != nil {
 		return err
 	}
-	if response.Response.NumUIDs != 1 {
+	if response.Response.NumUIDs == 0 {
 		return errors.New("error saving user")
 	}
 
@@ -861,7 +859,7 @@ func (db *DgraphDatabase) GetUserByUsername(ctx context.Context, username, clien
 	if err != nil {
 		return nil, err
 	}
-	if len(response.Users) != 1 {
+	if len(response.Users) == 0 {
 		return nil, ErrNotFound
 	}
 
