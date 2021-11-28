@@ -9,6 +9,7 @@ import (
 	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/internal/database"
 	"github.com/ftauth/ftauth/pkg/model"
+	"github.com/ftauth/ftauth/pkg/oauth"
 )
 
 type authorizationRequestError struct {
@@ -164,7 +165,7 @@ func (v ftauthValidator) ValidateAuthorizationCodeRequest(r *http.Request) (*mod
 	}
 
 	// Generate authorization request
-	code := model.GenerateAuthorizationCode()
+	code := oauth.GenerateState()
 	exp := time.Now().Add(10 * time.Minute) // TODO: document
 
 	scopes, _ := model.ParseScope(scope)

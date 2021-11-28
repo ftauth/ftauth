@@ -2,25 +2,28 @@ package database
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"net/url"
 	"time"
 
-	"github.com/dgraph-io/dgo/v200"
-	"github.com/dgraph-io/dgo/v200/protos/api"
+	"github.com/dgraph-io/dgo/v210"
+	"github.com/dgraph-io/dgo/v210/protos/api"
 	"github.com/ftauth/ftauth/internal/config"
+	"github.com/ftauth/ftauth/pkg/dgraph"
 	"github.com/ftauth/ftauth/pkg/graphql"
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/ftauth/ftauth/pkg/util/passwordutil"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 // DgraphDatabase holds connection to a Dgraph DB instance.
 type DgraphDatabase struct {
 	// The Dgraph client, wrapping conn.
-	client *graphql.Client
+	client *dgraph.GraphQLClient
 
 	// Admin client
 	adminClient *model.ClientInfo
@@ -30,13 +33,28 @@ type DgraphDatabase struct {
 	dgoClient *dgo.Dgraph
 }
 
+// From dgo: gRPC authorization credentials
+type authCreds struct {
+	token string
+}
+
+func (a *authCreds) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
+	return map[string]string{"Authorization": a.token}, nil
+}
+
+func (a *authCreds) RequireTransportSecurity() bool {
+	return true
+}
+
 // DgraphOptions holds configuration options for the Dgraph database.
 type DgraphOptions struct {
-	URL      string
-	APIKey   string
-	Username string
-	Password string
-	SeedDB   bool
+	GraphQLEndpoint string
+	GrpcEndpoint    string
+	APIKey          string
+	Username        string
+	Password        string
+	SeedDB          bool
+	DropAll         bool // Whether to drop all data
 }
 
 // Common errors
@@ -44,36 +62,52 @@ var (
 	ErrNotFound = errors.New("not found")
 )
 
-func setupDgoClient(_url string) (*grpc.ClientConn, *dgo.Dgraph, error) {
-	grpcURL, err := url.Parse(_url)
+func setupDgoClient(ctx context.Context, opts DgraphOptions) (*grpc.ClientConn, *dgo.Dgraph, error) {
+	grpcURL, err := url.Parse(opts.GrpcEndpoint)
+	if err != nil {
+		return nil, nil, err
+	}
+	if grpcURL.Port() == "" {
+		grpcURL.Host = fmt.Sprintf("%s:%d", grpcURL.Hostname(), 9080)
+	}
+	grpcURL.Scheme = ""
+
+	// From dgo
+	pool, err := x509.SystemCertPool()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	grpcConn, err := grpc.Dial(fmt.Sprintf("%s:%d", grpcURL.Hostname(), 9080), grpc.WithInsecure())
+	creds := credentials.NewClientTLSFromCert(pool, "")
+
+	grpcConn, err := grpc.DialContext(
+		ctx,
+		grpcURL.Host,
+		grpc.WithTransportCredentials(creds),
+		grpc.WithPerRPCCredentials(&authCreds{opts.APIKey}),
+	)
 	if err != nil {
 		return nil, nil, err
 	}
 	dgraphClient := dgo.NewDgraphClient(api.NewDgraphClient(grpcConn))
 
-	return grpcConn, dgraphClient, nil
+	return grpcConn, dgraphClient, err
 }
 
 // InitializeDgraphDatabase creates a new Dgraph database connection
 // uses settings from the loaded configuration.
 func InitializeDgraphDatabase(ctx context.Context, opts DgraphOptions) (*DgraphDatabase, error) {
-	addr := config.Current.Database.URL
 	privateKey, err := config.Current.GetKeyForAlgorithm(jwt.AlgorithmRSASHA256, true)
 	if err != nil {
 		return nil, err
 	}
-	client, err := graphql.NewClient(addr, privateKey, map[string]interface{}{
+	client, err := dgraph.NewClient(opts.GraphQLEndpoint, privateKey, opts.APIKey, map[string]interface{}{
 		"ROLE": "SUPERUSER",
 	})
 	if err != nil {
 		return nil, err
 	}
-	grpcConn, dgoClient, err := setupDgoClient(addr)
+	grpcConn, dgoClient, err := setupDgoClient(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +118,7 @@ func InitializeDgraphDatabase(ctx context.Context, opts DgraphOptions) (*DgraphD
 		dgoClient: dgoClient,
 	}
 
+	// Check DB health via GraphQL endpoint
 	{
 		ctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
 		defer cancel()
@@ -94,20 +129,20 @@ func InitializeDgraphDatabase(ctx context.Context, opts DgraphOptions) (*DgraphD
 		}
 	}
 
+	if opts.DropAll {
+		ctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
+		defer cancel()
+
+		err = db.DropAll(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if opts.SeedDB {
 		schema, err := model.Schema()
 		if err != nil {
 			return nil, err
-		}
-
-		{
-			ctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
-			defer cancel()
-
-			err := client.ValidateSchema(ctx, schema)
-			if err != nil {
-				return nil, err
-			}
 		}
 
 		{
@@ -192,7 +227,7 @@ func (db *DgraphDatabase) Seed(ctx context.Context) (*model.ClientInfo, error) {
 	}
 
 	// Create admin client if absent
-	return CreateAdminClient(db)
+	return CreateAdminClient(ctx, db)
 }
 
 // Close handles closing all connections to the database.
@@ -201,7 +236,7 @@ func (db *DgraphDatabase) Close() error {
 }
 
 // clear drops all data from the database.
-func (db *DgraphDatabase) clear(ctx context.Context) error {
+func (db *DgraphDatabase) DropAll(ctx context.Context) error {
 	db.adminClient = nil
 	op := &api.Operation{
 		DropOp: api.Operation_DATA,

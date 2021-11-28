@@ -42,10 +42,6 @@ func makeUserKey(id string) []byte {
 	return makeKey(prefixUser, id)
 }
 
-func makeMetadataKey(id uint64) []byte {
-	return makeKey(prefixMetadata, fmt.Sprintf("%d", id))
-}
-
 func makeScopeKey(id string) []byte {
 	return makeKey(prefixScope, id)
 }
@@ -68,6 +64,7 @@ type BadgerOptions struct {
 	Path     string // Path to the DB storage
 	InMemory bool   // Whether or not the DB is in memory
 	SeedDB   bool   // Whether or not to seed the DB
+	DropAll  bool   // Whether to drop all data
 }
 
 // InitializeBadgerDB creates a new database with a Badger backend.
@@ -89,12 +86,18 @@ func InitializeBadgerDB(opts BadgerOptions) (*BadgerDB, error) {
 		return nil, err
 	}
 
-	// TODO: If empty, seed with default client and server metadata.
 	badgerDB := &BadgerDB{DB: db, Options: opts}
+
+	if opts.DropAll {
+		err = badgerDB.DropAll(context.Background())
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	if opts.SeedDB {
 		if badgerDB.isEmpty() {
-			admin, err := CreateAdminClient(badgerDB)
+			admin, err := CreateAdminClient(context.Background(), badgerDB)
 			if err != nil {
 				return nil, err
 			}
@@ -114,6 +117,10 @@ func InitializeBadgerDB(opts BadgerOptions) (*BadgerDB, error) {
 // Close handles closing all connections to the database.
 func (db *BadgerDB) Close() error {
 	return db.DB.Close()
+}
+
+func (db *BadgerDB) DropAll(ctx context.Context) error {
+	return db.DB.DropAll()
 }
 
 // Reset clears all non-mandatory keys from the database.

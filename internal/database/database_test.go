@@ -27,7 +27,8 @@ func runDgraph() bool {
 	if _runDgraph == nil {
 		var err error
 		dgraphClient, err = InitializeDgraphDatabase(context.Background(), DgraphOptions{
-			SeedDB: true,
+			SeedDB:  true,
+			DropAll: true,
 		})
 		_runDgraph = new(bool)
 		*_runDgraph = err == nil
@@ -46,14 +47,14 @@ var dgraphClient *DgraphDatabase
 
 func setupDgraph(t *testing.T) {
 	if dgraphClient != nil {
-		_, err := CreateAdminClient(dgraphClient)
+		_, err := CreateAdminClient(context.Background(), dgraphClient)
 		require.NoError(t, err)
 	}
 }
 
 func teardownDgraph(t *testing.T) {
 	ctx := context.Background()
-	err := dgraphClient.clear(ctx)
+	err := dgraphClient.DropAll(ctx)
 	require.NoError(t, err)
 }
 
@@ -65,7 +66,7 @@ func setupBadger(t *testing.T) {
 		require.NoError(t, err)
 		badgerClient = db
 	} else {
-		_, err := CreateAdminClient(badgerClient)
+		_, err := CreateAdminClient(context.Background(), badgerClient)
 		require.NoError(t, err)
 	}
 }

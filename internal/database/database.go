@@ -12,24 +12,6 @@ import (
 // for a database operation to complete.
 const DefaultTimeout = time.Second * 3
 
-// // SQLDatabase is a database for communicating with an SQL server.
-// type SQLDatabase struct {
-// 	Type model.DatabaseType
-// 	DB   *sqlx.DB
-// }
-
-// // Bindvar returns the query parameter type for this database for use with sqlx.
-// func (db *SQLDatabase) Bindvar() int {
-// 	switch db.Type {
-// 	case model.DatabaseTypeOracle:
-// 		return sqlx.NAMED
-// 	case model.DatabaseTypePostgres:
-// 		return sqlx.DOLLAR
-// 	default:
-// 		return sqlx.UNKNOWN
-// 	}
-// }
-
 // Database handles all interactions with the data backend.
 type Database interface {
 	ClientDB
@@ -39,6 +21,7 @@ type Database interface {
 	ScopeDB
 	GetDefaultAdminClient(ctx context.Context) (*model.ClientInfo, error)
 	Close() error
+	DropAll(ctx context.Context) error
 }
 
 // ClientDB handles interactions with the client database.

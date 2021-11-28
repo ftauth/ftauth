@@ -50,10 +50,14 @@ func (s *ServerConfig) URL() string {
 
 // DatabaseConfig holds configuration variables for the database.
 type DatabaseConfig struct {
-	URL      string
-	APIKey   string
-	Username string
-	Password string
+	// The GraphQL endpoint
+	URL string
+
+	// The Dgraph gRPC endpoint
+	Grpc string
+
+	// The GraphQL API key
+	APIKey string
 
 	// For embedded DB
 	Dir string // Path to store data in (for embedded)

@@ -30,14 +30,11 @@ func GenerateCodeChallenge() (string, string) {
 }
 
 // GenerateState produces a new random state.
-func GenerateState() (string, error) {
+func GenerateState() string {
 	r := crand.Reader
 	var b bytes.Buffer
-	_, err := io.CopyN(&b, r, 16)
-	if err != nil {
-		return "", err
-	}
-	return base64url.Encode(b.Bytes()), nil
+	io.CopyN(&b, r, 16)
+	return base64url.Encode(b.Bytes())
 }
 
 // CreateBasicAuthorization returns an Authorization header value for basic client authentication.

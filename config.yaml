@@ -3,9 +3,8 @@ server:
   host: localhost
   port: 8000
 database:
-  host: localhost
-  port: 5432
-  dbname: oauth
+  url: http://localhost:8080
+  grpc: http://localhost:9080
 oauth:
   tokens:
     # The paths to the RSA private key for signing JWT tokens

@@ -10,7 +10,7 @@ import (
 )
 
 // CreateAdminClient creates an admin client in the database.
-func CreateAdminClient(db Database) (*model.ClientInfo, error) {
+func CreateAdminClient(ctx context.Context, db Database) (*model.ClientInfo, error) {
 	clientID := config.Current.OAuth.Admin.ClientID
 	if clientID == "" {
 		id, err := uuid.NewV4()
@@ -60,7 +60,7 @@ func CreateAdminClient(db Database) (*model.ClientInfo, error) {
 		Username:     config.Current.OAuth.Admin.Username,
 		PasswordHash: passwordHash,
 	}
-	err = db.RegisterUser(context.Background(), user)
+	err = db.RegisterUser(ctx, user)
 	if err != nil {
 		return nil, err
 	}

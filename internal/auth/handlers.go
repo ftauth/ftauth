@@ -323,16 +323,6 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Delete session cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   0,
-		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
-	})
-
 	if requestInfo.Expiry.Before(time.Now()) {
 		http.Error(w, "Session expired", http.StatusBadRequest)
 		return
@@ -364,6 +354,16 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+
+	// Delete session cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   0,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	})
 
 	if redirect {
 		redirectUrl := fmt.Sprintf("%s?code=%s&state=%s", requestInfo.RedirectURI, requestInfo.Code, requestInfo.State)

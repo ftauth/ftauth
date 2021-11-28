@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/ftauth/ftauth/pkg/graphql"
+	"github.com/ftauth/ftauth/pkg/oauth"
 	"github.com/ftauth/ftauth/pkg/util"
-	"github.com/ftauth/ftauth/pkg/util/sqlutil"
 	"github.com/gofrs/uuid"
 )
 
@@ -84,7 +84,7 @@ func NewClient(
 ) (*ClientInfo, error) {
 	var secret string
 	if typ == ClientTypeConfidential {
-		secret = GenerateAuthorizationCode()
+		secret = oauth.GenerateState()
 	}
 	var grantTypes []GrantType
 	if typ == ClientTypeConfidential {
@@ -274,17 +274,6 @@ type ClientInfoUpdate struct {
 	AccessTokenLife  *int        `json:"access_token_life,omitempty"`
 	RefreshTokenLife *int        `json:"refresh_token_life,omitempty"`
 	Providers        *[]Provider `json:"providers,omitempty"`
-}
-
-func parseGrantTypes(grants string) []GrantType {
-	var grantTypes []GrantType
-	for _, str := range sqlutil.ParseArray(grants) {
-		grantType := GrantType(str)
-		if grantType.IsValid() {
-			grantTypes = append(grantTypes, grantType)
-		}
-	}
-	return grantTypes
 }
 
 // GQL returns the GraphQL representation.

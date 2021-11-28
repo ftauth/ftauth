@@ -35,7 +35,11 @@ var (
 	BuildDate string
 )
 
-var runEmbedded bool
+var (
+	runEmbedded bool
+	seedDB      bool
+	dropAll     bool
+)
 
 // staticFS holds static files for the web server like
 // templates and global CSS styles
@@ -57,6 +61,8 @@ func init() {
 	fmt.Println("Build date:\t", BuildDate)
 
 	flag.BoolVar(&runEmbedded, "embedded", false, "run in embedded mode")
+	flag.BoolVar(&seedDB, "seed", true, "seed the database with a default admin client and superuser")
+	flag.BoolVar(&dropAll, "drop-all", false, "WARNING: drop all data")
 	flag.Parse()
 }
 
@@ -68,8 +74,9 @@ func main() {
 	var adminClient *model.ClientInfo
 	if runEmbedded {
 		opts := database.BadgerOptions{
-			Path:   config.Current.Database.Dir,
-			SeedDB: true,
+			Path:    config.Current.Database.Dir,
+			SeedDB:  seedDB,
+			DropAll: dropAll,
 		}
 		badgerDB, err := database.InitializeBadgerDB(opts)
 		if err != nil {
@@ -79,11 +86,11 @@ func main() {
 		adminClient = badgerDB.AdminClient
 	} else {
 		opts := database.DgraphOptions{
-			URL:      config.Current.Database.URL,
-			APIKey:   config.Current.Database.APIKey,
-			Username: config.Current.Database.Username,
-			Password: config.Current.Database.Password,
-			SeedDB:   true,
+			GraphQLEndpoint: config.Current.Database.URL,
+			GrpcEndpoint:    config.Current.Database.Grpc,
+			APIKey:          config.Current.Database.APIKey,
+			SeedDB:          seedDB,
+			DropAll:         dropAll,
 		}
 
 		ctx := context.Background()

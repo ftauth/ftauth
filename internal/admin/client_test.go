@@ -58,7 +58,7 @@ func (suite *clientTestSuite) SetupSuite() {
 }
 
 func (suite *clientTestSuite) SetupTest() {
-	admin, err := database.CreateAdminClient(suite.db)
+	admin, err := database.CreateAdminClient(context.Background(), suite.db)
 	require.NoError(suite.T(), err)
 	suite.admin = admin
 }
