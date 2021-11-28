@@ -33,14 +33,10 @@ type ServerConfig struct {
 func (s *ServerConfig) URL() string {
 	host := s.Host
 	includePort := func() bool {
-		if s.Port == "" {
-			return false
-		}
 		if s.Scheme == "http" {
-			return s.Port != "80"
+			return s.Port != "" && s.Port != "80"
 		}
-		// s.Scheme == "https"
-		return s.Port != "443"
+		return false
 	}()
 	if includePort {
 		host = fmt.Sprintf("%s:%s", host, s.Port)
