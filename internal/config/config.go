@@ -59,6 +59,12 @@ type DatabaseConfig struct {
 	// The GraphQL API key
 	APIKey string
 
+	// Whether or not to seed the DB
+	SeedDB bool
+
+	// Whether to drop all data
+	DropAll bool
+
 	// For embedded DB
 	Dir string // Path to store data in (for embedded)
 }
@@ -135,7 +141,9 @@ func setConfigDefaults() {
 	})
 
 	viper.SetDefault("database", map[string]interface{}{
-		"url": "http://localhost:8080/graphql",
+		"url":     "http://localhost:8080/graphql",
+		"seedDB":  true,
+		"dropAll": false,
 	})
 
 	viper.SetDefault("oauth.admin", map[string]interface{}{

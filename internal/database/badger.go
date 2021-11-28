@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	badger "github.com/dgraph-io/badger/v3"
+	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/pkg/jwt"
 	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/ftauth/ftauth/pkg/util/passwordutil"
@@ -15,9 +16,10 @@ import (
 
 // BadgerDB holds a connection to a Badger backend.
 type BadgerDB struct {
-	Options     BadgerOptions
 	DB          *badger.DB
 	AdminClient *model.ClientInfo
+	Path        string
+	InMemory    bool
 }
 
 const (
@@ -58,27 +60,20 @@ func makeKey(prefix, id string) []byte {
 	return []byte(fmt.Sprintf("%s_%s", prefix, id))
 }
 
-// BadgerOptions specifies the FTAuth-specific options
-// for initializing a DB instance
-type BadgerOptions struct {
-	Path     string // Path to the DB storage
-	InMemory bool   // Whether or not the DB is in memory
-	SeedDB   bool   // Whether or not to seed the DB
-	DropAll  bool   // Whether to drop all data
-}
-
-// InitializeBadgerDB creates a new database with a Badger backend.
+// NewBadgerDB creates a new database with a Badger backend.
 // Pass `true` to create an in-memory database (useful in tests, for example).
-func InitializeBadgerDB(opts BadgerOptions) (*BadgerDB, error) {
-	if opts.Path == "" && !opts.InMemory {
+func NewBadgerDB(inMemory bool) (*BadgerDB, error) {
+	opts := config.Current.Database
+	path := config.Current.Database.Dir
+	if path == "" && !inMemory {
 		return nil, errors.New("missing path")
 	}
 
 	var badgerOpts badger.Options
-	if opts.InMemory {
+	if inMemory {
 		badgerOpts = badger.DefaultOptions("").WithInMemory(true)
 	} else {
-		badgerOpts = badger.DefaultOptions(opts.Path)
+		badgerOpts = badger.DefaultOptions(path)
 	}
 	badgerOpts.ValueLogFileSize = 1 << 24 // 16 MB
 	db, err := badger.Open(badgerOpts)
@@ -86,7 +81,7 @@ func InitializeBadgerDB(opts BadgerOptions) (*BadgerDB, error) {
 		return nil, err
 	}
 
-	badgerDB := &BadgerDB{DB: db, Options: opts}
+	badgerDB := &BadgerDB{DB: db, Path: path, InMemory: inMemory}
 
 	if opts.DropAll {
 		err = badgerDB.DropAll(context.Background())

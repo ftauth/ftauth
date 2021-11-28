@@ -3,8 +3,7 @@ server:
   host: localhost
   port: 8000
 database:
-  url: http://localhost:8080
-  grpc: http://localhost:9080
+  url: http://localhost:8080/graphql
 oauth:
   tokens:
     # The paths to the RSA private key for signing JWT tokens

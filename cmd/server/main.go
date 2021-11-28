@@ -68,34 +68,23 @@ func init() {
 
 func main() {
 	config.LoadConfig()
+	config.Current.Database.SeedDB = seedDB
+	config.Current.Database.DropAll = dropAll
 
 	// Setup database
 	var db database.Database
 	var adminClient *model.ClientInfo
 	if runEmbedded {
-		opts := database.BadgerOptions{
-			Path:    config.Current.Database.Dir,
-			SeedDB:  seedDB,
-			DropAll: dropAll,
-		}
-		badgerDB, err := database.InitializeBadgerDB(opts)
+		badgerDB, err := database.NewBadgerDB(false)
 		if err != nil {
 			log.Fatalf("Error initializing DB: %v\n", err)
 		}
 		db = badgerDB
 		adminClient = badgerDB.AdminClient
 	} else {
-		opts := database.DgraphOptions{
-			GraphQLEndpoint: config.Current.Database.URL,
-			GrpcEndpoint:    config.Current.Database.Grpc,
-			APIKey:          config.Current.Database.APIKey,
-			SeedDB:          seedDB,
-			DropAll:         dropAll,
-		}
-
 		ctx := context.Background()
 		var err error
-		db, err = database.InitializeDgraphDatabase(ctx, opts)
+		db, err = database.NewDgraphDatabase(ctx)
 		if err != nil {
 			log.Fatalln("Error initializing DB: ", err)
 		}

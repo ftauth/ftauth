@@ -26,10 +26,7 @@ func runDgraph() bool {
 	}
 	if _runDgraph == nil {
 		var err error
-		dgraphClient, err = InitializeDgraphDatabase(context.Background(), DgraphOptions{
-			SeedDB:  true,
-			DropAll: true,
-		})
+		dgraphClient, err = NewDgraphDatabase(context.Background())
 		_runDgraph = new(bool)
 		*_runDgraph = err == nil
 		if err != nil {
@@ -62,7 +59,7 @@ var badgerClient *BadgerDB
 
 func setupBadger(t *testing.T) {
 	if badgerClient == nil {
-		db, err := InitializeBadgerDB(BadgerOptions{InMemory: true, SeedDB: true})
+		db, err := NewBadgerDB(true)
 		require.NoError(t, err)
 		badgerClient = db
 	} else {

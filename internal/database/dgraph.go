@@ -62,8 +62,9 @@ var (
 	ErrNotFound = errors.New("not found")
 )
 
-func setupDgoClient(ctx context.Context, opts DgraphOptions) (*grpc.ClientConn, *dgo.Dgraph, error) {
-	grpcURL, err := url.Parse(opts.GrpcEndpoint)
+func setupDgoClient(ctx context.Context) (*grpc.ClientConn, *dgo.Dgraph, error) {
+	opts := config.Current.Database
+	grpcURL, err := url.Parse(opts.Grpc)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -94,20 +95,21 @@ func setupDgoClient(ctx context.Context, opts DgraphOptions) (*grpc.ClientConn, 
 	return grpcConn, dgraphClient, err
 }
 
-// InitializeDgraphDatabase creates a new Dgraph database connection
+// NewDgraphDatabase creates a new Dgraph database connection
 // uses settings from the loaded configuration.
-func InitializeDgraphDatabase(ctx context.Context, opts DgraphOptions) (*DgraphDatabase, error) {
+func NewDgraphDatabase(ctx context.Context) (*DgraphDatabase, error) {
+	opts := config.Current.Database
 	privateKey, err := config.Current.GetKeyForAlgorithm(jwt.AlgorithmRSASHA256, true)
 	if err != nil {
 		return nil, err
 	}
-	client, err := dgraph.NewClient(opts.GraphQLEndpoint, privateKey, opts.APIKey, map[string]interface{}{
+	client, err := dgraph.NewClient(opts.URL, privateKey, opts.APIKey, map[string]interface{}{
 		"ROLE": "SUPERUSER",
 	})
 	if err != nil {
 		return nil, err
 	}
-	grpcConn, dgoClient, err := setupDgoClient(ctx, opts)
+	grpcConn, dgoClient, err := setupDgoClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -864,3 +866,5 @@ func (db *DgraphDatabase) VerifyUsernameAndPassword(ctx context.Context, usernam
 	}
 	return user, nil
 }
+
+var _ Database = (*DgraphDatabase)(nil)
