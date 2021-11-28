@@ -43,5 +43,6 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ftauth/ftauth:latest
           push: true
+          file: Dockerfile.buildx
       - name: Image Digest
         run: echo ${{ steps.docker_build.outputs.digest }}
