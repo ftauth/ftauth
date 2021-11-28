@@ -138,6 +138,7 @@ func main() {
 	r.PathPrefix("/").Handler(http.FileServer(http.FS(stripped)))
 
 	// Apply middleware
+	r.Use(handlers.CompressHandler)
 	r.Use(fthttp.SuppressReferrer)
 	r.Use(requestLogger)
 

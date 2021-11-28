@@ -1,5 +1,5 @@
 .DS_Store
 *.http
 .vscode
-cmd/server/static/js/*
+# cmd/server/static/js/*
 cmd/server/static/scss/*
