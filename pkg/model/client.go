@@ -315,22 +315,6 @@ func (clientUpdate *ClientInfoUpdate) GQL() string {
 	return "{" + bldr.String() + "}"
 }
 
-// Scope identifies an access scope for a client
-type Scope struct {
-	Name    string        `db:"name" json:"name"`                 // Primary key
-	Ruleset string        `db:"ruleset" json:"ruleset,omitempty"` // Set of rules - in JSON format
-	Clients []*ClientInfo `json:"clients,omitempty"`
-	Users   []*User       `json:"users,omitempty"`
-}
-
-// GQL returns the GraphQL representation.
-func (scope *Scope) GQL() string {
-	return fmt.Sprintf(
-		`{name:"%s"}`,
-		scope.Name,
-	)
-}
-
 // ValidateScopes affirms whether the client supports the given scopes.
 func (client *ClientInfo) ValidateScopes(scopes string) error {
 	// Parse scope

@@ -3,6 +3,7 @@ package model
 import (
 	_ "embed" // GraphQL embeds
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -29,6 +30,21 @@ var (
 	//go:embed gql/fragments/AllScopeInfo.graphql
 	AllScopeInfo string
 )
+
+// Scope identifies an access scope for a client
+type Scope struct {
+	ID      string `json:"id,omitempty"`
+	Name    string `json:"name"`
+	Ruleset string `json:"ruleset,omitempty"` // Set of rules
+}
+
+// GQL returns the GraphQL representation.
+func (scope *Scope) GQL() string {
+	return fmt.Sprintf(
+		`{name:"%s"}`,
+		scope.Name,
+	)
+}
 
 // ParseScope ensures the provided scope string contains
 // a valid list of scope tokens. If so, the list of scope

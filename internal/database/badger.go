@@ -121,28 +121,6 @@ func (db *BadgerDB) DropAll(ctx context.Context) error {
 	return db.DB.DropAll()
 }
 
-// Reset clears all non-mandatory keys from the database.
-func (db *BadgerDB) Reset() error {
-	if !db.DB.Opts().InMemory {
-		return errors.New("cannot clear db on disk")
-	}
-	return db.DB.Update(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		it := txn.NewIterator(opts)
-		defer it.Close()
-
-		for it.Rewind(); it.Valid(); it.Next() {
-			item := it.Item()
-			err := txn.Delete(item.Key())
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-}
-
 func (db *BadgerDB) isEmpty() (empty bool) {
 	db.DB.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
@@ -572,24 +550,6 @@ func (db *BadgerDB) GetScope(ctx context.Context, scopeName string) (s *model.Sc
 	if err != nil {
 		return
 	}
-
-	// Get all client (ids) for the scope
-	clients, err := db.ListClientsByPredicate(ctx, func(client *model.ClientInfo) bool {
-		// Scrap other information we don't need
-		defer func() {
-			*client = model.ClientInfo{
-				ID: client.ID,
-			}
-		}()
-		for _, scope := range client.Scopes {
-			if scope.Name == scopeName {
-				return true
-			}
-		}
-		return false
-	})
-
-	s.Clients = clients
 	return
 }
 

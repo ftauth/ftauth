@@ -64,7 +64,7 @@ func (suite *clientTestSuite) SetupTest() {
 }
 
 func (suite *clientTestSuite) TearDownTest() {
-	suite.db.Reset()
+	suite.db.DropAll(context.Background())
 }
 
 func (suite *clientTestSuite) TearDownSuite() {
