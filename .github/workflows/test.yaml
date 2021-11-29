@@ -17,6 +17,7 @@ jobs:
         go-version: [1.17]
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
+    environment: dev
     container:
       image: golang:${{ matrix.go-version }}
     services:
