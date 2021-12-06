@@ -17,6 +17,7 @@ import (
 
 	"github.com/ftauth/ftauth/internal/admin"
 	"github.com/ftauth/ftauth/internal/auth"
+	"github.com/ftauth/ftauth/internal/client"
 	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/internal/database"
 	"github.com/ftauth/ftauth/internal/discovery"
@@ -108,6 +109,9 @@ func main() {
 	discovery.SetupRoutes(r, db)
 	admin.SetupRoutes(r, db, db)
 	user.SetupRoutes(r, db)
+	if config.Current.OAuth.Clients.DynamicRegistration {
+		client.SetupRoutes(r, db)
+	}
 
 	err = templates.SetupTemplates(staticFS)
 	if err != nil {

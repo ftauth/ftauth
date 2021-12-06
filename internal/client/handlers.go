@@ -2,11 +2,17 @@ package client
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"net/http"
+	"path"
 
+	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/internal/database"
+	"github.com/ftauth/ftauth/internal/discovery"
 	"github.com/ftauth/ftauth/pkg/model"
+	"github.com/ftauth/ftauth/pkg/util/cors"
+	"github.com/gofrs/uuid"
 	"github.com/gorilla/mux"
 )
 
@@ -19,8 +25,10 @@ const (
 
 // SetupRoutes configures routes for client registration.
 func SetupRoutes(r *mux.Router, clientDB database.ClientDB) {
-	r.Path("/client/register").
-		HandlerFunc(clientRegistrationHandler{clientDB}.handleRegisterClient).
+	s := r.Path("/client/register").Subrouter()
+	s.Use(mux.CORSMethodMiddleware(s))
+	s.Use(cors.Middleware)
+	s.Handle("", clientRegistrationHandler{clientDB}).
 		Methods(http.MethodOptions, http.MethodGet, http.MethodPost)
 }
 
@@ -28,7 +36,7 @@ type clientRegistrationHandler struct {
 	db database.ClientDB
 }
 
-func (h clientRegistrationHandler) handleRegisterClient(w http.ResponseWriter, r *http.Request) {
+func (h clientRegistrationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
@@ -56,6 +64,28 @@ func (h clientRegistrationHandler) handleRegisterClient(w http.ResponseWriter, r
 		handleRegistrationError(w, model.ClientRegistrationErrorInvalidClientMetadata, parameterScopes)
 		return
 	}
+
+	// Fill in remaining details
+	request.ID = uuid.Must(uuid.NewV4()).String()
+	if request.Type == model.ClientTypeConfidential {
+		reader := rand.Reader
+		secret := make([]byte, 32)
+		_, err := reader.Read(secret)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		request.Secret = string(secret)
+	}
+	request.JWKsURI = path.Join(config.Current.Server.URL(), discovery.JWKSEndpoint)
+	request.GrantTypes = []model.GrantType{
+		model.GrantTypeAuthorizationCode,
+		model.GrantTypeClientCredentials,
+		model.GrantTypeRefreshToken,
+		model.GrantTypeResourceOwnerPasswordCredentials, // TODO: if enabled
+	}
+	request.AccessTokenLife = 60 * 60       // 1 hour
+	request.RefreshTokenLife = 24 * 60 * 60 // 1 day
 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()

@@ -5,6 +5,8 @@ server:
 database:
   url: http://localhost:8080/graphql
 oauth:
+  clients:
+    dynamicRegistration: true
   tokens:
     # The paths to the RSA private key for signing JWT tokens
     privateKeyFile: ~/.ftauth/private.pem

@@ -82,7 +82,8 @@ type OAuthConfig struct {
 		Username string
 		Password string
 	}
-	Tokens struct {
+	Clients ClientsConfig
+	Tokens  struct {
 		PrivateKeyFile   string
 		DefaultAlgorithm jwt.Algorithm
 		KeySet           map[jwt.Algorithm]TokenConfig
@@ -96,6 +97,10 @@ type OAuthConfig struct {
 	Template struct {
 		Options *templateOptions
 	}
+}
+
+type ClientsConfig struct {
+	DynamicRegistration bool
 }
 
 type templateOptions struct {
@@ -150,6 +155,10 @@ func setConfigDefaults() {
 		"clientID": "",
 		"username": "admin",
 		"password": "password",
+	})
+
+	viper.SetDefault("oauth.clients", map[string]interface{}{
+		"dynamicRegistration": false,
 	})
 
 	viper.SetDefault("oauth.scopes.default", "default")
