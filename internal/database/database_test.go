@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 	"os"
 	"reflect"
 	"testing"
@@ -719,7 +721,7 @@ func TestRegisterScope(t *testing.T) {
 	config.LoadConfig()
 
 	test := func(db Database) {
-		const scopeName = "my_scope"
+		scopeName := fmt.Sprintf("my_scope_%d", rand.Int())
 
 		scope, err := db.RegisterScope(ctx, scopeName)
 		require.NoError(t, err)
