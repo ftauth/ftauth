@@ -72,31 +72,28 @@ const (
 // SetupRoutes configures routing for the given mux.
 func SetupRoutes(
 	r *mux.Router,
-	authorizationDB database.AuthorizationDB,
-	authenticationDB database.UserDB,
-	clientDB database.ClientDB,
+	db database.Database,
 ) {
-	mi := middlewareInjector{db: authorizationDB}
+	mi := middlewareInjector{db}
 	dpopMiddleware := mi.DPoPAuthenticated()
 
 	r.Handle(
 		AuthorizationEndpoint,
-		authorizationEndpointHandler{db: authorizationDB, clientDB: clientDB},
+		authorizationEndpointHandler{db},
 	)
 	r.Handle(
 		TokenEndpoint,
-		dpopMiddleware(tokenEndpointHandler{db: authorizationDB, clientDB: clientDB, authDB: authenticationDB}),
+		dpopMiddleware(tokenEndpointHandler{db}),
 	)
 	r.Handle(
 		LoginEndpoint,
-		loginEndpointHandler{authenticationDB, authorizationDB},
+		loginEndpointHandler{db},
 	)
-	r.Handle(RegisterEndpoint, registerHandler{authenticationDB: authenticationDB})
+	r.Handle(RegisterEndpoint, registerHandler{db})
 }
 
 type authorizationEndpointHandler struct {
-	db       database.AuthorizationDB
-	clientDB database.ClientDB
+	db database.Database
 }
 
 func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +112,7 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	var validator Validator
 	switch provider {
 	case model.ProviderFTAuth:
-		validator = &ftauthValidator{h.clientDB}
+		validator = &ftauthValidator{h.db}
 	default:
 		handleAuthorizationRequestError(w, r, &authorizationRequestError{
 			err: model.AuthorizationRequestErrInvalidRequest,
@@ -176,7 +173,7 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 }
 
 type registerHandler struct {
-	authenticationDB database.UserDB
+	db database.Database
 }
 
 func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -208,6 +205,55 @@ func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Determine client ID
+	var clientID string
+
+	sessionCookie, err := r.Cookie("session")
+	clearToken := func() {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session",
+			Value:    "",
+			Path:     "/",
+			MaxAge:   0,
+			HttpOnly: true,
+			SameSite: http.SameSiteStrictMode,
+		})
+	}
+	if err == nil {
+		sessionID := sessionCookie.Value
+
+		// Get session information
+		ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
+		defer cancel()
+
+		requestInfo, err := h.db.GetRequestInfo(ctx, sessionID)
+		if err != nil {
+			log.Printf("Error retrieving request info: %v\n", err)
+			clearToken()
+			return
+		}
+
+		if requestInfo.Expiry.Before(time.Now()) {
+			clearToken()
+			return
+		}
+
+		clientID = requestInfo.ClientID
+	} else {
+		// Get default client
+		ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
+		defer cancel()
+
+		clientInfo, err := h.db.GetDefaultAdminClient(ctx)
+		if err != nil {
+			log.Printf("Error retrieving default client: %v\n", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		clientID = clientInfo.ID
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
@@ -231,11 +277,12 @@ func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	user := &model.User{
 		ID:           id.String(),
+		ClientID:     clientID,
 		Username:     username,
 		PasswordHash: hash,
 		Scopes:       scopes,
 	}
-	err = h.authenticationDB.RegisterUser(ctx, user)
+	err = h.db.RegisterUser(ctx, user)
 	if err != nil {
 		log.Printf("Error creating user: %v\n", err)
 		http.Error(w, "An unknown error occurred", http.StatusInternalServerError)
@@ -246,8 +293,7 @@ func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type loginEndpointHandler struct {
-	authenticationDB database.UserDB
-	authorizationDB  database.AuthorizationDB
+	db database.Database
 }
 
 func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -316,7 +362,7 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	requestInfo, err := h.authorizationDB.GetRequestInfo(ctx, sessionID)
+	requestInfo, err := h.db.GetRequestInfo(ctx, sessionID)
 	if err != nil {
 		log.Printf("Error retrieving request info: %v\n", err)
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
@@ -331,7 +377,7 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	ctx, cancel = context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	user, err := h.authenticationDB.VerifyUsernameAndPassword(
+	user, err := h.db.VerifyUsernameAndPassword(
 		ctx,
 		loginData.Username,
 		requestInfo.ClientID,
@@ -348,7 +394,7 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	ctx, cancel = context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	err = h.authorizationDB.UpdateRequestInfo(ctx, requestInfo)
+	err = h.db.UpdateRequestInfo(ctx, requestInfo)
 	if err != nil {
 		log.Printf("Error saving request info: %v\n", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -388,9 +434,7 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 type tokenEndpointHandler struct {
-	db       database.AuthorizationDB
-	authDB   database.UserDB
-	clientDB database.ClientDB
+	db database.Database
 }
 
 type tokenRequestInfo struct {
@@ -425,7 +469,7 @@ func (h tokenEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	clientInfo, err := h.clientDB.GetClient(ctx, clientID)
+	clientInfo, err := h.db.GetClient(ctx, clientID)
 	if err != nil {
 		handleHeaderErr("Could not locate client ID")
 		return
@@ -649,7 +693,7 @@ func (h tokenEndpointHandler) validateResourceOwnerPasswordCredentialsRequest(w 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	user, err := h.authDB.VerifyUsernameAndPassword(ctx, username, clientInfo.ID, password)
+	user, err := h.db.VerifyUsernameAndPassword(ctx, username, clientInfo.ID, password)
 	if err != nil {
 		handleTokenRequestError(w, model.TokenRequestErrInvalidGrant, model.RequestErrorDetails{})
 		return nil

@@ -105,7 +105,7 @@ func main() {
 
 	// Setup routing
 	r := mux.NewRouter()
-	auth.SetupRoutes(r, db, db, db)
+	auth.SetupRoutes(r, db)
 	discovery.SetupRoutes(r, db)
 	admin.SetupRoutes(r, db, db)
 	user.SetupRoutes(r, db)

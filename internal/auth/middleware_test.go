@@ -26,11 +26,7 @@ func TestBearerAuthentated(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	handler := tokenEndpointHandler{
-		db:       db,
-		clientDB: db,
-		authDB:   db,
-	}
+	handler := tokenEndpointHandler{db}
 
 	id, err := uuid.NewV4()
 	require.NoError(t, err)
@@ -146,11 +142,7 @@ func TestBearerAuthentatedWithScope(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	handler := tokenEndpointHandler{
-		db:       db,
-		clientDB: db,
-		authDB:   db,
-	}
+	handler := tokenEndpointHandler{db}
 
 	id, err := uuid.NewV4()
 	require.NoError(t, err)

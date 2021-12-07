@@ -482,7 +482,7 @@ func (db *BadgerDB) GetUserByUsername(ctx context.Context, username, clientID st
 				return err
 			}
 
-			if _user.Username == strings.ToLower(username) && _user.ClientID == clientID {
+			if strings.EqualFold(_user.Username, username) && _user.ClientID == clientID {
 				user = &_user
 				return nil
 			}

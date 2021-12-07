@@ -73,10 +73,7 @@ func TestAuthorizationEndpoint(t *testing.T) {
 
 	admin := db.AdminClient
 
-	handler := authorizationEndpointHandler{
-		db:       db,
-		clientDB: db,
-	}
+	handler := authorizationEndpointHandler{db}
 
 	clientID := admin.ID
 	state := "state"
@@ -321,10 +318,7 @@ func TestClientCredentialsGrant(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	handler := tokenEndpointHandler{
-		db:       db,
-		clientDB: db,
-	}
+	handler := tokenEndpointHandler{db}
 
 	id, err := uuid.NewV4()
 	require.NoError(t, err)
@@ -451,11 +445,7 @@ func TestResourceOwnerPasswordCredentialsGrant(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	handler := tokenEndpointHandler{
-		db:       db,
-		clientDB: db,
-		authDB:   db,
-	}
+	handler := tokenEndpointHandler{db}
 
 	id, err := uuid.NewV4()
 	require.NoError(t, err)
@@ -640,11 +630,7 @@ func TestRefreshTokenGrant(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	handler := tokenEndpointHandler{
-		db:       db,
-		clientDB: db,
-		authDB:   db,
-	}
+	handler := tokenEndpointHandler{db}
 
 	id, err := uuid.NewV4()
 	require.NoError(t, err)
@@ -760,6 +746,97 @@ func TestRefreshTokenGrant(t *testing.T) {
 				require.NotEmpty(t, resp.Description)
 				require.NotEmpty(t, resp.URI)
 			}
+		})
+	}
+}
+
+func TestRegister(t *testing.T) {
+	config.LoadConfig()
+
+	db, err := database.NewBadgerDB(true, nil)
+	require.NoError(t, err)
+	defer db.Close()
+
+	admin := db.AdminClient
+
+	handler := registerHandler{db}
+	defaultClientID := admin.ID
+	additionalClient := &model.ClientInfo{
+		ID: "test",
+	}
+
+	_, err = db.RegisterClient(
+		context.Background(),
+		additionalClient,
+		model.ClientOptionNone,
+	)
+	require.NoError(t, err)
+
+	createCookie := func(clientID string) *http.Cookie {
+		id, err := uuid.NewV4()
+		require.NoError(t, err)
+
+		sessionID := id.String()
+		request := &model.AuthorizationRequest{
+			ID:       sessionID,
+			ClientID: clientID,
+			Expiry:   time.Now().Add(sessionExp),
+		}
+
+		err = db.CreateSession(context.Background(), request)
+		require.NoError(t, err)
+
+		return &http.Cookie{
+			Name:     "session",
+			Value:    sessionID,
+			Path:     "/",
+			Expires:  time.Now().Add(sessionExp),
+			HttpOnly: true,
+			SameSite: http.SameSiteStrictMode,
+		}
+	}
+
+	tt := []struct {
+		name      string
+		hasCookie bool
+		clientId  string
+	}{
+		{
+			name:     "No cookies",
+			clientId: defaultClientID,
+		},
+		{
+			name:      "With session cookie",
+			hasCookie: true,
+			clientId:  additionalClient.ID,
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			formValues := url.Values{
+				"username": []string{test.name},
+				"password": []string{"password"},
+				"confirm":  []string{"password"},
+			}
+			body := strings.NewReader(formValues.Encode())
+
+			request := httptest.NewRequest(http.MethodPost, RegisterEndpoint, body)
+			request.Header.Add("Authorization", oauth.CreateBasicAuthorization(defaultClientID, ""))
+			request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			if test.hasCookie {
+				request.AddCookie(createCookie(test.clientId))
+			}
+
+			response := httptest.NewRecorder()
+
+			handler.ServeHTTP(response, request)
+
+			// Verify user was created with correct client ID
+			user, err := db.GetUserByUsername(context.Background(), test.name, test.clientId)
+			require.NoError(t, err)
+
+			require.Equal(t, user.ClientID, test.clientId)
 		})
 	}
 }

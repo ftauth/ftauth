@@ -59,7 +59,7 @@ type DgraphOptions struct {
 
 // Common errors
 var (
-	ErrNotFound = errors.New("Key not found")
+	ErrNotFound = errors.New("key not found")
 )
 
 func setupDgoClient(ctx context.Context, opts *config.DatabaseConfig) (*grpc.ClientConn, *dgo.Dgraph, error) {
