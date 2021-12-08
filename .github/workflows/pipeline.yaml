@@ -1,0 +1,101 @@
+name: Pipeline
+
+on:
+  push:
+    branches:
+      - '*'
+  pull_request:
+    branches:
+      - '*'
+
+jobs:
+  build:
+    name: Build
+    strategy:
+      matrix:
+        go-version: [1.17]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    container:
+      image: golang:${{ matrix.go-version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Build
+        run: make server
+  test:
+    name: Test
+    strategy:
+      matrix:
+        dgraph-version: [v21.03.2, v21.12.0]
+        go-version: [1.17]
+        os: [ubuntu-latest]
+      
+      # Since they access the same dedicated backend
+      max-parallel: 1
+    runs-on: ${{ matrix.os }}
+    environment: dev
+    container:
+      image: golang:${{ matrix.go-version }}
+    services:
+      dgraph:
+        image: dgraph/standalone:${{ matrix.dgraph-version }}
+        ports:
+        - 9080:9080
+        - 8080:8080
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Test
+        run: make server-test
+        env:
+          DGRAPH_URL: http://dgraph:8080/graphql
+          DGRAPH_GRPC: http://dgraph:9080
+          DGRAPH_SLASH_URL: ${{ secrets.DGRAPH_SLASH_URL }}
+          DGRAPH_SLASH_GRPC: ${{ secrets.DGRAPH_SLASH_GRPC }}
+          DGRAPH_SLASH_API_KEY: ${{ secrets.DGRAPH_SLASH_API_KEY }}
+      - name: Upload Coverage
+        uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.txt
+          fail_ci_if_error: true
+          verbose: true
+  docker-latest:
+    name: Docker (Latest)
+    needs: test
+    strategy:
+      matrix:
+        go-version: [1.17]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Login to DockerHub
+        uses: docker/login-action@v1 
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Setup Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Inspect Builder
+        run: |
+          echo "Name:      ${{ steps.buildx.outputs.name }}"
+          echo "Endpoint:  ${{ steps.buildx.outputs.endpoint }}"
+          echo "Status:    ${{ steps.buildx.outputs.status }}"
+          echo "Flags:     ${{ steps.buildx.outputs.flags }}"
+          echo "Platforms: ${{ steps.buildx.outputs.platforms }}"
+      - name: Build and Push to DockerHub
+        id: docker_build
+        uses: docker/build-push-action@v2
+        with:
+          platforms: linux/amd64,linux/arm64
+          tags: ftauth/ftauth:latest
+          push: true
+          file: Dockerfile.buildx
+      - name: Image Digest
+        run: echo ${{ steps.docker_build.outputs.digest }}
