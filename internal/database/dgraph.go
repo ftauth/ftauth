@@ -59,7 +59,7 @@ type DgraphOptions struct {
 
 // Common errors
 var (
-	ErrNotFound = errors.New("key not found")
+	ErrNotFound = errors.New("Key not found")
 )
 
 func setupDgoClient(ctx context.Context, opts *config.DatabaseConfig) (*grpc.ClientConn, *dgo.Dgraph, error) {
@@ -253,8 +253,7 @@ func (db *DgraphDatabase) Close() error {
 func (db *DgraphDatabase) DropAll(ctx context.Context) error {
 	db.adminClient = nil
 	op := &api.Operation{
-		DropOp:          api.Operation_DATA,
-		RunInBackground: false,
+		DropOp: api.Operation_DATA,
 	}
 	return db.dgoClient.Alter(ctx, op)
 }

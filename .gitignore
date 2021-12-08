@@ -4,3 +4,4 @@
 # cmd/server/static/js/*
 cmd/server/static/scss/*
 coverage.txt
+.env

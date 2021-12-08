@@ -2,8 +2,6 @@ package database
 
 import (
 	"context"
-	"fmt"
-	"math/rand"
 	"os"
 	"reflect"
 	"testing"
@@ -47,9 +45,11 @@ func requireNotFound(t *testing.T, err error) {
 }
 
 func setupDgraph(t *testing.T) {
+	ctx := context.Background()
+
 	if dgraphClient == nil {
 		var err error
-		dgraphClient, err = NewDgraphDatabase(context.Background(), &config.DatabaseConfig{
+		dgraphClient, err = NewDgraphDatabase(ctx, &config.DatabaseConfig{
 			URL:     dgraphGraphQLUrl,
 			Grpc:    dgraphGrpcUrl,
 			APIKey:  dgraphApiKey,
@@ -58,15 +58,20 @@ func setupDgraph(t *testing.T) {
 		})
 		require.NoError(t, err)
 	} else {
-		_, err := CreateAdminClient(context.Background(), dgraphClient)
+		err := dgraphClient.DropAll(ctx)
+		require.NoError(t, err)
+
+		_, err = CreateAdminClient(ctx, dgraphClient)
 		require.NoError(t, err)
 	}
 }
 
 func setupDgraphSlash(t *testing.T) {
+	ctx := context.Background()
+
 	if dgraphSlashClient == nil {
 		var err error
-		dgraphSlashClient, err = NewDgraphDatabase(context.Background(), &config.DatabaseConfig{
+		dgraphSlashClient, err = NewDgraphDatabase(ctx, &config.DatabaseConfig{
 			URL:     dgraphSlashGraphQlUrl,
 			Grpc:    dgraphSlashGrpcUrl,
 			APIKey:  dgraphSlashApiKey,
@@ -75,21 +80,12 @@ func setupDgraphSlash(t *testing.T) {
 		})
 		require.NoError(t, err)
 	} else {
-		_, err := CreateAdminClient(context.Background(), dgraphSlashClient)
+		err := dgraphSlashClient.DropAll(ctx)
+		require.NoError(t, err)
+
+		_, err = CreateAdminClient(ctx, dgraphSlashClient)
 		require.NoError(t, err)
 	}
-}
-
-func teardownDgraph(t *testing.T) {
-	ctx := context.Background()
-	err := dgraphClient.DropAll(ctx)
-	require.NoError(t, err)
-}
-
-func teardownDgraphSlash(t *testing.T) {
-	ctx := context.Background()
-	err := dgraphSlashClient.DropAll(ctx)
-	require.NoError(t, err)
 }
 
 func setupBadger(t *testing.T) {
@@ -101,29 +97,25 @@ func setupBadger(t *testing.T) {
 		})
 		require.NoError(t, err)
 	} else {
-		_, err := CreateAdminClient(context.Background(), badgerClient)
+		ctx := context.Background()
+		err := badgerClient.DropAll(ctx)
+		require.NoError(t, err)
+
+		_, err = CreateAdminClient(ctx, badgerClient)
 		require.NoError(t, err)
 	}
-}
-
-func teardownBadger(t *testing.T) {
-	err := badgerClient.Close()
-	require.NoError(t, err)
-	badgerClient = nil
 }
 
 func runTest(t *testing.T, test func(Database)) {
 	t.Run("Badger", func(t *testing.T) {
 		setupBadger(t)
 		test(badgerClient)
-		teardownBadger(t)
 	})
 
 	if runDgraph() {
 		t.Run("Dgraph", func(t *testing.T) {
 			setupDgraph(t)
 			test(dgraphClient)
-			teardownDgraph(t)
 		})
 	}
 
@@ -131,7 +123,6 @@ func runTest(t *testing.T, test func(Database)) {
 		t.Run("Dgraph Slash", func(t *testing.T) {
 			setupDgraphSlash(t)
 			test(dgraphSlashClient)
-			teardownDgraphSlash(t)
 		})
 	}
 }
@@ -721,7 +712,7 @@ func TestRegisterScope(t *testing.T) {
 	config.LoadConfig()
 
 	test := func(db Database) {
-		scopeName := fmt.Sprintf("my_scope_%d", rand.Int())
+		const scopeName = "my_scope"
 
 		scope, err := db.RegisterScope(ctx, scopeName)
 		require.NoError(t, err)
