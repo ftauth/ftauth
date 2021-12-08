@@ -253,7 +253,8 @@ func (db *DgraphDatabase) Close() error {
 func (db *DgraphDatabase) DropAll(ctx context.Context) error {
 	db.adminClient = nil
 	op := &api.Operation{
-		DropOp: api.Operation_DATA,
+		DropOp:          api.Operation_DATA,
+		RunInBackground: false,
 	}
 	return db.dgoClient.Alter(ctx, op)
 }
