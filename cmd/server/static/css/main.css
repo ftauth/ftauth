@@ -1,4 +1,3 @@
-@import 'normalize.css';
 *,
 *:after,
 *:before {
@@ -401,7 +400,7 @@ input[type=radio] {
   .row {
     flex-direction: row;
     margin-left: -1rem;
-    width: calc(100% + 2.0rem);
+    width: calc(100% + 2rem);
   }
   .row .column {
     margin-bottom: inherit;
@@ -580,7 +579,7 @@ body {
 }
 
 .login {
-  max-width: 400px;
+  max-width: 200px;
   margin: 20px;
 }
 
@@ -612,6 +611,11 @@ body {
 }
 .navigation .navigation-link {
   line-height: 5.2rem;
+}
+
+#error {
+  color: red;
+  font-size: small;
 }
 
 /*# sourceMappingURL=main.css.map */

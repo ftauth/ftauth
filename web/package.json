@@ -1,0 +1,14 @@
+{
+  "name": "web",
+  "version": "1.0.0",
+  "private": "true",
+  "scripts": {
+    "build": "node tool/build.js"
+  },
+  "dependencies": {
+    "milligram": "^1.4.1"
+  },
+  "devDependencies": {
+    "sass": "^1.44.0"
+  }
+}
