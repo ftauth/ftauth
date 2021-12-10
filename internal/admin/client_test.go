@@ -24,14 +24,16 @@ import (
 
 type clientTestSuite struct {
 	suite.Suite
-	db       *database.BadgerDB
-	admin    *model.ClientInfo
-	token    *jwt.Token
-	tokenJWT string
-	r        *mux.Router
+	db            *database.BadgerDB
+	admin         *model.ClientInfo
+	adminToken    *jwt.Token
+	adminTokenJWT string
+	demoTokenJWT  string
+	r             *mux.Router
 }
 
 func (suite *clientTestSuite) SetupSuite() {
+	ctx := context.Background()
 	config.LoadConfig()
 
 	db, err := database.NewBadgerDB(true, nil)
@@ -42,19 +44,43 @@ func (suite *clientTestSuite) SetupSuite() {
 	suite.db = db
 	suite.admin = admin
 
-	suite.r = mux.NewRouter()
-	SetupRoutes(suite.r, db, nil)
-
-	token, err := token.IssueAccessToken(admin, &model.User{ID: "test"}, "default admin")
+	// Setup demo client
+	demoClient, err := db.RegisterClient(ctx, &mock.DefaultClient, model.ClientOptionNone)
 	require.NoError(suite.T(), err)
 
-	suite.token = token
+	suite.r = mux.NewRouter()
+	SetupRoutes(suite.r, admin.ID, db, nil)
+
+	scopes := []*model.Scope{
+		{Name: config.Current.OAuth.Scopes.Default},
+	}
+	adminScopes := append([]*model.Scope{}, scopes...)
+	adminScopes = append(adminScopes, &model.Scope{Name: "admin"})
+
+	adminUser, err := model.NewUser("test", "password", admin.ID, adminScopes)
+	require.NoError(suite.T(), err)
+
+	adminToken, err := token.IssueAccessToken(admin, adminUser, "default admin")
+	require.NoError(suite.T(), err)
+
+	suite.adminToken = adminToken
+
+	// Create demo token
+	demoUser, err := model.NewUser("test", "password", demoClient.ID, scopes)
+	require.NoError(suite.T(), err)
+
+	demoToken, err := token.IssueAccessToken(demoClient, demoUser, "default")
+	require.NoError(suite.T(), err)
 
 	privateKey := config.Current.DefaultSigningKey()
 	require.NoError(suite.T(), err)
-	tokenJWT, err := token.Encode(privateKey)
+	tokenJWT, err := adminToken.Encode(privateKey)
 	require.NoError(suite.T(), err)
-	suite.tokenJWT = tokenJWT
+	suite.adminTokenJWT = tokenJWT
+
+	demoTokenJWT, err := demoToken.Encode(privateKey)
+	require.NoError(suite.T(), err)
+	suite.demoTokenJWT = demoTokenJWT
 }
 
 func (suite *clientTestSuite) SetupTest() {
@@ -94,13 +120,19 @@ func (suite *clientTestSuite) TestListClients() {
 			name: "Valid Auth",
 			headers: func() http.Header {
 				header := http.Header{}
-				privateKey := config.Current.DefaultSigningKey()
-				signed, err := suite.token.Encode(privateKey)
-				assert.NoError(t, err)
-				header.Add("Authorization", fmt.Sprintf("Bearer %s", signed))
+				header.Add("Authorization", fmt.Sprintf("Bearer %s", suite.adminTokenJWT))
 				return header
 			},
 			statusCode: http.StatusOK,
+		},
+		{
+			name: "Invalid Client",
+			headers: func() http.Header {
+				header := http.Header{}
+				header.Add("Authorization", fmt.Sprintf("Bearer %s", suite.demoTokenJWT))
+				return header
+			},
+			statusCode: http.StatusUnauthorized,
 		},
 	}
 
@@ -165,7 +197,7 @@ func (suite *clientTestSuite) TestAddClient() {
 
 			bb := bytes.NewBuffer(b)
 			req := httptest.NewRequest(http.MethodPost, "/api/admin/clients", bb)
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", suite.tokenJWT))
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", suite.adminTokenJWT))
 
 			resp := httptest.NewRecorder()
 
@@ -234,7 +266,7 @@ func (suite *clientTestSuite) TestUpdateClient() {
 
 			bb := bytes.NewBuffer([]byte(reqJSON))
 			req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/admin/clients/%s", original.ID), bb)
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", suite.tokenJWT))
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", suite.adminTokenJWT))
 
 			resp := httptest.NewRecorder()
 

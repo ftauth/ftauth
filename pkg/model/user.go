@@ -6,6 +6,8 @@ import (
 
 	"github.com/ftauth/ftauth/pkg/graphql"
 	"github.com/ftauth/ftauth/pkg/util"
+	"github.com/ftauth/ftauth/pkg/util/passwordutil"
+	"github.com/gofrs/uuid"
 )
 
 // GraphQL embeds
@@ -13,6 +15,25 @@ var (
 	//go:embed gql/fragments/AllUserInfo.graphql
 	AllUserInfo string
 )
+
+// NewUser creates a new User model.
+func NewUser(
+	username,
+	password,
+	clientID string,
+	scopes []*Scope,
+) (*User, error) {
+	passwordHash, err := passwordutil.GeneratePasswordHash(password)
+	if err != nil {
+		return nil, err
+	}
+	return &User{
+		ID:           uuid.Must(uuid.NewV4()).String(),
+		Username:     username,
+		PasswordHash: passwordHash,
+		Scopes:       scopes,
+	}, nil
+}
 
 // User is a user/resource owner.
 type User struct {

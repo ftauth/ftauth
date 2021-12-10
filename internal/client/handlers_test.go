@@ -75,6 +75,9 @@ func TestDynamicClientRegistration(t *testing.T) {
 				err := json.NewDecoder(resp.Body).Decode(&client)
 				require.NoError(t, err)
 
+				err = client.IsValid()
+				require.NoError(t, err)
+
 				require.NotEmpty(t, client.ID)
 				require.NotEmpty(t, client.GrantTypes)
 				require.NotEmpty(t, client.JWKsURI)

@@ -31,4 +31,5 @@ var DefaultClient = model.ClientInfo{
 	},
 	AccessTokenLife:  3600,
 	RefreshTokenLife: 86400,
+	Providers:        []model.Provider{model.ProviderFTAuth},
 }

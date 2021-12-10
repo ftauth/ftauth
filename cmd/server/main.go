@@ -107,7 +107,7 @@ func main() {
 	r := mux.NewRouter()
 	auth.SetupRoutes(r, db)
 	discovery.SetupRoutes(r, db)
-	admin.SetupRoutes(r, db, db)
+	admin.SetupRoutes(r, adminClient.ID, db, db)
 	user.SetupRoutes(r, db)
 	if config.Current.OAuth.Clients.DynamicRegistration {
 		client.SetupRoutes(r, db)

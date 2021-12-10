@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"log"
 	"net/http"
 	"path"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/ftauth/ftauth/internal/discovery"
 	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/ftauth/ftauth/pkg/util/cors"
+	"github.com/ftauth/ftauth/pkg/util/passwordutil"
 	"github.com/gofrs/uuid"
 	"github.com/gorilla/mux"
 )
@@ -24,16 +26,16 @@ const (
 )
 
 // SetupRoutes configures routes for client registration.
-func SetupRoutes(r *mux.Router, clientDB database.ClientDB) {
+func SetupRoutes(r *mux.Router, db database.Database) {
 	s := r.Path("/client/register").Subrouter()
 	s.Use(mux.CORSMethodMiddleware(s))
 	s.Use(cors.Middleware)
-	s.Handle("", clientRegistrationHandler{clientDB}).
+	s.Handle("", clientRegistrationHandler{db}).
 		Methods(http.MethodOptions, http.MethodGet, http.MethodPost)
 }
 
 type clientRegistrationHandler struct {
-	db database.ClientDB
+	db database.Database
 }
 
 func (h clientRegistrationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -86,6 +88,7 @@ func (h clientRegistrationHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	}
 	request.AccessTokenLife = 60 * 60       // 1 hour
 	request.RefreshTokenLife = 24 * 60 * 60 // 1 day
+	request.Providers = []model.Provider{model.ProviderFTAuth}
 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
@@ -94,6 +97,35 @@ func (h clientRegistrationHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
+	}
+
+	// Create default user
+
+	{
+		userId := uuid.Must(uuid.NewV4())
+
+		passwordHash, err := passwordutil.GeneratePasswordHash("password")
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
+		defer cancel()
+		err = h.db.RegisterUser(ctx, &model.User{
+			ID:           userId.String(),
+			Username:     "user",
+			ClientID:     clientInfo.ID,
+			PasswordHash: passwordHash,
+			Scopes: []*model.Scope{
+				{Name: config.Current.OAuth.Scopes.Default},
+			},
+		})
+		if err != nil {
+			log.Printf("Error creating user: %v\n", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	if err := json.NewEncoder(w).Encode(clientInfo); err != nil {

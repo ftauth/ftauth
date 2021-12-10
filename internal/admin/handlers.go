@@ -12,7 +12,12 @@ import (
 )
 
 // SetupRoutes configures admin API endpoints
-func SetupRoutes(r *mux.Router, clientDB database.ClientDB, scopeDB database.ScopeDB) {
+func SetupRoutes(
+	r *mux.Router,
+	adminClientID string,
+	clientDB database.ClientDB,
+	scopeDB database.ScopeDB,
+) {
 	s := r.PathPrefix("/api/admin").Subrouter()
 	s.Use(mux.CORSMethodMiddleware(s))
 	s.Use(cors.Middleware)
@@ -20,7 +25,7 @@ func SetupRoutes(r *mux.Router, clientDB database.ClientDB, scopeDB database.Sco
 	if err != nil {
 		log.Fatalln("Error setting up admin routes: ", err)
 	}
-	s.Use(m.BearerAuthenticatedWithScope("admin"))
+	s.Use(m.BearerAuthenticatedWithClientAndScope(adminClientID, "admin"))
 
 	// TODO: REMOVE
 	s.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {

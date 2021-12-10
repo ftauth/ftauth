@@ -125,6 +125,64 @@ func (m *Middleware) BearerAuthenticatedWithScope(scope string) func(http.Handle
 	}
 }
 
+// BearerAuthenticatedWithScope protects endpoints based off a user's Bearer auth token
+// and the assigned client ID and scope on the bearer token.
+func (m *Middleware) BearerAuthenticatedWithClientAndScope(clientID, scope string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handleErr := func(err error) {
+				w.Header().Set("WWW-Authenticate", "Bearer realm="+clientID)
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte(err.Error()))
+			}
+			authHeader := r.Header.Get("Authorization")
+			token, err := m.decodeAndVerifyAuthHeader(authHeader)
+			if err != nil {
+				log.Printf("Error decoding/verifying auth header: %v\n", err)
+				handleErr(err)
+				return
+			}
+
+			ftClaims, err := ParseClaims(token)
+			if err != nil {
+				log.Printf("Error parsing FTAuth claims for token: %s\n%v\n", authHeader, err)
+				handleErr(err)
+				return
+			}
+
+			if ftClaims.ClientID != clientID {
+				log.Printf("Invalid client ID: %s\n", ftClaims.ClientID)
+				handleErr(ErrInvalidClaims)
+				return
+			}
+
+			grantedScopes, err := model.ParseScope(token.Claims.Scope)
+			if err != nil {
+				log.Printf("Error parsing scopes '%s': %v", token.Claims.Scope, err)
+				handleErr(err)
+				return
+			}
+			validScope := false
+			for _, grantedScope := range grantedScopes {
+				if grantedScope == scope {
+					validScope = true
+				}
+			}
+
+			if !validScope {
+				handleErr(fmt.Errorf("token not granted scope: %s", scope))
+				return
+			}
+
+			// Attach token to context
+			ctx := context.WithValue(r.Context(), JwtContextKey, token)
+			r = r.WithContext(ctx)
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func (m *Middleware) decodeAndVerifyAuthHeader(authHeader string) (*jwt.Token, error) {
 	if authHeader == "" {
 		return nil, ErrEmptyAuthHeader
