@@ -239,9 +239,6 @@ func (client *ClientInfo) IsValid() error {
 			if redirectURI.Scheme == "http" {
 				return fmt.Errorf("invalid redirect URI: %s: HTTP is not allowed", uri)
 			}
-			if redirectURI.Hostname() == "" {
-				return fmt.Errorf("invalid redirect URI: %s: Missing host", uri)
-			}
 		}
 	}
 	if len(client.Scopes) == 0 {

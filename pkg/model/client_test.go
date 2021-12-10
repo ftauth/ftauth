@@ -13,7 +13,10 @@ import (
 func TestIsValidRedirectURI(t *testing.T) {
 	devClient := mock.PublicClient
 	prodClient := mock.PublicClient
-	prodClient.RedirectURIs = []string{"myapp://auth"}
+	prodClient.RedirectURIs = []string{
+		"myapp://",
+		"myapp://auth",
+	}
 	tt := []struct {
 		client      model.ClientInfo
 		redirectURI string
@@ -72,6 +75,11 @@ func TestIsValidRedirectURI(t *testing.T) {
 		{
 			client:      prodClient,
 			redirectURI: "myapp://auth",
+			valid:       true,
+		},
+		{
+			client:      prodClient,
+			redirectURI: "myapp://",
 			valid:       true,
 		},
 	}
