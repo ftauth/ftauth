@@ -147,6 +147,8 @@ func setConfigDefaults() {
 
 	viper.SetDefault("database", map[string]interface{}{
 		"url":     "http://localhost:8080/graphql",
+		"grpc":    "",
+		"apiKey":  "",
 		"seedDB":  true,
 		"dropAll": false,
 	})

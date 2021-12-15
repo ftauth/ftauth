@@ -38,6 +38,7 @@ var (
 
 var (
 	runEmbedded bool
+	runInMemory bool
 	seedDB      bool
 	dropAll     bool
 )
@@ -62,6 +63,7 @@ func init() {
 	fmt.Println("Build date:\t", BuildDate)
 
 	flag.BoolVar(&runEmbedded, "embedded", false, "run in embedded mode")
+	flag.BoolVar(&runInMemory, "in-memory", false, "run in in-memory mode (implies --embedded)")
 	flag.BoolVar(&seedDB, "seed", true, "seed the database with a default admin client and superuser")
 	flag.BoolVar(&dropAll, "drop-all", false, "WARNING: drop all data")
 	flag.Parse()
@@ -75,8 +77,8 @@ func main() {
 	// Setup database
 	var db database.Database
 	var adminClient *model.ClientInfo
-	if runEmbedded {
-		badgerDB, err := database.NewBadgerDB(false, nil)
+	if runEmbedded || runInMemory {
+		badgerDB, err := database.NewBadgerDB(runInMemory, nil)
 		if err != nil {
 			log.Fatalf("Error initializing DB: %v\n", err)
 		}
