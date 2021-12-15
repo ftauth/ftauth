@@ -4,16 +4,15 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
-	"log"
 	"net/http"
 	"path"
+	"strings"
 
 	"github.com/ftauth/ftauth/internal/config"
 	"github.com/ftauth/ftauth/internal/database"
 	"github.com/ftauth/ftauth/internal/discovery"
 	"github.com/ftauth/ftauth/pkg/model"
 	"github.com/ftauth/ftauth/pkg/util/cors"
-	"github.com/ftauth/ftauth/pkg/util/passwordutil"
 	"github.com/gofrs/uuid"
 	"github.com/gorilla/mux"
 )
@@ -44,7 +43,7 @@ func (h clientRegistrationHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	var request model.ClientInfo
+	var request model.ClientRegistrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Error processing body", http.StatusInternalServerError)
 		return
@@ -67,8 +66,23 @@ func (h clientRegistrationHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	scopes := []*model.Scope{}
+
+	for _, scope := range request.Scopes {
+		if !strings.EqualFold(scope, "admin") {
+			scopes = append(scopes, &model.Scope{Name: scope})
+		}
+	}
+
+	clientRequest := &model.ClientInfo{
+		Name:         request.Name,
+		Type:         request.Type,
+		RedirectURIs: request.RedirectURIs,
+		Scopes:       scopes,
+	}
+
 	// Fill in remaining details
-	request.ID = uuid.Must(uuid.NewV4()).String()
+	clientRequest.ID = uuid.Must(uuid.NewV4()).String()
 	if request.Type == model.ClientTypeConfidential {
 		reader := rand.Reader
 		secret := make([]byte, 32)
@@ -77,55 +91,26 @@ func (h clientRegistrationHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		request.Secret = string(secret)
+		clientRequest.Secret = string(secret)
 	}
-	request.JWKsURI = path.Join(config.Current.Server.URL(), discovery.JWKSEndpoint)
-	request.GrantTypes = []model.GrantType{
+	clientRequest.JWKsURI = path.Join(config.Current.Server.URL(), discovery.JWKSEndpoint)
+	clientRequest.GrantTypes = []model.GrantType{
 		model.GrantTypeAuthorizationCode,
 		model.GrantTypeClientCredentials,
 		model.GrantTypeRefreshToken,
 		model.GrantTypeResourceOwnerPasswordCredentials, // TODO: if enabled
 	}
-	request.AccessTokenLife = 60 * 60       // 1 hour
-	request.RefreshTokenLife = 24 * 60 * 60 // 1 day
-	request.Providers = []model.Provider{model.ProviderFTAuth}
+	clientRequest.AccessTokenLife = 60 * 60       // 1 hour
+	clientRequest.RefreshTokenLife = 24 * 60 * 60 // 1 day
+	clientRequest.Providers = []model.Provider{model.ProviderFTAuth}
 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
 	defer cancel()
 
-	clientInfo, err := h.db.RegisterClient(ctx, &request, model.ClientOptionNone)
+	clientInfo, err := h.db.RegisterClient(ctx, clientRequest, model.ClientOptionNone)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
-	}
-
-	// Create default user
-
-	{
-		userId := uuid.Must(uuid.NewV4())
-
-		passwordHash, err := passwordutil.GeneratePasswordHash("password")
-		if err != nil {
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
-
-		ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
-		defer cancel()
-		err = h.db.RegisterUser(ctx, &model.User{
-			ID:           userId.String(),
-			Username:     "user",
-			ClientID:     clientInfo.ID,
-			PasswordHash: passwordHash,
-			Scopes: []*model.Scope{
-				{Name: config.Current.OAuth.Scopes.Default},
-			},
-		})
-		if err != nil {
-			log.Printf("Error creating user: %v\n", err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
 	}
 
 	if err := json.NewEncoder(w).Encode(clientInfo); err != nil {

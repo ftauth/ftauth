@@ -25,33 +25,48 @@ func TestDynamicClientRegistration(t *testing.T) {
 
 	tt := []struct {
 		name          string
-		clientRequest model.ClientInfo
+		clientRequest model.ClientRegistrationRequest
 		statusCode    int
+		predicates    func(client model.ClientInfo)
 	}{
 		{
 			name:          "Empty Request",
-			clientRequest: model.ClientInfo{},
+			clientRequest: model.ClientRegistrationRequest{},
 			statusCode:    http.StatusBadRequest,
 		},
 		{
 			name: "Valid Public",
-			clientRequest: model.ClientInfo{
+			clientRequest: model.ClientRegistrationRequest{
 				Name:         "example",
 				Type:         model.ClientTypePublic,
 				RedirectURIs: []string{"localhost"},
-				Scopes:       []*model.Scope{{Name: "default"}},
+				Scopes:       []string{"default"},
 			},
 			statusCode: http.StatusOK,
 		},
 		{
 			name: "Valid Confidential",
-			clientRequest: model.ClientInfo{
+			clientRequest: model.ClientRegistrationRequest{
 				Name:         "example",
 				Type:         model.ClientTypeConfidential,
 				RedirectURIs: []string{"localhost"},
-				Scopes:       []*model.Scope{{Name: "default"}},
+				Scopes:       []string{"default"},
 			},
 			statusCode: http.StatusOK,
+		},
+		{
+			name: "Cannot Request admin scope",
+			clientRequest: model.ClientRegistrationRequest{
+				Name:         "example",
+				Type:         model.ClientTypeConfidential,
+				RedirectURIs: []string{"localhost"},
+				Scopes:       []string{"default", "admin", "AdMiN"},
+			},
+			statusCode: http.StatusOK,
+			predicates: func(client model.ClientInfo) {
+				require.Equal(t, 1, len(client.Scopes))
+				require.Equal(t, "default", client.Scopes[0].Name)
+			},
 		},
 	}
 
@@ -85,6 +100,10 @@ func TestDynamicClientRegistration(t *testing.T) {
 				require.NotEmpty(t, client.RefreshTokenLife)
 				if client.Type == model.ClientTypeConfidential {
 					require.NotEmpty(t, client.Secret)
+				}
+
+				if test.predicates != nil {
+					test.predicates(client)
 				}
 			}
 		})

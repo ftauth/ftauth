@@ -394,3 +394,11 @@ func (client *ClientInfo) IsValidRedirectURI(uri string) bool {
 	}
 	return false
 }
+
+// ClientRegistrationRequest is a dynamic request for a new client with the given properties.
+type ClientRegistrationRequest struct {
+	Name         string     `json:"name"`
+	Type         ClientType `json:"type"`
+	RedirectURIs []string   `json:"redirect_uris"`
+	Scopes       []string   `json:"scopes"`
+}
