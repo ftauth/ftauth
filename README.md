@@ -44,7 +44,7 @@ Admin client: {
 ## Client SDKs
 
 - Dart/Flutter: https://github.com/ftauth/sdk-dart
-- iOS: https://github.com/ftauth/sdk-ios
+- Go: https://github.com/ftauth/sdk-go
 
 ## Features
 FTAuth supports the OAuth 2.1 protocol, currently in [draft](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-04), which slims the original OAuth 2.0 spec and incorporates best practices for security.
