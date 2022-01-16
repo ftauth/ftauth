@@ -817,7 +817,6 @@ func TestRegister(t *testing.T) {
 			formValues := url.Values{
 				"username": []string{test.name},
 				"password": []string{"password"},
-				"confirm":  []string{"password"},
 			}
 			body := strings.NewReader(formValues.Encode())
 

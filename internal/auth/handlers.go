@@ -165,7 +165,8 @@ func (h authorizationEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		Path:     "/",
 		Expires:  time.Now().Add(sessionExp),
 		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
 	})
 
 	// Redirect to session login
@@ -216,9 +217,11 @@ func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Path:     "/",
 			MaxAge:   0,
 			HttpOnly: true,
-			SameSite: http.SameSiteStrictMode,
+			Secure:   true,
+			SameSite: http.SameSiteNoneMode,
 		})
 	}
+
 	if err == nil {
 		sessionID := sessionCookie.Value
 
@@ -408,7 +411,8 @@ func (h loginEndpointHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		Path:     "/",
 		MaxAge:   0,
 		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
 	})
 
 	if redirect {
