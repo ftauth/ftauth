@@ -183,26 +183,46 @@ func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse form body for username and password
-	err := r.ParseForm()
-	if err != nil {
-		http.Error(w, "POST endpoint accepts valid form encoding only", http.StatusBadRequest)
-		return
+	var loginData struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	var redirect bool
+	switch r.Header.Get("Content-Type") {
+	case "application/x-www-form-urlencoded":
+		redirect = true
+		// Parse form body for username and password
+		err := r.ParseForm()
+		if err != nil {
+			http.Error(w, "POST endpoint accepts valid form encoding only", http.StatusBadRequest)
+			return
+		}
+		loginData.Username = strings.ToLower(r.FormValue("username"))
+		loginData.Password = r.FormValue("password")
+	default:
+		redirect = false
+		defer r.Body.Close()
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "Could not read body", http.StatusBadRequest)
+			return
+		}
+		err = json.Unmarshal(body, &loginData)
+		if err != nil {
+			http.Error(w, "Bad JSON", http.StatusBadRequest)
+			return
+		}
 	}
 
-	username := r.FormValue("username")
-	if username == "" {
+	if loginData.Username == "" {
+		log.Println("Username cannot be empty")
 		http.Error(w, "Username cannot be empty", http.StatusBadRequest)
 		return
 	}
-	password := r.FormValue("password")
-	if password == "" {
+
+	if loginData.Password == "" {
+		log.Println("Password cannot be empty")
 		http.Error(w, "Password cannot be empty", http.StatusBadRequest)
-		return
-	}
-	confirm := r.FormValue("confirm")
-	if password != confirm {
-		http.Error(w, "Passwords do not match", http.StatusBadRequest)
 		return
 	}
 
@@ -243,18 +263,18 @@ func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		clientID = requestInfo.ClientID
 	} else {
-		// Get default client
-		ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
-		defer cancel()
-
-		clientInfo, err := h.db.GetDefaultAdminClient(ctx)
-		if err != nil {
-			log.Printf("Error retrieving default client: %v\n", err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		// Require Basic client authorization
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "Missing Authorization header", http.StatusBadRequest)
 			return
 		}
+		clientID, _, err = fthttp.ParseBasicAuthorizationHeader(authHeader)
 
-		clientID = clientInfo.ID
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error parsing Authorization header: %v", err), http.StatusBadRequest)
+			return
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), database.DefaultTimeout)
@@ -267,7 +287,7 @@ func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hash, err := passwordutil.GeneratePasswordHash(password)
+	hash, err := passwordutil.GeneratePasswordHash(loginData.Password)
 	if err != nil {
 		log.Printf("Error generating password hash: %v\n", err)
 	}
@@ -281,7 +301,7 @@ func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	user := &model.User{
 		ID:           id.String(),
 		ClientID:     clientID,
-		Username:     username,
+		Username:     loginData.Username,
 		PasswordHash: hash,
 		Scopes:       scopes,
 	}
@@ -292,7 +312,9 @@ func (h registerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, LoginEndpoint, http.StatusFound)
+	if redirect {
+		http.Redirect(w, r, LoginEndpoint, http.StatusFound)
+	}
 }
 
 type loginEndpointHandler struct {
