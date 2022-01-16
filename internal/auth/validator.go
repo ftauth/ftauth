@@ -60,17 +60,28 @@ func (v ftauthValidator) ValidateAuthorizationCodeRequest(r *http.Request) (*mod
 	// If they do, use that
 	// If not, consider this a required parameter
 	redirectURI := query.Get(paramRedirectURI)
-	{
-		// Verify redirect URI
-		if !clientInfo.IsValidRedirectURI(redirectURI) {
+	// Verify redirect URI
+	if redirectURI == "" {
+		if len(clientInfo.RedirectURIs) != 1 {
 			// Do not redirect to an unverified redirect URI
 			return nil, &authorizationRequestError{
 				err: model.AuthorizationRequestErrInvalidRequest,
 				details: model.RequestErrorDetails{
 					ParamName: paramRedirectURI,
-					Details:   "Invalid redirect URI",
+					Details:   "Missing redirect URI",
 				},
 			}
+		}
+		redirectURI = clientInfo.RedirectURIs[0]
+	}
+	if !clientInfo.IsValidRedirectURI(redirectURI) {
+		// Do not redirect to an unverified redirect URI
+		return nil, &authorizationRequestError{
+			err: model.AuthorizationRequestErrInvalidRequest,
+			details: model.RequestErrorDetails{
+				ParamName: paramRedirectURI,
+				Details:   "Invalid redirect URI",
+			},
 		}
 	}
 
